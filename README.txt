@@ -1,4 +1,4 @@
-MnM Loot Tracker
+Session Viewer
 =================
 
 What this is
@@ -24,7 +24,7 @@ This app:
   - NEVER injects code/DLLs into the game.
   - NEVER writes to anything inside the game's install or save folders.
   - NEVER makes any network connection (no telemetry, no uploads, nothing
-    ever leaves your PC). You can verify this yourself - open LootTracker.ps1
+    ever leaves your PC). You can verify this yourself - open SessionViewer.ps1
     in any text editor; there is no networking code in it at all.
   - Only writes files you explicitly ask it to, via the "Save Session to
     File" button, into this folder's own Sessions\ subfolder (or wherever
@@ -36,8 +36,8 @@ the game didn't already write to disk on its own.
 
 How to run it
 --------------
-Double-click "Launch Loot Tracker.vbs". This starts the app with no console
-window popping up. (You can also just right-click LootTracker.ps1 and choose
+Double-click "Start.vbs". This starts the app with no console
+window popping up. (You can also just right-click SessionViewer.ps1 and choose
 "Run with PowerShell" if you prefer to see the console.)
 
 Using it

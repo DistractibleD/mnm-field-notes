@@ -1,1 +1,4 @@
 Sessions/
+Data/
+lib/webview2/*.dll
+lib/autotest-result.txt

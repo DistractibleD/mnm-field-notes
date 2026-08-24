@@ -1,0 +1,270 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --bg-page: #14151a;
+  --bg-surface: #1b1d24;
+  --bg-raised: #23262f;
+  --bg-raised-hover: #2b2e38;
+  --border: #2c2f3a;
+  --border-strong: #4b5063;
+  --text-primary: #e7e6e2;
+  --text-secondary: #9a9ba3;
+  --text-muted: #6b6c74;
+  --accent: #e0a640;
+  --accent-strong: #eab660;
+  --accent-soft: rgba(224,166,64,0.14);
+  --accent-craft: #5fb3a3;
+  --accent-craft-dim: #35635a;
+  --success: #6FA85A;
+  --danger: #D9776D;
+  --danger-soft: rgba(217,119,109,0.14);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.masthead h1 { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 24px; margin: 0; letter-spacing: -0.01em; color: var(--accent); }
+.masthead .sub { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+.masthead .clock { font-family: Consolas, monospace; font-size: 14px; color: var(--text-secondary); }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.tab {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.tab:hover { background: var(--bg-raised); color: var(--text-primary); }
+.tab.active { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
+.tab.active[data-tab="harvest"], .tab.active[data-tab="fishing"], .tab.active[data-tab="craft"] { background: rgba(95,179,163,0.14); color: var(--accent-craft); border-color: var(--accent-craft-dim); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+.stat { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; }
+.stat .val { font-family: Consolas, monospace; font-size: 18px; font-weight: 600; color: var(--text-primary); }
+
+.session-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 1rem;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.session-bar input[type=text] { max-width: 220px; }
+.session-bar .status { font-size: 13px; color: var(--text-secondary); }
+
+.panel-body { display: none; }
+.panel-body.active { display: block; }
+
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+
+.roster { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; align-self: start; }
+.roster-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 2px 4px 10px; }
+.roster-add { display: flex; gap: 6px; margin-bottom: 10px; }
+.roster-add input { flex: 1; min-width: 0; }
+.roster-item {
+  position: relative;
+  width: 100%; text-align: left; background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 11px; margin-bottom: 6px; cursor: pointer; color: var(--text-primary);
+}
+.roster-item:hover { background: var(--bg-raised-hover); }
+.roster-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+.roster-item .name { font-size: 13.5px; font-weight: 500; padding-right: 16px; }
+.roster-item-remove {
+  position: absolute; top: 6px; right: 8px; width: 16px; height: 16px; line-height: 15px;
+  text-align: center; border-radius: 50%; font-size: 13px; font-weight: 600;
+  color: var(--danger); cursor: pointer;
+}
+.roster-item-remove:hover { background: var(--danger-soft); }
+.roster-item .meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; font-family: Consolas, monospace; }
+.roster-item .quickadd { display: flex; justify-content: flex-end; margin-top: 6px; }
+.roster-empty { color: var(--text-muted); font-size: 12.5px; padding: 8px 4px; }
+
+.mini-btn {
+  font-size: 11px; padding: 3px 9px; border-radius: 5px; border: 1px solid var(--border-strong);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.mini-btn:hover { color: var(--accent-strong); border-color: var(--accent); }
+
+.detail { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+.detail-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.detail-head h2 { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 18px; margin: 0; }
+.detail-empty { color: var(--text-muted); font-size: 14px; padding: 2rem 0; text-align: center; }
+
+label { display: block; font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; }
+input, select {
+  width: 100%; background: var(--bg-raised); border: 1px solid var(--border-strong); border-radius: 6px;
+  color: var(--text-primary); font-size: 13.5px; padding: 8px 10px; font-family: inherit;
+}
+input::placeholder { color: var(--text-muted); }
+input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 10px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip {
+  font-size: 12px; padding: 4px 10px; border-radius: 20px; background: var(--bg-raised);
+  border: 1px solid var(--border-strong); color: var(--text-primary); display: inline-flex; align-items: center; gap: 6px;
+}
+.chip.new { border-color: var(--success); color: var(--success); }
+.chip .x { cursor: pointer; opacity: 0.6; }
+.chip .x:hover { opacity: 1; }
+
+.primary-btn {
+  width: 100%; background: var(--accent); color: #1A1408; border: none; border-radius: 7px; padding: 11px;
+  font-size: 14px; font-weight: 600; cursor: pointer; margin: 14px 0 0;
+}
+.primary-btn:hover { background: var(--accent-strong); }
+.primary-btn:disabled { opacity: 0.5; cursor: default; }
+
+.secondary-btn {
+  background: transparent; color: var(--text-secondary); border: 1px solid var(--border-strong);
+  border-radius: 7px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+}
+.secondary-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+
+.log { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.log-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; }
+.log-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.log-row:last-child { border-bottom: none; }
+.log-row .when { color: var(--text-muted); font-family: Consolas, monospace; font-size: 11.5px; }
+
+.con-pill { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; display: inline-block; }
+.con-trivial { background: #CDEFE3; color: #0F5C46; }
+.con-green { background: #DCF0D3; color: #2E6B1F; }
+.con-lblue { background: #D2F5EE; color: #146357; }
+.con-dblue { background: #D9E6FA; color: #1F4C8C; }
+.con-white { background: #F0EEE6; color: #4A4638; }
+.con-yellow { background: #FBEFC2; color: #7A5E0A; }
+.con-red { background: #FADADA; color: #8C2323; }
+
+.stub { color: var(--text-secondary); font-size: 14px; line-height: 1.7; max-width: 60ch; padding: 2rem 0; }
+.stub b { color: var(--text-primary); font-weight: 600; }
+
+.err { font-size: 13px; color: var(--danger); display: none; margin-bottom: 8px; }
+
+.toast {
+  position: fixed; bottom: 20px; right: 20px; background: var(--bg-raised); border: 1px solid var(--accent);
+  color: var(--text-primary); padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none;
+}
+
+.lookup-search { max-width: 420px; margin-bottom: 16px; }
+.result-card {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
+  margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+}
+.result-card .rname { font-size: 13.5px; font-weight: 500; }
+.result-card .rtype { font-size: 11.5px; color: var(--text-muted); }
+
+/* ---------- Checklist dropdown: toggle + small-font 2-col checkbox panel
+   with a live search box at the top. This is the standard app-wide pattern
+   for "pick any number of known things" (started with the wiki's own
+   "search by stat/buff" filter, generalized here 2026-08-24 per explicit
+   request - use this, not a plain <select>, for any future multi-pick list
+   long enough that scanning it by eye is slow). ---------- */
+.checklist-dropdown { position: relative; flex: 1; }
+.checklist-toggle {
+  width: 100%; display: inline-flex; align-items: center; justify-content: space-between; gap: 6px;
+  background: var(--bg-raised); border: 1px solid var(--border-strong); color: var(--text-primary);
+  padding: 8px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.checklist-toggle:hover { border-color: var(--accent); }
+.checklist-dropdown.open .checklist-toggle { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.checklist-count { color: var(--accent); font-weight: 600; }
+.checklist-caret { color: var(--text-muted); font-size: 0.75em; margin-left: auto; }
+.checklist-panel {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); width: max-content; max-width: min(340px, calc(100vw - 32px));
+}
+.checklist-dropdown.open .checklist-panel { display: block; }
+.checklist-search {
+  width: 100%; margin-bottom: 8px; padding: 6px 8px; font-size: 12.5px;
+}
+.checklist-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 11px;
+}
+.checklist-clear { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.checklist-clear:hover { text-decoration: underline; }
+.checklist-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 2px 10px;
+  max-height: 260px; overflow-y: auto;
+}
+.checklist-option {
+  display: flex; align-items: center; gap: 5px; padding: 3px 4px; border-radius: 4px;
+  font-size: 11.5px; line-height: 1.25; color: var(--text-primary); cursor: pointer; user-select: none;
+}
+.checklist-option:hover { background: var(--bg-raised-hover); }
+.checklist-option input { width: 13px; height: 13px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.checklist-option.filtered-out { display: none; }
+.checklist-no-matches { grid-column: 1 / -1; font-size: 11.5px; color: var(--text-muted); padding: 6px 4px; }
+
+/* ---------- Profile modal (first-run + "add another profile") ---------- */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  align-items: center; justify-content: center; z-index: 100;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 22px 24px; width: 320px; max-width: calc(100vw - 40px); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+}
+.modal-box h2 { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 17px; margin: 0 0 8px; color: var(--accent); }
+.modal-box p { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; }
+
+/* ---------- Fishing "pick a fish" buttons - the primary logging action,
+   so sized/spaced for fast repeat tapping, not a passive tag/chip. ---------- */
+.fish-pick-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fish-pick-btn {
+  background: var(--bg-raised); border: 1px solid var(--border-strong); color: var(--text-primary);
+  border-radius: 20px; padding: 9px 16px; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.fish-pick-btn:hover { border-color: var(--accent-craft); background: var(--bg-raised-hover); }
+.fish-pick-btn:active { transform: scale(0.97); }
+.fish-pick-btn.new { border-color: var(--success); }
+.fish-pick-new-badge { font-size: 10px; color: var(--success); vertical-align: 2px; margin-left: 2px; }
+.fish-pick-btn.no-catch { border-style: dashed; color: var(--text-secondary); }
+.fish-pick-btn.no-catch:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ---------- Responsive: optimized for a tall/narrow (portrait) second
+   monitor, still comfortable on a wide landscape one. ---------- */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .roster { margin-bottom: 4px; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 1rem 0.85rem 2rem; }
+  .masthead h1 { font-size: 20px; }
+  .tab { padding: 7px 11px; font-size: 12.5px; }
+  .detail { padding: 14px 14px; }
+}

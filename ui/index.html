@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Session Viewer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <div>
+      <h1>Session Viewer</h1>
+      <div class="sub" id="session-sub">No session running</div>
+    </div>
+    <div class="clock" id="clock">00:00:00</div>
+  </div>
+
+  <div class="session-bar">
+    <div class="status" id="session-status">
+      Profile: <select id="profile-select"></select>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="secondary-btn" id="btn-start-session">Start session</button>
+      <button class="secondary-btn" id="btn-end-session" disabled>End session &amp; export</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="combat">Combat</button>
+    <button class="tab" data-tab="harvest">Harvesting</button>
+    <button class="tab" data-tab="fishing">Fishing</button>
+    <button class="tab" data-tab="craft">Crafting</button>
+    <button class="tab" data-tab="multi">Multi</button>
+    <button class="tab" data-tab="lookup">Lookup</button>
+  </div>
+
+  <div class="stats" id="stats-combat">
+    <div class="stat"><div class="label">Kills logged</div><div class="val" id="s-kills">0</div></div>
+    <div class="stat"><div class="label">Unique monsters</div><div class="val" id="s-unique">0</div></div>
+    <div class="stat"><div class="label">Coin total</div><div class="val" id="s-coin">&mdash;</div></div>
+    <div class="stat"><div class="label">Items logged</div><div class="val" id="s-items">0</div></div>
+    <div class="stat"><div class="label">New for wiki</div><div class="val" id="s-new" style="color:var(--success);">0</div></div>
+  </div>
+
+  <div class="stats" id="stats-fishing" style="display:none;">
+    <div class="stat"><div class="label">Catches logged</div><div class="val" id="fs-catches">0</div></div>
+    <div class="stat"><div class="label">Unique fish</div><div class="val" id="fs-unique">0</div></div>
+    <div class="stat"><div class="label">Total attempts</div><div class="val" id="fs-attempts">0</div></div>
+    <div class="stat"><div class="label">Current skill</div><div class="val" id="fs-skill">0</div></div>
+    <div class="stat"><div class="label">New for wiki</div><div class="val" id="fs-new" style="color:var(--success);">0</div></div>
+  </div>
+
+  <div class="panel-body active" id="panel-combat">
+    <div class="layout">
+      <div class="roster">
+        <div class="roster-title">This session</div>
+        <div class="roster-add">
+          <input id="new-mob" placeholder="Add monster&hellip;" list="mob-list" autocomplete="off" />
+          <datalist id="mob-list"></datalist>
+          <button class="mini-btn" id="add-mob">+</button>
+        </div>
+        <div id="roster-list"><div class="roster-empty">No monsters yet &mdash; add one above.</div></div>
+      </div>
+
+      <div class="detail" id="detail-panel">
+        <div class="detail-empty">Add a monster to the roster, then select it to start logging kills.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-body" id="panel-harvest">
+    <div class="layout">
+      <div class="roster">
+        <div class="roster-title">This session</div>
+        <div class="roster-add" style="flex-direction:column; gap:6px;">
+          <select id="new-node-tradeskill">
+            <option>Mining</option><option>Lumberjacking</option><option>Herbalism</option>
+            <option>Foraging</option>
+          </select>
+          <div style="display:flex; gap:6px;">
+            <input id="new-node" placeholder="Add node&hellip;" list="node-list" autocomplete="off" />
+            <button class="mini-btn" id="add-node">+</button>
+          </div>
+        </div>
+        <datalist id="node-list"></datalist>
+        <div id="node-roster-list" style="margin-top:10px;"><div class="roster-empty">No nodes yet &mdash; add one above.</div></div>
+      </div>
+
+      <div class="detail" id="node-detail-panel">
+        <div class="detail-empty">Add a node to the roster, then select it to start logging attempts.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-body" id="panel-fishing"></div>
+
+  <div class="panel-body" id="panel-craft">
+    <div class="stub">Crafting logging isn't built yet. Planned: roster of <b>recipes attempted</b>, detail panel capturing <b>tradeskill, your skill, difficulty color, and components used</b>.</div>
+  </div>
+
+  <div class="panel-body" id="panel-multi">
+    <div class="stub">Multi sessions aren't built yet. Planned: one roster mixing monsters, nodes, and recipes together for open-world play that isn't just one activity.</div>
+  </div>
+
+  <div class="panel-body" id="panel-lookup">
+    <input class="lookup-search" id="lookup-input" placeholder="Search monsters or items from the wiki&hellip;" />
+    <div id="lookup-results"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal-box">
+    <h2 id="profile-modal-title">Welcome</h2>
+    <p id="profile-modal-body">What name should we log your entries under?</p>
+    <input type="text" id="profile-modal-input" placeholder="Your name" />
+    <div class="err" id="profile-modal-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="profile-modal-save" style="margin:0;">Save</button>
+      <button class="secondary-btn" id="profile-modal-cancel" style="display:none;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fish-key-modal">
+  <div class="modal-box">
+    <h2>Listening for a key</h2>
+    <p>Press the key you use to fish. From then on the app counts that key everywhere &mdash; it never touches the game itself.</p>
+    <div id="fish-key-modal-status" style="font-size:13px; color:var(--accent); margin-top:4px;">Waiting for a keypress&hellip;</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fish-skill-modal">
+  <div class="modal-box">
+    <h2>Before you start</h2>
+    <p>What's your current fishing skill? You can adjust it any time once you're fishing.</p>
+    <input type="number" id="fish-skill-modal-input" min="0" placeholder="Skill level" />
+    <div class="err" id="fish-skill-modal-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="fish-skill-modal-go" style="margin:0;">Start fishing!</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
