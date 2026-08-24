@@ -194,3 +194,27 @@ A UI mockup (roster + active-detail panel, live stats bar, item chips flagging "
 the wiki," and a working Lookup-tab search demo) was built and approved before any real
 implementation started — see the artifact published 2026-08-24 for the approved layout
 if the working app's UI ever needs to be checked against what was agreed.
+
+### Naming un-genericized: "Session Viewer" → "MnM Field Notes" (2026-08-24)
+
+The "Naming genericization" entry above (renaming "MnM Loot Tracker" to the generic
+"Session Viewer") was itself superseded today. That earlier rename's stated motivation had
+already gone moot once the manual-entry redesign meant the app touches no game file at
+all — at that point it was kept only as "a mild personal-privacy preference," per that
+entry's own closing note. Today the user explained what that preference actually was: it
+was residual caution about staying hidden/anonymous from the *Monsters and Memories*
+developers specifically, left over from when the EULA-conflict scare was still live. The
+user has since told NWC directly that they're welcome to look at all the code for this
+project — there's no one left to stay generic *from*, so the generic naming no longer
+serves the purpose it was kept for.
+
+Renamed to **"MnM Field Notes"** (user's pick from a shortlist of notebook/journal-themed
+suggestions — Field Notes, Logbook, Field Journal, Session Notebook, Camp Journal — leaning
+into how the app was already described in `CLAUDE.md`'s own "What this is": "the equivalent
+of jotting notes in a notebook while playing"). Window title, script filename
+(`MnMFieldNotes.ps1`), and the UI's `<title>`/`<h1>` all updated to match; `Start.vbs` kept
+its own name since it was never part of the generic-from-developers surface. See "Naming —
+'MnM Field Notes'" in `CLAUDE.md` for the current rule, and note explicitly what did *not*
+change: the Secrecy section's guild-only distribution, no-remote rule, and
+never-mention-in-the-wiki-repo rule are a separate, still-fully-in-force concern (a
+different audience, a different reason) — this rename doesn't touch any of that.

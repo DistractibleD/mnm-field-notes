@@ -9,7 +9,7 @@ rules/architecture only.
 ## What this is
 
 A personal, offline, second-monitor data-collection companion for *Monsters and
-Memories* ("Session Viewer" — see "Naming" below). Every field is typed by the user after
+Memories* ("MnM Field Notes" — see "Naming" below). Every field is typed by the user after
 observing it on screen, during or after play — the app never reads any file the game
 writes, never touches its process/memory, and never interacts with the game in any way.
 It's the equivalent of jotting notes in a notebook while playing, structured for two
@@ -73,14 +73,27 @@ this section is the current, correct scope.
 - Beyond the guild, nothing about this project should be uploaded, synced, or shared
   anywhere without the user explicitly asking for that specific action.
 
-## Naming — deliberately generic
+## Naming — "MnM Field Notes"
 
-Window/dialog titles, script filenames, and the launcher use generic names ("Session
-Viewer" / `SessionViewer.ps1` / `Start.vbs`), not "MnM"/"Loot"/"Tracker"/the game's name.
-Originally motivated by process/window detectability concerns that no longer apply now
-that the app touches no game data at all (see `CLAUDE-HISTORY.md`) — kept anyway as a mild
-personal-privacy preference. `README.txt`'s prose content and this file's own content
-aren't part of that surface and can stay descriptive/accurate.
+**Renamed 2026-08-24** from the deliberately-generic "Session Viewer"/`SessionViewer.ps1`.
+The old genericness was a holdover from the pre-redesign era when the user wanted to stay
+hidden/anonymous from the *Monsters and Memories* developers specifically — that reasoning
+is gone: the user has told NWC they're welcome to see all the code, so there's no one left
+to stay generic *from*. "MnM Field Notes" is the current window title (`$form.Text`), the
+script filename (`MnMFieldNotes.ps1`), and the `<title>`/`<h1>` in `ui/index.html`. Keep new
+naming (error dialogs, future windows, etc.) consistent with this rather than reverting to
+generic phrasing — that instinct is exactly what's being deliberately undone here. See
+"Naming un-genericized" in `CLAUDE-HISTORY.md` for the full reasoning if this ever needs
+revisiting.
+
+**This does not change the Secrecy scope above** — the guild-only distribution, the
+no-remote rule, and "never mention this project in the wiki repo" are about a different
+audience (the public/the wiki) and a different concern (no hosting, no accounts) than the
+game-developer-specific hiding this naming change undoes. Don't read this as a signal that
+the project has gone more broadly public.
+
+`Start.vbs` (the launcher) keeps its own name — it was always a plain functional label, not
+part of the generic-from-developers surface, so there's nothing to rename there.
 
 ## Visual style — matches the wiki, on purpose
 
@@ -98,7 +111,7 @@ whole point is staying visually paired with it.
 1080×1920 portrait) while staying comfortable on a wide landscape one — `.layout` (roster +
 detail) stacks to one column below 900px width, `.stats`/`.field-grid` use
 `repeat(auto-fit, minmax(...))` so they reflow at any width without extra breakpoints, and
-`$form.Width`/`Height` in `SessionViewer.ps1` (900×1500) default to a portrait-friendly
+`$form.Width`/`Height` in `MnMFieldNotes.ps1` (900×1500) default to a portrait-friendly
 shape — still freely resizable, this is just the out-of-box size.
 
 ## Architecture
@@ -144,7 +157,7 @@ slow regardless.
 ### Profiles
 
 Who's logging is a persisted concept (`Data\Profiles.json`, `Get-Profiles`/
-`Add-OrSetLastProfile` in `SessionViewer.ps1`), not retyped every launch. First run (zero
+`Add-OrSetLastProfile` in `MnMFieldNotes.ps1`), not retyped every launch. First run (zero
 saved profiles) opens `#profile-modal` automatically; returning users get their last-used
 profile pre-selected in the session-bar dropdown (`#profile-select`). Adding another
 profile is available any time via that dropdown's "+ Add new profile…" entry, reusing the
@@ -192,6 +205,19 @@ with its own con/level.
   tab, see below), node name, zone, player skill, success/fail, result item.
 - **Crafting** → tradeskill, recipe name, player skill, difficulty color, components used.
 
+**The session-level export label (`session.type` in `app.js`, the "Session export - X" header
+and the export filename suffix) is derived from whichever tab is active at the moment "Start
+session" is clicked** — `TAB_SESSION_TYPE` maps each tab to a label (`fishing`/`harvesting`
+kept distinct here even though both log entries with `sessionType: 'harvesting'`, since this
+label is purely a human-facing export title, not what `Write-SessionExport` groups entries
+by). **Bug fixed 2026-08-24**: `btnStart`'s click handler used to hard-code
+`session.type = 'combat'` unconditionally, silently overriding whatever tab was actually
+active — every export said "Session export - combat" regardless of session content. Now
+reads `document.querySelector('.tab.active')` at click time instead of trusting a value that
+could've drifted from an earlier, since-superseded fix attempt in the tab-click handler
+itself. If this ever breaks again, check both places `session.type` gets assigned, not just
+one.
+
 ### Fishing — its own tab, deliberately not the roster pattern
 
 Fishing doesn't share Harvesting's roster UI — there's no discrete "node" the way an ore
@@ -205,11 +231,25 @@ explicitly). Two states in `renderFishingPanel()` (`ui/app.js`):
   users had no way to know what "Listen for key" meant before clicking it), and "Start
   fishing!". Nothing else renders here on purpose — don't add fields to this screen without
   checking first, it's an explicit design choice, not an oversight.
-- **"Start fishing!" opens `#fish-skill-modal` first** (2026-08-24) — asks for the player's
-  current skill before the active screen renders at all, rather than defaulting to 0 and
-  making the user immediately correct it. `openFishSkillModal()`/the modal's `-go` handler
-  set `fishingSession.skill` and only then call `startFishing()`.
-- **Active** (after the skill modal is confirmed): a **single-select** zone control — the
+- **"Start fishing!" opens two modals in sequence, then auto-starts the session** (skill
+  modal 2026-08-24, zone modal + auto-start 2026-08-24) — `#fish-skill-modal` asks for
+  current skill first (its "Next" button sets `fishingSession.skill`, then opens
+  `#fish-zone-modal`, whose own `#fish-zone-modal-picker` is a searchable single-select
+  checklist built fresh each open from `wikiData.zones`, same component as the in-screen
+  zone dropdown). Zone was always optional here too — picking nothing doesn't block
+  proceeding. **Confirming the zone modal auto-starts the overall session if one isn't
+  already running**, reusing the same `startNewSession()` the top "Start session" button
+  calls, rather than joining a session started from another tab. This exists because
+  forgetting to press the separate top "Start session" button meant every fishing catch
+  silently failed to log (`logFishCatch()`'s `if (!session.id)` guard rejected it with an
+  easy-to-miss toast) — the user hit this for real once. **`startSession`'s reply is a real
+  async WebView2 round trip, not synchronous** — `startFishing()` is deliberately not called
+  right after `startNewSession()`; instead a `pendingFishingStart` flag defers it until the
+  `sessionStarted` message actually confirms `session.id`. Skipping that and calling
+  `startFishing()` immediately was tried and reproducibly sent `fishingStarted`/first-catch
+  messages with `sessionId: null` in testing — the race is real even though a human's actual
+  click-through speed makes it very unlikely to hit in practice.
+- **Active** (after both modals are confirmed and the session is running): a **single-select** zone control — the
   general `checklistDropdownHTML`/`setupChecklistDropdown` component in `multi:false` (radio)
   mode, not the multi-select checkbox mode the faction dropdowns use, since a player can only
   be in one zone at a time (2026-08-24: was a plain `<select>` originally, converted to this
@@ -223,6 +263,41 @@ explicitly). Two states in `renderFishingPanel()` (`ui/app.js`):
   one-tap fish buttons (`renderFishPickGrid()`, sourced from `wikiData.nodes` filtered to
   Fishing, plus any typed in via "+ Add" this session) — **clicking a fish logs immediately**,
   no confirm step, no form to fill.
+- **An optional free-text Area field sits next to Zone** (2026-08-24) — a specific lake,
+  pond, or dock within a zone, since different bodies of water in the same zone can give
+  different results. Unlike Zone this has no wiki-sourced fixed list (the wiki data has no
+  sub-zone granularity for Fishing at all), so it's a plain `<input>` (`#fish-area`) with a
+  `<datalist>` autocompleting from areas typed/logged this session
+  (`refreshFishAreaDatalist()`). Deliberately not part of the pre-fishing modal flow — only
+  Zone was asked for explicitly, Area stays an in-screen-only convenience. `logFishCatch()`
+  and `flushPendingFishAttempts()` both read it fresh from the DOM at logging time, same
+  reasoning as the zone-staleness lesson (see `CLAUDE-HISTORY.md`). Exported as `Area: X` on
+  the entry line in `Write-HarvestingBlock` (`MnMFieldNotes.ps1`) when present, entirely
+  generic/optional — non-Fishing harvesting entries never send it and the line is unaffected.
+- **The fish-pick grid sorts/highlights by zone (and area) relevance and flags junk**
+  (2026-08-24). `Get-WikiData` in `MnMFieldNotes.ps1` forwards each Fishing node's
+  `locations` and `note` fields (previously only `name`/`tradeskill` were sent) so the client
+  has what it needs:
+  - **Junk has no structured field in the wiki data** — it only ever shows up as free text in
+    a node's `note` (e.g. "A junk drop."), so `renderFishPickGrid()` matches `/junk/i` against
+    it. Confirmed with the user 2026-08-24 as the intended approach over a hardcoded name list
+    or a manual per-catch toggle — accept that it'll miss junk items whose note doesn't use
+    that word (e.g. a "not a fish species" phrasing) until the wiki data gains a real field.
+  - **"Expected in this zone"** is the union of the wiki's own `locations` for the selected
+    zone *and* anything actually caught in that zone (and Area, see below - 2026-08-24) this
+    session (`fishingSession.entries` filtered to `success && zone === selectedZone && area
+    === selectedArea`) — a catch not yet reflected in the wiki's `locations` still surfaces
+    as expected from that point on, re-rendered immediately (`logFishCatch()` calls
+    `renderFishPickGrid()` after logging, and the zone dropdown's `onChange`/the area input's
+    `input` listener both re-render it too). The wiki-sourced half of "expected" stays
+    zone-only regardless of area, since the wiki data has no area granularity to filter by -
+    only the session-observed half is area-scoped. Expected fish sort to the top under a
+    "Expected in this zone" label; everything else sorts alphabetically below. Junk styling
+    (dashed border, muted color) is independent of this and applies wherever the item lands,
+    including inside the expected group.
+  - Each button also shows a running `×N` catch count for this session (from
+    `fishingSession.entries`), separate from the "new" badge (which means "not in the wiki's
+    node list yet", still tracked independently).
 - **No separate "No catch" button** (removed 2026-08-24) — a zero-catch cast is implied by
   the attempts counter going up without a fish click following it. `flushPendingFishAttempts()`
   sends whatever's accumulated in `fishingSession.liveAttempts` as a single `success:false`
@@ -235,6 +310,19 @@ explicitly). Two states in `renderFishingPanel()` (`ui/app.js`):
   Catches logged / Unique fish / Total attempts / Current skill / New for wiki instead,
   updated via `updateFishStats()` at every state change (catch, attempt, skill change, session
   end).
+- **Skill is recorded once at session start and once at session end** (2026-08-24) —
+  `startFishing()` sends a `fishingStarted` message the first time it runs each session
+  (`fishingSession.startSkillSent` guards against repeats if the skill modal is reopened),
+  and the `btnEnd` click handler sends `fishingEnded` with the current skill (gated on
+  `fishingSession.startSkillSent`, so it's only sent if fishing was actually used this
+  session) — both fire before `endSession`, same ordering requirement as
+  `flushPendingFishAttempts()`, since the session must still exist host-side to accept them.
+  Stored as `fishingStartSkill`/`fishingEndSkill` on that session's info in
+  `$script:Sessions`. `Write-SessionExport` prints both as "Fishing skill at session
+  start"/"...end" lines in the export header, separate from the per-catch `skill` value
+  already on each harvesting entry. The end value exists specifically to catch skill-ups
+  that happened without a catch following them (e.g. skilled up right before ending the
+  session) — without it, that skill-up wouldn't show up anywhere in the export.
 
 A **Lookup** tab searches the wiki's already-gathered data (read-only, live from its JSON
 — see "Wiki data as a read-only reference" below), independent of session logging.
@@ -279,7 +367,7 @@ scoping/confirmation pass when it's actually picked up.
 
 ## File layout
 
-- `SessionViewer.ps1` — the WinForms host: WebView2 initialization, the keypress-counter
+- `MnMFieldNotes.ps1` — the WinForms host: WebView2 initialization, the keypress-counter
   hook, and all message handlers (session lifecycle, log entries, export, wiki fetch). Owns
   every bit of file I/O and networking in the app.
 - `ui/` — the actual UI: `index.html` + `style.css` + `app.js`, served into the WebView2

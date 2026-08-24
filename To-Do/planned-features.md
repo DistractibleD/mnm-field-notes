@@ -79,7 +79,7 @@ guild rollout to keep in sync, not just a nice-to-have.
 Open questions/dependencies, not decided yet — this one has more unresolved shape than the
 others above:
 - **No version source exists yet.** The app has no version number at all today (not in
-  `SessionViewer.ps1`, not anywhere) — a real prerequisite before "check for updates" means
+  `MnMFieldNotes.ps1`, not anywhere) — a real prerequisite before "check for updates" means
   anything is picking a versioning scheme in the first place.
 - **Where would the app check *against*?** This project is deliberately local-only, no git
   remote (see "Secrecy" in `CLAUDE.md`) — there's no hosted "latest version" location today.
@@ -96,51 +96,54 @@ others above:
 ## 6. Fishing UX polish (2026-08-24)
 
 A batch of small-to-medium refinements to the Fishing tab and session-export flow, called
-out after reviewing a real session export. Not scoped/ordered yet — pick individually when
-picked up, several touch the same fish-pick-grid area so may be worth doing together.
+out after reviewing a real session export. First wave (fish-pick-grid + quick fixes) done
+2026-08-24 — see `CLAUDE.md` "Session types and fields" and "Fishing" for the actual
+implementation. Remaining items still need their own pass.
 
-- **Visually separate junk from regular fish** on the fish-pick-grid buttons — a border or
-  similar, just to make junk stand out at a glance.
-- **Surface "expected fish" for the selected zone at the top of the grid**, visually
-  distinct (not just position) — derive the expected list from the wiki's own data
-  (`gathering-nodes.json`, Fishing-tradeskill entries) filtered to the active zone.
-- **As soon as a player catches a fish (or junk) in a zone this session, add it to that
-  zone's "expected fish"** — session-observed catches should feed back into what's shown as
-  expected, not just the wiki's pre-existing list.
-- **Color-code the fish button font by category** — expected / normal / junk as three
-  distinct font colors, cheap visual sort without restructuring the grid.
-- **Default fish button sort order should be alphabetical**, except the expected/junk
-  buckets above sort ahead of/separately from the plain alphabetical list.
-- **Add a running per-fish catch count on each button** — lets the user compare what
-  they've logged against their in-game inventory, since the game doesn't always name the
-  catch explicitly on-screen.
-- **Disable the "Export" action after a session has already been ended/exported** — currently
-  re-clickable with no guard.
+### Done (2026-08-24)
+
+- ~~Visually separate junk from regular fish~~ — dashed border + muted color, matched from
+  the wiki node's `note` text (`/junk/i`), confirmed with the user as the intended detection
+  method over a hardcoded name list or a manual per-catch toggle.
+- ~~Surface "expected fish" for the selected zone at the top of the grid~~ — derived from the
+  wiki's `locations` field (now forwarded by `Get-WikiData`) union'd with anything actually
+  caught in that zone this session.
+- ~~Auto-add caught fish/junk to that zone's "expected fish"~~ — same mechanism as above,
+  live-updates the moment a catch is logged.
+- ~~Color-code the fish buttons by category~~ — expected (accent gold) / junk (muted dashed)
+  / normal (default). Note: junk styling wins visually over expected when a catch is both
+  (e.g. a junk item caught in-zone) — position still reflects expected-first, only the
+  color/border is overridden.
+- ~~Default alphabetical sort~~ — applies within the expected group and the rest group
+  separately (expected always sorts to the top as its own block, not interleaved).
+- ~~Running per-fish catch count on each button~~ — `×N` badge, this session only.
+- ~~Toast messages fade too fast~~ — extended from 2.5s to 4.5s.
+- ~~"combat" mislabel bug~~ — root cause was actually deeper than first diagnosed: on top of
+  the tab-click handler only updating `session.type` for the Combat tab, `btnStart`'s own
+  click handler unconditionally hard-coded `session.type = 'combat'` right before sending
+  `startSession`, silently overriding anything the tab handler had set. Fixed by deriving the
+  label from `document.querySelector('.tab.active')` directly at start-click time instead of
+  trusting a value that two different code paths were independently trying to maintain.
+
+### Still open
+
+- **Disable the "Export" action after a session has already been ended/exported** — wasn't
+  in scope for the 2026-08-24 pass (the button already disables via `btnEnd.disabled = true`
+  in the `sessionEnded` handler; re-check whether there's still a real gap here, e.g. a
+  double-click race before the disabled attribute lands, before building anything).
 - **Add an app-wide tooltip system** explaining what buttons/areas do — general
-  discoverability, not fishing-specific, but called out while looking at the fishing tab.
-- **Toast messages (e.g. "Exported") fade too fast to read** — extend the display duration.
-- **Bug, root cause confirmed via mock-browser testing (2026-08-24)**: a real session
-  export's header read `Session export - combat` even though the session was a Fishing
-  session (body content was correctly grouped under "harvesting"/"Fishing (Fishing)").
-  Root cause: the tab-click handler in `ui/app.js` only reassigns `session.type` when the
-  **Combat** tab specifically is clicked (`session.type = t.dataset.tab === 'combat' ?
-  'combat' : session.type;`) — switching to Harvesting/Fishing/Crafting/Multi never updates
-  it, so `session.type` (sent as `sessionType` on `startSession`) stays whatever it
-  defaulted to (`'combat'`) unless the user happened to click Combat first. Fix needs a real
-  per-tab type mapping (fishing tab → harvesting sessionType with tradeskill Fishing, per
-  existing `logEntry` shape) rather than the current combat-only special case — check
-  `Write-SessionExport` in `SessionViewer.ps1` too, in case it has its own independent
-  assumption about session type.
+  discoverability, not fishing-specific. Bigger, deserves its own scoping pass.
 - **Guard against key-listener spam skewing attempt counts**: if the fishing key is pressed
   3+ times within 1 second, auto-disable the listener and show a warning that spamming the
   key gives bad results — mention the user can add attempts manually instead, and that the
-  listener can be re-enabled any time. Make sure the user is generally aware spamming the key
-  is bad before this even triggers (the description text added above "Listen for key" is a
-  good place to mention it too).
+  listener can be re-enabled any time. Touches the native keyboard hook (see
+  `CLAUDE.md`'s "PowerShell/WinForms gotcha" — hook callbacks must stay minimal), so this
+  needs care, not a quick pass.
 - **Flag unnaturally high click/attempt counts for review** when Claude processes a guild
   submission — exact threshold not decided ("not sure how to gauge what 'many clicks' are"),
   ties into the spam-guard above but is a separate, softer check on the data-review side
-  rather than a hard client-side block.
+  rather than a hard client-side block. Not app code — a process note for whoever (Claude)
+  reviews submissions.
 - **Add the ability to edit a logged session entry** after the fact — e.g. fixing a missing
   zone (forgot to select one before logging), or correcting skill/fish-type on a misclick.
   Needs its own scoping pass: which fields are editable, whether edits are visible in the

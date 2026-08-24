@@ -1,74 +1,79 @@
-Session Viewer
+MnM Field Notes
 =================
 
 What this is
 ------------
-A standalone, second-monitor companion window for Monsters and Memories that
-shows what you've looted, from which monster/NPC, in which zone, during your
-current play session.
+A standalone, second-monitor companion window for Monsters and Memories. It's
+a place to jot down what happens while you play - kills, harvesting/fishing
+attempts, crafting results - typed in by hand as you go, structured enough
+that it can later be turned into wiki updates.
 
 How it works
 ------------
-Monsters and Memories writes its own per-character "Ledger" log files to:
-
-  %USERPROFILE%\AppData\LocalLow\Niche Worlds Cult\Monsters and Memories\beta1\<Character>\Ledger\
-
-Every time you loot an item off a corpse, the game appends a record there
-containing the monster's name, the item name, the quantity, the zone, and a
-timestamp. This app reads those files every couple of seconds and displays
-a running tally. That's it.
+Everything in this app is manual entry. It never reads any file the game
+writes, never touches the game's process or memory, and never interacts with
+the game in any way - it's the equivalent of keeping a notebook open next to
+the game, not a tool that watches the game for you.
 
 This app:
-  - Only ever READS files the game already writes for its own purposes.
-  - NEVER reads game process memory.
-  - NEVER injects code/DLLs into the game.
-  - NEVER writes to anything inside the game's install or save folders.
-  - NEVER makes any network connection (no telemetry, no uploads, nothing
-    ever leaves your PC). You can verify this yourself - open SessionViewer.ps1
-    in any text editor; there is no networking code in it at all.
-  - Only writes files you explicitly ask it to, via the "Save Session to
-    File" button, into this folder's own Sessions\ subfolder (or wherever
-    you choose in the save dialog).
+  - NEVER reads any file Monsters and Memories writes (install folder, save
+    data, log files, config, anything).
+  - NEVER reads game process memory, and NEVER injects code/DLLs into the
+    game.
+  - NEVER writes to anything inside the game's install or save folders - all
+    of its own data lives under this project's own Data\ and Sessions\
+    folders.
+  - The only network connection it ever makes is a read-only fetch of
+    already-public data (monsters, items, gathering nodes, zones) from the
+    published wiki site, used for autocomplete and the Lookup tab. It never
+    talks to any Niche Worlds Cult server, never sends telemetry, and never
+    talks to another copy of this app on anyone else's computer.
 
 This is not a cheat tool. It doesn't change anything about how the game
-plays, doesn't automate any action, and doesn't give you any information
-the game didn't already write to disk on its own.
+plays, doesn't automate any action, and doesn't give you any information you
+didn't type in yourself.
 
 How to run it
 --------------
-Double-click "Start.vbs". This starts the app with no console
-window popping up. (You can also just right-click SessionViewer.ps1 and choose
-"Run with PowerShell" if you prefer to see the console.)
+Double-click "Start.vbs". This starts the app with no console window popping
+up. (You can also right-click MnMFieldNotes.ps1 and choose "Run with
+PowerShell" if you prefer to see the console.)
 
 Using it
 --------
-1. Pick your character from the dropdown at the top (it auto-selects
-   whichever character has the most recently active log file on startup).
-2. Play normally. The list of monsters fills in live as you loot things.
-3. Click a monster row to see its full item breakdown below.
-4. "Start New Session" clears the current tally and starts counting fresh
-   from that moment (useful if you want to isolate one farming run, one
-   dungeon, etc).
-5. "Save Session to File" writes a plain text report of everything tallied
-   so far to the Sessions\ folder (or anywhere else you pick).
+1. First launch asks for a name to log entries under - this is saved and
+   pre-selected next time, but can be changed or added to any time from the
+   dropdown at the top.
+2. Pick a tab: Combat, Harvesting, Fishing, or Crafting (Multi mixes several
+   in one session; Crafting/Multi are still being built out).
+3. Click "Start session", then log things as they happen:
+   - Combat/Harvesting keep a roster of everything encountered this session
+     (monsters/nodes) - add one, select it, and log details against it.
+   - Fishing is built for fast repeat logging: pick a zone (and optionally a
+     specific area, like a particular lake or pond), set your skill, and
+     just tap the fish you caught each time - no form to fill in.
+4. "End session & export" writes a plain-text summary of everything logged
+   to the Sessions\ folder, grouped and formatted so it's easy to hand
+   straight to Claude for a wiki update.
+5. The Lookup tab searches the wiki's existing monster/item data without
+   needing a session running - useful for checking what's already known
+   before you go log something new.
 
-What it can't show, and why
-----------------------------
-- Coin drop amounts per monster: the game does not write coin loot from a
-  monster corpse to any file - only item loot is logged this way. So this
-  always shows "N/A".
-- Monster level: the game doesn't write monster level to any file either.
-  Also always "N/A".
-These columns are still shown (rather than removed) so it's clear they were
-considered, in case a future game update starts logging this data.
+Sharing with guildmates
+------------------------
+This app isn't public, but it's fine to hand a copy of this folder to guild
+members so they can log their own sessions too - there's no account system
+or server involved, just manual file sharing (Discord, etc.). Each export
+records who logged it, so anything that conflicts with existing data can be
+flagged rather than silently overwritten.
 
 Known limitations
 ------------------
-- Only counts what you (or, if you're grouped, a party member) actually
-  looted - like the loot window itself, if a corpse had more items than
-  got picked up, those never appear anywhere.
-- "Session" means "since this app was started, or since you last clicked
-  Start New Session" - it does not retroactively include earlier play from
-  before the app was running.
-- If you have several characters, switching the character dropdown starts
-  a fresh session for that character.
+- Only as accurate as what you type in - there's no automatic detection of
+  anything, so a missed field or a typo just isn't captured.
+- A session only includes what's logged between "Start session" and "End
+  session & export" - it doesn't retroactively pull in anything from before
+  the app was running or before that button was pressed.
+- Wiki-sourced autocomplete (zones, known monsters/items/fish) needs a
+  working internet connection to load; without it the app still works, just
+  without those suggestions.

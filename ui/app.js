@@ -39,7 +39,10 @@ function mockHostRespond(msg) {
         nodes: [
           { name: 'Lionleaf', tradeskill: 'Herbalism' }, { name: 'Ghost Poppy', tradeskill: 'Herbalism' },
           { name: 'Copper Vein', tradeskill: 'Mining' }, { name: 'Limestone Deposit', tradeskill: 'Mining' },
-          { name: 'Whitefish', tradeskill: 'Fishing' }, { name: 'Grouper', tradeskill: 'Fishing' },
+          { name: 'Whitefish', tradeskill: 'Fishing', locations: ['Night Harbor', 'Shaded Dunes'] },
+          { name: 'Grouper', tradeskill: 'Fishing', locations: ['Night Harbor', 'Sungreet Strand'] },
+          { name: 'Basa', tradeskill: 'Fishing', locations: ['Shaded Dunes'] },
+          { name: 'Old Boot', tradeskill: 'Fishing', locations: ['Night Harbor'], note: 'A junk drop.' },
         ],
         factions: ['Bends Garrison', 'Citizens of Night Harbor', 'Orcs', 'Pyrmos Mercenaries', 'Steel Talons', 'Ten Hooks', 'Vermahn\'s Brood'],
         zones: ['Night Harbor', 'Shaded Dunes', 'Sungreet Strand', 'Vale of Zintar', 'Evershade Weald'],
@@ -240,7 +243,7 @@ function showToast(text) {
   t.textContent = text;
   t.style.display = 'block';
   clearTimeout(showToast._h);
-  showToast._h = setTimeout(() => { t.style.display = 'none'; }, 2500);
+  showToast._h = setTimeout(() => { t.style.display = 'none'; }, 4500);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,13 +311,19 @@ profileModalCancel.addEventListener('click', closeProfileModal);
 // ---------------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------------
+// Maps the active tab to the session-level label used for the export
+// header/filename (e.g. "Session export - fishing") - independent of the
+// sessionType each logged entry carries (Fishing entries still log as
+// 'harvesting', matching Write-HarvestingBlock's grouping in MnMFieldNotes.ps1).
+const TAB_SESSION_TYPE = { combat: 'combat', harvest: 'harvesting', fishing: 'fishing', craft: 'crafting', multi: 'multi' };
+
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.panel-body').forEach(x => x.classList.remove('active'));
   t.classList.add('active');
   document.getElementById('panel-' + t.dataset.tab).classList.add('active');
-  if (t.dataset.tab !== 'lookup') {
-    session.type = t.dataset.tab === 'combat' ? 'combat' : session.type;
+  if (TAB_SESSION_TYPE[t.dataset.tab]) {
+    session.type = TAB_SESSION_TYPE[t.dataset.tab];
   }
   // Kills/coin are meaningless on the Fishing tab, so it gets its own stats
   // bar rather than showing Combat numbers that don't apply.
@@ -330,14 +339,19 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 const btnStart = document.getElementById('btn-start-session');
 const btnEnd = document.getElementById('btn-end-session');
 
-btnStart.addEventListener('click', () => {
+// Shared by the top "Start session" button and the fishing start-up flow
+// (which auto-starts a session once skill+zone are entered, rather than
+// making the user separately remember to press "Start session" first).
+// Returns false (and toasts why) if a session couldn't be started.
+function startNewSession() {
   if (!profileState.active) {
     showToast('Pick or add a profile first');
-    return;
+    return false;
   }
   session.loggedBy = profileState.active;
   session.startedAt = Date.now();
-  session.type = 'combat';
+  const activeTab = document.querySelector('.tab.active');
+  session.type = TAB_SESSION_TYPE[activeTab.dataset.tab] || 'combat';
   roster.clear();
   activeTarget = null;
   renderRoster();
@@ -345,11 +359,19 @@ btnStart.addEventListener('click', () => {
   updateStats();
 
   sendToHost({ type: 'startSession', sessionType: session.type, loggedBy: session.loggedBy });
-});
+  return true;
+}
+
+btnStart.addEventListener('click', startNewSession);
 
 btnEnd.addEventListener('click', () => {
   if (!session.id) { showToast('No session running'); return; }
   flushPendingFishAttempts(); // must happen before endSession - the session still needs to exist host-side to accept this last entry
+  if (fishingSession.startSkillSent) {
+    // Record the skill as of session end too, in case the player skilled up
+    // but didn't happen to catch anything after the last logged entry.
+    sendToHost({ type: 'fishingEnded', sessionId: session.id, skill: fishingSession.skill });
+  }
   sendToHost({ type: 'endSession', sessionId: session.id });
 });
 
@@ -360,6 +382,10 @@ onHostMessage((msg) => {
     btnEnd.disabled = false;
     profileSelect.disabled = true;
     document.getElementById('session-sub').textContent = 'Session running · logged by ' + session.loggedBy;
+    if (pendingFishingStart) {
+      pendingFishingStart = false;
+      startFishing();
+    }
   } else if (msg.type === 'sessionEnded') {
     showToast('Exported ' + msg.entryCount + ' entries to ' + msg.exportFileName);
     session.id = null;
@@ -379,10 +405,12 @@ onHostMessage((msg) => {
     stopKeyCounting();
     fishingSession.active = false;
     fishingSession.zone = '';
+    fishingSession.area = '';
     fishingSession.skill = 0;
     fishingSession.liveAttempts = 0;
     fishingSession.entries = [];
     fishingSession.customFish = [];
+    fishingSession.startSkillSent = false;
     renderFishingPanel();
     updateStats();
     updateFishStats();
@@ -777,10 +805,12 @@ function logHarvestBatch() {
 const fishingSession = {
   active: false,        // has "Start fishing!" been pressed
   zone: '',
+  area: '',              // optional sub-location within the zone (a specific lake/pond/dock)
   skill: 0,
   liveAttempts: 0,
   entries: [],
   customFish: [],       // fish names typed in this session that aren't in wikiData.nodes yet
+  startSkillSent: false, // has the starting skill for this session already been reported to the host
 };
 
 const keyState = {
@@ -823,6 +853,11 @@ function renderFishingPanel() {
       </p>
       <div class="field-grid" style="margin-bottom:4px;">
         <div><label>Zone</label>${checklistDropdownHTML('fish-zone', fishingSession.zone ? fishingSession.zone : 'Select zone', wikiData.zones, { multi: false, selected: fishingSession.zone ? [fishingSession.zone] : [] })}</div>
+        <div>
+          <label>Area <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+          <input id="fish-area" list="fish-area-list" placeholder="Specific lake, pond, dock&hellip;" value="${escapeHtml(fishingSession.area || '')}" autocomplete="off" />
+          <datalist id="fish-area-list">${[...new Set(fishingSession.entries.map(e => e.area).filter(Boolean))].map(a => `<option value="${escapeHtml(a)}">`).join('')}</datalist>
+        </div>
       </div>
       ${renderAttemptsCounterHTML(fishingSession)}
       ${renderSkillCounterHTML(fishingSession)}
@@ -838,7 +873,8 @@ function renderFishingPanel() {
       </div>
     </div>
   `;
-  fishZoneCtrl = setupChecklistDropdown('fish-zone', { multi: false });
+  fishZoneCtrl = setupChecklistDropdown('fish-zone', { multi: false, onChange: () => { fishingSession.zone = fishZoneCtrl.getValue(); renderFishPickGrid(); } });
+  document.getElementById('fish-area').addEventListener('input', e => { fishingSession.area = e.target.value; renderFishPickGrid(); });
   document.getElementById('fish-change-key-link').addEventListener('click', e => { e.preventDefault(); openFishKeyModal(); });
   bindCounterEvents();
   bindSkillEvents();
@@ -865,12 +901,49 @@ document.getElementById('fish-skill-modal-go').addEventListener('click', () => {
   }
   fishingSession.skill = isNaN(v) ? 0 : v;
   document.getElementById('fish-skill-modal').classList.remove('open');
-  startFishing();
+  openFishZoneModal();
 });
 document.getElementById('fish-skill-modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('fish-skill-modal-go').click(); });
 
+let fishZoneModalCtrl = null;
+function openFishZoneModal() {
+  document.getElementById('fish-zone-modal-picker').innerHTML = checklistDropdownHTML(
+    'fish-zone-modal', fishingSession.zone ? fishingSession.zone : 'Select zone', wikiData.zones,
+    { multi: false, selected: fishingSession.zone ? [fishingSession.zone] : [] }
+  );
+  fishZoneModalCtrl = setupChecklistDropdown('fish-zone-modal', { multi: false });
+  document.getElementById('fish-zone-modal').classList.add('open');
+}
+
+let pendingFishingStart = false; // session was just requested for fishing - start it once 'sessionStarted' confirms
+
+document.getElementById('fish-zone-modal-go').addEventListener('click', () => {
+  // Zone was always optional in the in-screen dropdown too - don't block
+  // starting fishing just because none was picked here.
+  fishingSession.zone = fishZoneModalCtrl ? fishZoneModalCtrl.getValue() : '';
+  document.getElementById('fish-zone-modal').classList.remove('open');
+  if (session.id) {
+    // A session is already running (e.g. started from another tab) - join it.
+    startFishing();
+    return;
+  }
+  // Auto-start the session here rather than making the user separately
+  // remember to press the top "Start session" button first - forgetting that
+  // step meant every catch silently failed to log (session.id was null).
+  // startSession's reply is async (a real WebView2 round trip, not
+  // synchronous), so don't call startFishing() until 'sessionStarted'
+  // actually confirms session.id - otherwise fishingStarted/logEntry can
+  // race ahead of it with a null sessionId.
+  if (!startNewSession()) return;
+  pendingFishingStart = true;
+});
+
 function startFishing() {
   fishingSession.active = true;
+  if (!fishingSession.startSkillSent) {
+    fishingSession.startSkillSent = true;
+    sendToHost({ type: 'fishingStarted', sessionId: session.id, skill: fishingSession.skill });
+  }
   renderFishingPanel();
   if (keyState.configured) startKeyCounting();
   updateFishStats();
@@ -982,12 +1055,52 @@ onHostMessage((msg) => {
 function renderFishPickGrid() {
   const el = document.getElementById('fish-pick-grid');
   if (!el) return;
-  const known = wikiData.nodes.filter(n => n.tradeskill === 'Fishing').map(n => n.name);
+  const fishNodes = wikiData.nodes.filter(n => n.tradeskill === 'Fishing');
+  const known = fishNodes.map(n => n.name);
   const all = [...known, ...fishingSession.customFish.filter(f => !known.includes(f))];
-  el.innerHTML = all.map(f => {
-    const isNew = !known.includes(f);
-    return `<button class="fish-pick-btn${isNew ? ' new' : ''}" data-fish="${escapeHtml(f)}">${escapeHtml(f)}${isNew ? '<span class="fish-pick-new-badge">new</span>' : ''}</button>`;
-  }).join('');
+
+  // Junk isn't a structured field in the wiki data - it only ever shows up as
+  // free text in a node's note (e.g. "A junk drop."), so match on that.
+  const junkNames = new Set(fishNodes.filter(n => n.note && /junk/i.test(n.note)).map(n => n.name));
+
+  const selectedZone = fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone;
+  const areaInput = document.getElementById('fish-area');
+  const selectedArea = areaInput ? areaInput.value.trim() : (fishingSession.area || '');
+  const wikiExpected = fishNodes.filter(n => selectedZone && (n.locations || []).includes(selectedZone)).map(n => n.name);
+  // Anything actually caught here this session counts as "expected" too, even
+  // if the wiki doesn't have this zone in that fish's locations yet. Scoped
+  // to area too when one's been entered - different bodies of water in the
+  // same zone can give different fish, so a catch in one pond shouldn't mark
+  // a fish "expected" in a different pond across the same zone.
+  const sessionCaughtHere = fishingSession.entries
+    .filter(e => e.success && e.zone === selectedZone && (e.area || '') === selectedArea)
+    .map(e => e.resultItem);
+  const expectedNames = new Set([...wikiExpected, ...sessionCaughtHere]);
+
+  const catchCounts = {};
+  fishingSession.entries.forEach(e => {
+    if (e.success && e.resultItem) catchCounts[e.resultItem] = (catchCounts[e.resultItem] || 0) + 1;
+  });
+
+  function renderBtn(f) {
+    const classes = ['fish-pick-btn'];
+    if (!known.includes(f)) classes.push('new');
+    if (expectedNames.has(f)) classes.push('expected');
+    if (junkNames.has(f)) classes.push('junk');
+    const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
+    const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
+    return `<button class="${classes.join(' ')}" data-fish="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
+  }
+
+  const expected = all.filter(f => expectedNames.has(f)).sort();
+  const rest = all.filter(f => !expectedNames.has(f)).sort();
+  let html = '';
+  if (expected.length > 0) {
+    html += '<div class="fish-pick-section-label">Expected in this zone</div>';
+    html += expected.map(renderBtn).join('');
+  }
+  html += rest.map(renderBtn).join('');
+  el.innerHTML = html;
   el.querySelectorAll('.fish-pick-btn[data-fish]').forEach(btn => btn.addEventListener('click', () => logFishCatch(btn.dataset.fish)));
 }
 
@@ -1025,8 +1138,10 @@ function renderFishLog() {
 // (called from the sessionEnded handler) logs the remainder so it isn't lost.
 function logFishCatch(fishName) {
   if (!session.id) { showToast('Start a session first'); return; }
+  const areaInput = document.getElementById('fish-area');
   const entry = {
     zone: fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone,
+    area: areaInput ? areaInput.value.trim() : (fishingSession.area || ''),
     skill: fishingSession.skill,
     success: !!fishName,
     resultItem: fishName || '',
@@ -1034,6 +1149,7 @@ function logFishCatch(fishName) {
     loggedAt: Date.now(),
   };
   fishingSession.zone = entry.zone;
+  fishingSession.area = entry.area;
   fishingSession.entries.push(entry);
   fishingSession.liveAttempts = 0;
   updateCounterBox();
@@ -1047,7 +1163,16 @@ function logFishCatch(fishName) {
 
   showToast('Logged ' + fishName + ' (skill ' + fishingSession.skill + ', ' + entry.attempts + ' attempts)');
   renderFishLog();
+  renderFishPickGrid(); // catch just fed back into this zone's "expected" set - reflect it now
+  refreshFishAreaDatalist();
   updateFishStats();
+}
+
+function refreshFishAreaDatalist() {
+  const dl = document.getElementById('fish-area-list');
+  if (!dl) return;
+  const areas = [...new Set(fishingSession.entries.map(e => e.area).filter(Boolean))];
+  dl.innerHTML = areas.map(a => `<option value="${escapeHtml(a)}">`).join('');
 }
 
 // Called right before the fishing UI resets for a new/ended session - if
@@ -1056,8 +1181,10 @@ function logFishCatch(fishName) {
 // logged automatically rather than silently discarded.
 function flushPendingFishAttempts() {
   if (!fishingSession.active || fishingSession.liveAttempts === 0 || !session.id) return;
+  const areaInput = document.getElementById('fish-area');
   const entry = {
     zone: fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone,
+    area: areaInput ? areaInput.value.trim() : (fishingSession.area || ''),
     skill: fishingSession.skill,
     success: false,
     resultItem: '',

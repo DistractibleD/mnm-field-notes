@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Session Viewer
+# MnM Field Notes
 # Manual-entry data-collection companion for Monsters and Memories. Never
 # reads any file the game writes, never touches its process. Every field is
 # typed by the user. See CLAUDE.md for the full rules this file must honor.
@@ -110,7 +110,7 @@ function Get-WikiData {
         $maps = Invoke-RestMethod -Uri ($WikiBaseUrl + 'maps.json') -TimeoutSec 10
         $result.monsters = @($monsters | ForEach-Object { @{ name = $_.name } })
         $result.items = @($items | ForEach-Object { @{ name = $_.name } })
-        $result.nodes = @($nodes | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill } })
+        $result.nodes = @($nodes | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill; locations = @($_.locations); note = $_.note } })
         $result.factions = @(
             $monsters | Where-Object { $_.factionEffects } |
                 ForEach-Object { $_.factionEffects } |
@@ -304,10 +304,11 @@ function Write-HarvestingBlock {
         $tradeskill = $g.Group[0].tradeskill
         [void]$sb.AppendLine("== $($g.Name) ($tradeskill) ==")
         foreach ($e in $g.Group) {
+            $areaPart = if ($e.area) { " | Area: $($e.area)" } else { '' }
             $skillPart = if ($null -ne $e.skill) { "Skill: $($e.skill) | " } else { '' }
             $outcome = if ($e.success) { "Result: $(if ($e.resultItem) { $e.resultItem } else { 'success' })" } else { 'No catch/result' }
             $attemptsPart = if ($null -ne $e.attempts) { " | Attempts: $($e.attempts)" } else { '' }
-            [void]$sb.AppendLine("- Zone: $($e.zone) | $skillPart$outcome$attemptsPart")
+            [void]$sb.AppendLine("- Zone: $($e.zone)$areaPart | $skillPart$outcome$attemptsPart")
         }
         [void]$sb.AppendLine('')
     }
@@ -323,6 +324,12 @@ function Write-SessionExport {
     [void]$sb.AppendLine("Started: $($sessionInfo.startedAt)")
     [void]$sb.AppendLine("Ended: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))")
     [void]$sb.AppendLine("Entries: $($entries.Count)")
+    if ($sessionInfo.ContainsKey('fishingStartSkill')) {
+        [void]$sb.AppendLine("Fishing skill at session start: $($sessionInfo.fishingStartSkill)")
+    }
+    if ($sessionInfo.ContainsKey('fishingEndSkill')) {
+        [void]$sb.AppendLine("Fishing skill at session end: $($sessionInfo.fishingEndSkill)")
+    }
     [void]$sb.AppendLine('')
 
     $byType = $entries | Group-Object -Property sessionType
@@ -348,7 +355,7 @@ function Write-SessionExport {
 $script:Sessions = @{}  # sessionId -> @{ type; loggedBy; startedAt }
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'Session Viewer'
+$form.Text = 'MnM Field Notes'
 $form.Width = 900
 $form.Height = 1500
 
@@ -400,7 +407,7 @@ function Send-ToUI {
 $wv.add_CoreWebView2InitializationCompleted({
     param($s, $e)
     if (-not $e.IsSuccess) {
-        [System.Windows.Forms.MessageBox]::Show("Could not start the embedded browser: $($e.InitializationException.Message)", 'Session Viewer') | Out-Null
+        [System.Windows.Forms.MessageBox]::Show("Could not start the embedded browser: $($e.InitializationException.Message)", 'MnM Field Notes') | Out-Null
         $form.Close()
         return
     }
@@ -477,6 +484,16 @@ $wv.add_CoreWebView2InitializationCompleted({
                     $script:closeAfterExportTimer.Start()
                 }
             }
+            'fishingStarted' {
+                if ($script:Sessions.ContainsKey($msg.sessionId)) {
+                    $script:Sessions[$msg.sessionId].fishingStartSkill = $msg.skill
+                }
+            }
+            'fishingEnded' {
+                if ($script:Sessions.ContainsKey($msg.sessionId)) {
+                    $script:Sessions[$msg.sessionId].fishingEndSkill = $msg.skill
+                }
+            }
             'startKeyCapture' {
                 Start-KeyHook -mode 'capture' -target $null
             }
@@ -526,10 +543,21 @@ $wv.add_CoreWebView2InitializationCompleted({
     byId('fish-skill-modal-go').click();
   }, 3200);
 
-  // Active screen is up: pick a zone via the searchable single-select
-  // checklist dropdown (radio inputs, not a <select> any more), bump skill,
-  // and add a custom fish so a pick button exists even if the wiki fetch
-  // failed in this environment.
+  // Confirming the skill modal opens a zone modal next (added 2026-08-24) -
+  // pick a zone there via its own searchable single-select checklist, then
+  // confirm. A session is already running by this point (started on the
+  // Combat tab above), so this joins it rather than starting a new one.
+  setTimeout(function() {
+    byId('fish-zone-modal-toggle').click();
+    var firstZoneModalOption = document.querySelector('#fish-zone-modal-grid input[type=radio]');
+    if (firstZoneModalOption) firstZoneModalOption.click();
+    byId('fish-zone-modal-go').click();
+  }, 3600);
+
+  // Active screen is up: pick a zone via the in-screen searchable
+  // single-select checklist dropdown too (radio inputs, not a <select> any
+  // more), bump skill, and add a custom fish so a pick button exists even
+  // if the wiki fetch failed in this environment.
   setTimeout(function() {
     byId('fish-zone-toggle').click();
     var firstZoneOption = document.querySelector('#fish-zone-grid input[type=radio]');
@@ -543,6 +571,7 @@ $wv.add_CoreWebView2InitializationCompleted({
   // end-of-session auto-flush (there's no separate "no catch" button any
   // more) has something to send.
   setTimeout(function() {
+    setVal('fish-area', 'Test Cove');
     var fishBtn = document.querySelector('.fish-pick-btn[data-fish="Autotest Fish"]');
     if (fishBtn) fishBtn.click();
     byId('fish-attempts-plus').click();
@@ -597,7 +626,7 @@ $form.Add_Shown({
     if ($env:SV_AUTOTEST -ne '1') {
         [System.Windows.Forms.MessageBox]::Show(
             "Something went wrong and that last action may not have saved. You can keep using the app - if this keeps happening, check Data\error.log.",
-            'Session Viewer'
+            'MnM Field Notes'
         ) | Out-Null
     }
 })

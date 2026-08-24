@@ -253,8 +253,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-btn:active { transform: scale(0.97); }
 .fish-pick-btn.new { border-color: var(--success); }
 .fish-pick-new-badge { font-size: 10px; color: var(--success); vertical-align: 2px; margin-left: 2px; }
-.fish-pick-btn.no-catch { border-style: dashed; color: var(--text-secondary); }
-.fish-pick-btn.no-catch:hover { border-color: var(--danger); color: var(--danger); }
+.fish-pick-btn.expected { color: var(--accent-strong); border-color: var(--accent); font-weight: 600; }
+.fish-pick-btn.junk { color: var(--text-muted); border-color: var(--text-muted); border-style: dashed; font-weight: 400; }
+.fish-pick-count { font-size: 11px; color: var(--text-secondary); margin-left: 4px; }
+.fish-pick-section-label {
+  flex-basis: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-secondary); margin: 2px 0 -2px;
+}
 
 /* ---------- Responsive: optimized for a tall/narrow (portrait) second
    monitor, still comfortable on a wide landscape one. ---------- */
