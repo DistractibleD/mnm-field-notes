@@ -351,7 +351,21 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Session Viewer'
 $form.Width = 900
 $form.Height = 1500
-$form.StartPosition = 'CenterScreen'
+
+# This app is designed to run on a second monitor while playing (see
+# CLAUDE.md "Visual style"), not share the primary one - open there
+# automatically when one is connected.
+$secondaryScreen = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+if ($secondaryScreen) {
+    $form.StartPosition = 'Manual'
+    $area = $secondaryScreen.WorkingArea
+    $form.Location = New-Object System.Drawing.Point(
+        ($area.X + [Math]::Max(0, [int](($area.Width - $form.Width) / 2))),
+        ($area.Y + [Math]::Max(0, [int](($area.Height - $form.Height) / 2)))
+    )
+} else {
+    $form.StartPosition = 'CenterScreen'
+}
 
 if ($env:SV_AUTOTEST -eq '1') {
     # Hard ceiling so an automated run can never hang/block indefinitely,
