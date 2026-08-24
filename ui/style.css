@@ -177,6 +177,16 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   color: var(--text-primary); padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none;
 }
 
+/* ---------- App-wide tooltips - any element with data-tip="..." gets one of
+   these on hover/focus, see setupTooltips() in app.js. ---------- */
+#app-tooltip {
+  position: fixed; z-index: 200; max-width: 260px; padding: 6px 10px; border-radius: 6px;
+  background: var(--bg-surface); border: 1px solid var(--border-strong); color: var(--text-primary);
+  font-size: 12px; line-height: 1.4; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  pointer-events: none; opacity: 0; transition: opacity 0.12s ease; display: none;
+}
+#app-tooltip.visible { display: block; opacity: 1; }
+
 .lookup-search { max-width: 420px; margin-bottom: 16px; }
 .result-card {
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;

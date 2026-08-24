@@ -135,9 +135,10 @@ function checklistDropdownHTML(idPrefix, label, options, config) {
   const optionsHTML = options.map(opt =>
     `<label class="checklist-option"><input type="${inputType}"${nameAttr} value="${escapeHtml(opt)}"${selected.includes(opt) ? ' checked' : ''}><span>${escapeHtml(opt)}</span></label>`
   ).join('');
+  const tipAttr = config.tip ? ` data-tip="${escapeHtml(config.tip)}"` : '';
   return `
     <div class="checklist-dropdown" id="${idPrefix}-dropdown">
-      <button type="button" class="checklist-toggle" id="${idPrefix}-toggle">
+      <button type="button" class="checklist-toggle" id="${idPrefix}-toggle"${tipAttr}>
         <span id="${idPrefix}-toggle-label">${escapeHtml(label)}</span>
         <span class="checklist-count" id="${idPrefix}-count"></span>
         <span class="checklist-caret">&#9662;</span>
@@ -163,6 +164,49 @@ function ensureChecklistDropdownGlobalClose() {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// App-wide tooltips - add data-tip="explanation" to any element and it gets
+// a small themed popup on hover/focus, no per-element wiring needed. Runs
+// once at load; delegated on document (mouseover/mouseout, focusin/focusout)
+// so it keeps working for elements that get replaced by innerHTML rebuilds
+// (fish-pick-grid buttons, roster rows, etc.) without re-registering anything.
+// ---------------------------------------------------------------------------
+(function setupTooltips() {
+  const tip = document.createElement('div');
+  tip.id = 'app-tooltip';
+  document.body.appendChild(tip);
+  let showTimer = null;
+
+  function place(target) {
+    const r = target.getBoundingClientRect();
+    tip.classList.add('visible');
+    const tipRect = tip.getBoundingClientRect();
+    let left = r.left + (r.width - tipRect.width) / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+    let top = r.top - tipRect.height - 8;
+    if (top < 8) top = r.bottom + 8; // no room above - show below instead
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  function show(target) {
+    const text = target.getAttribute('data-tip');
+    if (!text) return;
+    tip.textContent = text;
+    clearTimeout(showTimer);
+    showTimer = setTimeout(() => place(target), 300);
+  }
+  function hide() {
+    clearTimeout(showTimer);
+    tip.classList.remove('visible');
+  }
+
+  document.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); if (t) show(t); });
+  document.addEventListener('mouseout', e => { const t = e.target.closest('[data-tip]'); if (t) hide(); });
+  document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) show(t); });
+  document.addEventListener('focusout', e => { const t = e.target.closest('[data-tip]'); if (t) hide(); });
+})();
 
 function setupChecklistDropdown(idPrefix, config) {
   config = config || {};
@@ -366,6 +410,12 @@ btnStart.addEventListener('click', startNewSession);
 
 btnEnd.addEventListener('click', () => {
   if (!session.id) { showToast('No session running'); return; }
+  // Disable immediately rather than waiting for the async 'sessionEnded'
+  // reply - otherwise a rapid double-click fires this handler twice before
+  // the first round trip lands, and the second click's now-orphaned
+  // messages surface a confusing "Error: Unknown session" toast even though
+  // nothing was actually lost (the host already rejects them safely).
+  btnEnd.disabled = true;
   flushPendingFishAttempts(); // must happen before endSession - the session still needs to exist host-side to accept this last entry
   if (fishingSession.startSkillSent) {
     // Record the skill as of session end too, in case the player skilled up
@@ -411,6 +461,8 @@ onHostMessage((msg) => {
     fishingSession.entries = [];
     fishingSession.customFish = [];
     fishingSession.startSkillSent = false;
+    keyState.spamPaused = false;
+    keyPressTimestamps.length = 0;
     renderFishingPanel();
     updateStats();
     updateFishStats();
@@ -437,11 +489,24 @@ onHostMessage((msg) => {
     }
   } else if (msg.type === 'error') {
     showToast('Error: ' + msg.message);
+    // Safety net: if a session is still genuinely running (host-side export
+    // hit a real problem rather than this being a harmless redundant
+    // double-click response), don't leave "End session" stuck disabled with
+    // no way to retry.
+    if (session.id) btnEnd.disabled = false;
   }
 });
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// A stable per-entry id, generated client-side at logging time so a single
+// entry can be referenced later (currently: editing a fishing catch still in
+// the active session - see 'editEntry'). No uniqueness guarantee needed
+// beyond "won't collide within one session."
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 // ---------------------------------------------------------------------------
@@ -548,8 +613,8 @@ function renderDetail() {
     </div>
     <label>Faction change (optional)</label>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
-      ${checklistDropdownHTML('f-faction-pos', 'Went up', wikiData.factions)}
-      ${checklistDropdownHTML('f-faction-neg', 'Went down', wikiData.factions)}
+      ${checklistDropdownHTML('f-faction-pos', 'Went up', wikiData.factions, { tip: 'Factions this kill improved your standing with, if any.' })}
+      ${checklistDropdownHTML('f-faction-neg', 'Went down', wikiData.factions, { tip: 'Factions this kill worsened your standing with, if any.' })}
     </div>
     <label>Items looted</label>
     <div style="display:flex; gap:8px;">
@@ -817,6 +882,7 @@ const keyState = {
   listening: false,      // counting hook currently installed
   configured: null,      // { label, vkCode, ctrl, alt, shift } once a key has been captured
   capturing: false,      // mid-capture (waiting for the user's next keypress)
+  spamPaused: false,     // listening was auto-paused because the key was pressed unrealistically fast
 };
 
 let fishZoneCtrl = null; // the Zone checklist-dropdown's controller for the current render
@@ -830,7 +896,9 @@ function renderFishingPanel() {
         <p style="font-size:13px; color:var(--text-secondary); max-width:38ch; margin:0 auto 20px;">
           This lets the app count your casts automatically: pick one key you use to fish, and
           from then on every press of that key bumps the attempts counter below &mdash; the
-          app only ever watches for that one key, and never touches the game itself.
+          app only ever watches for that one key, and never touches the game itself. Pressing
+          it rapidly (holding it down, spamming it) throws off the count, so listening
+          auto-pauses if that happens &mdash; you can always add attempts manually instead.
         </p>
         <button class="secondary-btn" id="fish-listen-btn">${keyState.configured ? 'Change key (currently ' + escapeHtml(keyState.configured.label) + ')' : 'Listen for key'}</button>
         <div style="margin-top: 28px;">
@@ -851,11 +919,17 @@ function renderFishingPanel() {
         <a href="#" id="fish-change-key-link" style="color:var(--accent);">${keyState.configured ? 'change key' : 'set a key'}</a>.
         When you catch a fish, click it below.
       </p>
+      ${keyState.spamPaused ? `
+      <div style="background: var(--danger-soft); border: 1px solid var(--danger); border-radius: 8px; padding: 10px 14px; margin: 0 0 14px; text-align:center; font-size:13px;">
+        Listening paused &mdash; that many presses that fast usually means a stuck or held key,
+        not real casts.
+        <a href="#" id="fish-resume-listening-link" style="color:var(--accent); font-weight:600;">Resume listening</a>
+      </div>` : ''}
       <div class="field-grid" style="margin-bottom:4px;">
         <div><label>Zone</label>${checklistDropdownHTML('fish-zone', fishingSession.zone ? fishingSession.zone : 'Select zone', wikiData.zones, { multi: false, selected: fishingSession.zone ? [fishingSession.zone] : [] })}</div>
         <div>
           <label>Area <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
-          <input id="fish-area" list="fish-area-list" placeholder="Specific lake, pond, dock&hellip;" value="${escapeHtml(fishingSession.area || '')}" autocomplete="off" />
+          <input id="fish-area" list="fish-area-list" placeholder="Specific lake, pond, dock&hellip;" value="${escapeHtml(fishingSession.area || '')}" autocomplete="off" data-tip="Different bodies of water in the same zone can have different fish - leave blank if that doesn't apply here." />
           <datalist id="fish-area-list">${[...new Set(fishingSession.entries.map(e => e.area).filter(Boolean))].map(a => `<option value="${escapeHtml(a)}">`).join('')}</datalist>
         </div>
       </div>
@@ -876,6 +950,8 @@ function renderFishingPanel() {
   fishZoneCtrl = setupChecklistDropdown('fish-zone', { multi: false, onChange: () => { fishingSession.zone = fishZoneCtrl.getValue(); renderFishPickGrid(); } });
   document.getElementById('fish-area').addEventListener('input', e => { fishingSession.area = e.target.value; renderFishPickGrid(); });
   document.getElementById('fish-change-key-link').addEventListener('click', e => { e.preventDefault(); openFishKeyModal(); });
+  const resumeLink = document.getElementById('fish-resume-listening-link');
+  if (resumeLink) resumeLink.addEventListener('click', e => { e.preventDefault(); resumeKeyListening(); });
   bindCounterEvents();
   bindSkillEvents();
   renderFishPickGrid();
@@ -1049,8 +1125,36 @@ onHostMessage((msg) => {
     fishingSession.liveAttempts++;
     updateCounterBox();
     updateFishStats();
+    checkKeySpam();
   }
 });
+
+// Guards against a held-down or physically stuck key skewing the attempt
+// count: 3+ counted presses within 1 second isn't 3 real casts, so pause
+// listening rather than silently recording bad data. Deliberately handled
+// entirely here, not in the native hook or its poll timer in
+// MnMFieldNotes.ps1 - those have to stay minimal/trivial (see
+// CLAUDE.md's "PowerShell/WinForms gotcha"), and there's no need to touch
+// them at all since the UI already gets one message per press to work with.
+const keyPressTimestamps = [];
+function checkKeySpam() {
+  const now = Date.now();
+  keyPressTimestamps.push(now);
+  while (keyPressTimestamps.length && now - keyPressTimestamps[0] > 1000) keyPressTimestamps.shift();
+  if (keyPressTimestamps.length >= 3 && keyState.listening) {
+    keyPressTimestamps.length = 0;
+    keyState.spamPaused = true;
+    stopKeyCounting();
+    showToast('Key listening paused - that many presses that fast usually isn\'t real casts. Add attempts manually, or resume listening below.');
+    renderFishingPanel();
+  }
+}
+
+function resumeKeyListening() {
+  keyState.spamPaused = false;
+  startKeyCounting();
+  renderFishingPanel();
+}
 
 function renderFishPickGrid() {
   const el = document.getElementById('fish-pick-grid');
@@ -1123,8 +1227,10 @@ function renderFishLog() {
   el.innerHTML = fishingSession.entries.slice().reverse().map(e => {
     const when = new Date(e.loggedAt).toLocaleTimeString();
     const result = e.success ? escapeHtml(e.resultItem || 'caught something') : 'no catch';
-    return `<div class="log-row"><span>${escapeHtml(e.zone || '(no zone)')} &middot; Skill ${e.skill} &middot; ${result} &middot; ${e.attempts} attempt${e.attempts === 1 ? '' : 's'}</span><span class="when">${when}</span></div>`;
+    const areaPart = e.area ? ` (${escapeHtml(e.area)})` : '';
+    return `<div class="log-row"><span>${escapeHtml(e.zone || '(no zone)')}${areaPart} &middot; Skill ${e.skill} &middot; ${result} &middot; ${e.attempts} attempt${e.attempts === 1 ? '' : 's'}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span><button class="mini-btn" data-edit-id="${escapeHtml(e.id)}">Edit</button></span></div>`;
   }).join('');
+  el.querySelectorAll('[data-edit-id]').forEach(btn => btn.addEventListener('click', () => openFishEditModal(btn.dataset.editId)));
 }
 
 // This is the one action a real fishing session repeats over and over, so it
@@ -1140,6 +1246,7 @@ function logFishCatch(fishName) {
   if (!session.id) { showToast('Start a session first'); return; }
   const areaInput = document.getElementById('fish-area');
   const entry = {
+    id: genId(),
     zone: fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone,
     area: areaInput ? areaInput.value.trim() : (fishingSession.area || ''),
     skill: fishingSession.skill,
@@ -1174,6 +1281,66 @@ function refreshFishAreaDatalist() {
   const areas = [...new Set(fishingSession.entries.map(e => e.area).filter(Boolean))];
   dl.innerHTML = areas.map(a => `<option value="${escapeHtml(a)}">`).join('');
 }
+
+// ---------------------------------------------------------------------------
+// Editing a logged fishing entry - only while its session is still running
+// (see 'editEntry' in MnMFieldNotes.ps1 for why: the export is already
+// written once a session ends, so editing after that would silently
+// desync from it).
+// ---------------------------------------------------------------------------
+let editingEntryId = null;
+
+function openFishEditModal(id) {
+  const entry = fishingSession.entries.find(e => e.id === id);
+  if (!entry) return;
+  editingEntryId = id;
+  document.getElementById('fish-edit-zone').value = entry.zone || '';
+  document.getElementById('fish-edit-area').value = entry.area || '';
+  document.getElementById('fish-edit-skill').value = entry.skill;
+  document.getElementById('fish-edit-result').value = entry.success ? (entry.resultItem || '') : '';
+  document.getElementById('fish-edit-attempts').value = entry.attempts;
+  document.getElementById('fish-edit-err').style.display = 'none';
+  document.getElementById('fish-edit-modal').classList.add('open');
+}
+
+document.getElementById('fish-edit-cancel').addEventListener('click', () => {
+  document.getElementById('fish-edit-modal').classList.remove('open');
+  editingEntryId = null;
+});
+
+document.getElementById('fish-edit-save').addEventListener('click', () => {
+  const entry = fishingSession.entries.find(e => e.id === editingEntryId);
+  if (!entry) { document.getElementById('fish-edit-modal').classList.remove('open'); return; }
+  const skillVal = parseInt(document.getElementById('fish-edit-skill').value, 10);
+  const attemptsVal = parseInt(document.getElementById('fish-edit-attempts').value, 10);
+  if (isNaN(skillVal) || skillVal < 0 || isNaN(attemptsVal) || attemptsVal < 0) {
+    document.getElementById('fish-edit-err').textContent = 'Skill and attempts must be valid numbers';
+    document.getElementById('fish-edit-err').style.display = 'block';
+    return;
+  }
+  const resultVal = document.getElementById('fish-edit-result').value.trim();
+  const zoneVal = document.getElementById('fish-edit-zone').value.trim();
+  const patch = {
+    zone: zoneVal,
+    // 'target' is what Write-HarvestingBlock groups the export by - has to
+    // move with the zone or the corrected entry stays grouped under the
+    // export's old zone header.
+    target: zoneVal || 'Fishing',
+    area: document.getElementById('fish-edit-area').value.trim(),
+    skill: skillVal,
+    success: !!resultVal,
+    resultItem: resultVal,
+    attempts: attemptsVal,
+  };
+  Object.assign(entry, patch);
+  sendToHost({ type: 'editEntry', sessionId: session.id, entryId: editingEntryId, patch });
+  document.getElementById('fish-edit-modal').classList.remove('open');
+  editingEntryId = null;
+  renderFishLog();
+  renderFishPickGrid();
+  refreshFishAreaDatalist();
+  updateFishStats();
+});
 
 // Called right before the fishing UI resets for a new/ended session - if
 // there were casts since the last catch, that "no catch" data still matters

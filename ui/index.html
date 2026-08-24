@@ -17,11 +17,11 @@
 
   <div class="session-bar">
     <div class="status" id="session-status">
-      Profile: <select id="profile-select"></select>
+      Profile: <select id="profile-select" data-tip="Who these entries get logged under. Switch or add a profile any time a session isn't running."></select>
     </div>
     <div style="display:flex; gap:8px;">
-      <button class="secondary-btn" id="btn-start-session">Start session</button>
-      <button class="secondary-btn" id="btn-end-session" disabled>End session &amp; export</button>
+      <button class="secondary-btn" id="btn-start-session" data-tip="Begins a new log. On the Fishing tab this happens automatically once you start fishing, so you usually won't need this button there.">Start session</button>
+      <button class="secondary-btn" id="btn-end-session" disabled data-tip="Writes everything logged since the session started to a text file in Sessions\, ready to hand to Claude for a wiki update.">End session &amp; export</button>
     </div>
   </div>
 
@@ -139,6 +139,26 @@
     <div class="err" id="fish-skill-modal-err"></div>
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="primary-btn" id="fish-skill-modal-go" style="margin:0;">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fish-edit-modal">
+  <div class="modal-box">
+    <h2>Edit entry</h2>
+    <p>Fix a typo or misclick &mdash; this only updates entries in the session that's still
+      running.</p>
+    <div class="field-grid">
+      <div><label>Zone</label><input id="fish-edit-zone" /></div>
+      <div><label>Area</label><input id="fish-edit-area" /></div>
+      <div><label>Skill</label><input type="number" id="fish-edit-skill" min="0" /></div>
+      <div><label>Result <span style="color:var(--text-muted); font-weight:400;">(blank = no catch)</span></label><input id="fish-edit-result" /></div>
+      <div><label>Attempts</label><input type="number" id="fish-edit-attempts" min="0" /></div>
+    </div>
+    <div class="err" id="fish-edit-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="fish-edit-save" style="margin:0;">Save</button>
+      <button class="secondary-btn" id="fish-edit-cancel">Cancel</button>
     </div>
   </div>
 </div>

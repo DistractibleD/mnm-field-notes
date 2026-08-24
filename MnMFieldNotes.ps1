@@ -259,6 +259,29 @@ function Get-SessionEntries {
     }
 }
 
+# Rewrites the one matching line in place (by the entry's client-generated
+# id) rather than appending a correction - the all-time log stays append-only
+# for new entries, this is the one deliberate exception, scoped to fixing a
+# misclick before the session that logged it has ended (see 'editEntry').
+function Edit-AllTimeLogEntry {
+    param([string]$entryId, [PSCustomObject]$patch)
+    if (-not (Test-Path $AllTimeLogPath)) { return }
+    $lines = Get-Content -Path $AllTimeLogPath -Encoding UTF8
+    $out = foreach ($line in $lines) {
+        if (-not $line.Trim()) { $line; continue }
+        $o = $line | ConvertFrom-Json
+        if ($o.id -eq $entryId) {
+            foreach ($prop in $patch.PSObject.Properties) {
+                $o | Add-Member -MemberType NoteProperty -Name $prop.Name -Value $prop.Value -Force
+            }
+            $o | ConvertTo-Json -Compress -Depth 10
+        } else {
+            $line
+        }
+    }
+    Set-Content -Path $AllTimeLogPath -Value $out -Encoding UTF8
+}
+
 # ---------------------------------------------------------------------------
 # Per-session export - one plain-text file, wiki-relevant fields only.
 # ---------------------------------------------------------------------------
@@ -494,6 +517,15 @@ $wv.add_CoreWebView2InitializationCompleted({
                     $script:Sessions[$msg.sessionId].fishingEndSkill = $msg.skill
                 }
             }
+            'editEntry' {
+                # Only entries in a still-running session are editable - once
+                # a session's ended and exported, the export file is already
+                # written and editing the all-time log alone would leave it
+                # silently out of sync with what got exported.
+                if ($script:Sessions.ContainsKey($msg.sessionId)) {
+                    Edit-AllTimeLogEntry -entryId $msg.entryId -patch $msg.patch
+                }
+            }
             'startKeyCapture' {
                 Start-KeyHook -mode 'capture' -target $null
             }
@@ -575,8 +607,20 @@ $wv.add_CoreWebView2InitializationCompleted({
     var fishBtn = document.querySelector('.fish-pick-btn[data-fish="Autotest Fish"]');
     if (fishBtn) fishBtn.click();
     byId('fish-attempts-plus').click();
-    setTimeout(function() { byId('btn-end-session').click(); }, 300);
   }, 5800);
+
+  // Edit the entry just logged (added 2026-08-24) - exercises the whole
+  // round trip: client-side patch, 'editEntry' to the host, and the
+  // all-time log actually getting rewritten in place.
+  setTimeout(function() {
+    var editBtn = document.querySelector('[data-edit-id]');
+    if (editBtn) {
+      editBtn.click();
+      setVal('fish-edit-skill', '99');
+      byId('fish-edit-save').click();
+    }
+    setTimeout(function() { byId('btn-end-session').click(); }, 300);
+  }, 6400);
 })();
 '@
             Start-Sleep -Milliseconds 500

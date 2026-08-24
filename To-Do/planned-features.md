@@ -124,27 +124,46 @@ implementation. Remaining items still need their own pass.
   `startSession`, silently overriding anything the tab handler had set. Fixed by deriving the
   label from `document.querySelector('.tab.active')` directly at start-click time instead of
   trusting a value that two different code paths were independently trying to maintain.
+- ~~Disable "Export" after a session's already ended~~ — investigated 2026-08-24: the host
+  side was already idempotent (a redundant `endSession`/`logEntry` for an already-closed
+  session gets rejected gracefully, no duplicate data), but a rapid double-click still fired
+  the handler twice before the async `sessionEnded` reply disabled the button, surfacing a
+  confusing "Error: Unknown session" toast even though nothing was actually lost. Fixed by
+  disabling `btnEnd` synchronously on click instead of waiting for the round trip, with a
+  safety net in the `error` handler that re-enables it if `session.id` is still set (a
+  genuine host-side failure, not just a harmless redundant click, shouldn't leave the button
+  stuck disabled with no way to retry).
+- ~~Add the ability to edit a logged session entry~~ (2026-08-24) — built for Fishing,
+  scoped to entries in the still-running session only (editing after export was explicitly
+  ruled out — the export file's already written by then, and updating the all-time log alone
+  would silently desync from it). Each entry gets a client-generated `id`
+  (`genId()` in `app.js`); the `editEntry` message rewrites that one JSONL line in place
+  (`Edit-AllTimeLogEntry`). Verified live: catching a fish with the zone left blank, editing
+  it afterward, and confirming both the on-screen log and the final export reflect the fix
+  (including the export grouping correctly under the *corrected* zone's header, not the
+  original one — required also patching `target`, not just `zone`). Combat/Harvesting don't
+  have an edit UI yet — the host-side mechanism is entry-type-agnostic, so that's a UI-only
+  follow-up if wanted, not a new capability to build.
+- ~~Add an app-wide tooltip system~~ (2026-08-24) — any element gets a themed hover/focus
+  popup via `data-tip="..."`, delegated on `document` so it works on dynamically-rendered
+  content without per-element wiring (see "Tooltips" in `CLAUDE.md`). Applied to the
+  session-bar buttons, profile dropdown, Combat's faction dropdowns, and the Fishing Area
+  field — deliberately not everywhere, skipped wherever adjacent text already explains the
+  same thing (e.g. Fishing's "Listen for key", which already sits under an explanatory
+  paragraph). More coverage can be added the same way as it comes up.
+- ~~Guard against key-listener spam skewing attempt counts~~ (2026-08-24) — 3+ counted
+  presses within 1 second auto-pauses listening (`checkKeySpam()` in `app.js`), with a toast
+  and a persistent "Resume listening" banner in the active screen. Implemented entirely
+  client-side rather than touching the native hook/poll timer in `MnMFieldNotes.ps1` — no
+  need to go near that code at all since the UI already gets one message per press. The
+  pre-start screen's description text was also updated to mention this proactively. Verified
+  in the mock preview: 3 rapid presses triggers the pause and banner, 2 doesn't, and "Resume
+  listening" correctly re-enables without needing to re-capture the key.
 
 ### Still open
 
-- **Disable the "Export" action after a session has already been ended/exported** — wasn't
-  in scope for the 2026-08-24 pass (the button already disables via `btnEnd.disabled = true`
-  in the `sessionEnded` handler; re-check whether there's still a real gap here, e.g. a
-  double-click race before the disabled attribute lands, before building anything).
-- **Add an app-wide tooltip system** explaining what buttons/areas do — general
-  discoverability, not fishing-specific. Bigger, deserves its own scoping pass.
-- **Guard against key-listener spam skewing attempt counts**: if the fishing key is pressed
-  3+ times within 1 second, auto-disable the listener and show a warning that spamming the
-  key gives bad results — mention the user can add attempts manually instead, and that the
-  listener can be re-enabled any time. Touches the native keyboard hook (see
-  `CLAUDE.md`'s "PowerShell/WinForms gotcha" — hook callbacks must stay minimal), so this
-  needs care, not a quick pass.
 - **Flag unnaturally high click/attempt counts for review** when Claude processes a guild
   submission — exact threshold not decided ("not sure how to gauge what 'many clicks' are"),
   ties into the spam-guard above but is a separate, softer check on the data-review side
   rather than a hard client-side block. Not app code — a process note for whoever (Claude)
   reviews submissions.
-- **Add the ability to edit a logged session entry** after the fact — e.g. fixing a missing
-  zone (forgot to select one before logging), or correcting skill/fish-type on a misclick.
-  Needs its own scoping pass: which fields are editable, whether edits are visible in the
-  all-time log as edits or silently overwrite, etc.

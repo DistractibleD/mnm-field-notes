@@ -166,6 +166,24 @@ session-scoped control — switching only takes effect for the *next* session, m
 `loggedBy` is already locked in server-side once a session starts. `sessionType`/export
 attribution ties directly to the active profile name.
 
+### Tooltips — `data-tip="..."`, no per-element wiring
+
+App-wide, added 2026-08-24. Any element gets a small themed hover/focus popup just by adding
+a `data-tip="explanation"` attribute — `setupTooltips()` in `app.js` delegates on `document`
+(`mouseover`/`mouseout`/`focusin`/`focusout`, matched via `closest('[data-tip]')`), so this
+keeps working for elements that get replaced by an `innerHTML` rebuild (fish-pick-grid
+buttons, roster rows, the faction dropdowns, etc.) without ever needing to re-register a
+listener after a re-render. `checklistDropdownHTML` accepts an optional `config.tip` that
+puts the attribute straight on the toggle button, for components built from that helper.
+
+**Used deliberately sparingly, not on every element** — only where there's no adjacent text
+already explaining the same thing (e.g. skipped on the Fishing pre-start screen's "Listen for
+key" button, which already sits under a paragraph explaining exactly what it does). Current
+coverage: the session-bar Start/End buttons, the profile dropdown, Combat's two faction
+checklist dropdowns, and the Fishing Area field. Add more the same way as the app grows, but
+check first whether the surrounding UI already says it before adding a tooltip that would
+just repeat it.
+
 ### Checklist dropdown — the standard pattern for "pick any number, searchably"
 
 `checklistDropdownHTML`/`setupChecklistDropdown` (generalized 2026-08-24 from what started
@@ -323,6 +341,17 @@ explicitly). Two states in `renderFishingPanel()` (`ui/app.js`):
   already on each harvesting entry. The end value exists specifically to catch skill-ups
   that happened without a catch following them (e.g. skilled up right before ending the
   session) — without it, that skill-up wouldn't show up anywhere in the export.
+- **Listening auto-pauses on a suspiciously fast key-press burst** (2026-08-24) — 3+
+  `keyCounted` messages within 1 second (a held-down or physically stuck key, not real
+  casts) triggers `checkKeySpam()` in `app.js`, which calls `stopKeyCounting()`, shows a
+  toast, and renders a persistent "Resume listening" banner in the active screen until the
+  user clicks it (`resumeKeyListening()`, reuses the already-known `keyState.configured` key
+  — no need to re-capture). **Deliberately implemented entirely client-side, not touching
+  the native hook or its poll timer in `MnMFieldNotes.ps1` at all** — those have to stay
+  minimal per the "PowerShell/WinForms gotcha" above, and there's no need to touch them
+  since the UI already gets one message per press to work with; the safest way to honor
+  that constraint was to not go anywhere near it. The pre-start screen's description text
+  mentions this proactively too, so it isn't a surprise the first time it triggers.
 
 A **Lookup** tab searches the wiki's already-gathered data (read-only, live from its JSON
 — see "Wiki data as a read-only reference" below), independent of session logging.
@@ -333,6 +362,20 @@ Three distinct stores, not one — don't collapse them:
 
 1. **All-time local log** — everything ever logged, own file(s) under this project,
    grows forever, is what the app's own Lookup/history features query. Not curated.
+   **Append-only, with one deliberate exception (2026-08-24)**: a still-running session's
+   Fishing entries can be edited (fix a missing zone, a misclicked skill/fish, etc.) via an
+   "Edit" button on each row in the Fishing tab's session log. Each entry gets a
+   client-generated `id` (`genId()` in `app.js`) at logging time specifically so it can be
+   referenced later; the `editEntry` message rewrites that one JSONL line in place
+   (`Edit-AllTimeLogEntry` in `MnMFieldNotes.ps1`) rather than appending a correction.
+   **Scoped to the entry's own still-running session on purpose** — once a session ends,
+   `Write-SessionExport` has already written the export file, and editing the all-time log
+   after that would silently desync from what was actually exported. Editing the `zone`
+   field also has to patch `target` (what `Write-HarvestingBlock` groups the export by) in
+   the same call, or the corrected entry stays grouped under the old zone's header. Combat
+   and Harvesting entries don't have this yet (no "Edit" affordance built for their
+   roster+detail UI) — the underlying mechanism is entry-type-agnostic, so extending it
+   there later is a UI-only addition, not a new host-side capability.
 2. **Per-session export** — one plain-text file per session (confirmed with the user
    2026-08-24: one file per session, not an accumulating inbox-style file), containing
    only wiki-relevant fields — no session metrics like elapsed time or click counts.
