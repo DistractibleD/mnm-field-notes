@@ -225,7 +225,10 @@ pass when picked up.
 - `lib/serve-ui.ps1` — dev-only preview server, not shipped.
 - `lib/webview2-smoketest.ps1`, `lib/keyhook-spike*.ps1` — isolated diagnostic scripts,
   reference only.
-- `README.txt` — user docs, keep in sync.
+- `README.txt` — what the app does/how to use it, keep in sync.
+- `INSTALL.txt` — setup/uninstall/update guide for someone who just received a copy. Written
+  entirely as "you" addressed to that recipient, never to the project owner — no "it's fine
+  to share this" framing, that's not their concern to read about.
 - `Data\` (gitignored): `AllTimeLog.jsonl`, `Profiles.json`, `WebView2UserData\`,
   `error.log` (ThreadException handler).
 - `Sessions\` (gitignored): per-session export txts.

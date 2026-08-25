@@ -1,0 +1,42 @@
+Installing MnM Field Notes
+============================
+
+1. Unzip this folder anywhere you like - Desktop, Documents, wherever. No
+   installer, no admin rights needed.
+2. Double-click "Start.vbs" to launch it. That's it.
+
+What's inside
+--------------
+- Start.vbs / MnMFieldNotes.ps1 - the app itself.
+- ui\ - the window's interface (HTML/CSS/JS), loaded by the app.
+- lib\webview2\ - browser-engine files the app runs on. Already included in
+  this zip, nothing to download separately.
+- README.txt - what the app does and how to use it once it's running.
+
+What shows up after you first run it
+---------------------------------------
+Two new folders appear next to Start.vbs the first time you launch:
+- Data\ - your saved profile name and the running log of everything you log.
+  Stays on your computer; nothing here is sent anywhere automatically.
+- Sessions\ - one text file per session, written when you click "End session
+  & export." Hand the relevant file to whoever's updating the wiki when
+  you're ready to share what you logged.
+
+Removing it
+------------
+Delete the folder. Nothing else was touched on your computer - no registry
+entries, no other install location, nothing to uninstall.
+
+Getting updates
+-----------------
+The app checks for a newer version automatically when it opens (and any time
+via "Check for updates" near the top of the window). If one's available
+you'll see a banner with a link to the release page - download that zip and
+unzip it the same way you did this one. Your Data\ and Sessions\ folders are
+just files, so copy them into the new folder first if you want to keep your
+history, or start fresh - either way is fine.
+
+If something goes wrong
+--------------------------
+If the app shows an error message, check Data\error.log - it has more detail
+than the popup does.

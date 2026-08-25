@@ -1,6 +1,9 @@
 MnM Field Notes
 =================
 
+First time setting this up? See INSTALL.txt. This file covers what the app
+does and how to use it once it's running.
+
 What this is
 ------------
 A standalone, second-monitor companion window for Monsters and Memories. It's
@@ -59,13 +62,15 @@ Using it
    needing a session running - useful for checking what's already known
    before you go log something new.
 
-Sharing with guildmates
+About the profile name
 ------------------------
-This app isn't public, but it's fine to hand a copy of this folder to guild
-members so they can log their own sessions too - there's no account system
-or server involved, just manual file sharing (Discord, etc.). Each export
-records who logged it, so anything that conflicts with existing data can be
-flagged rather than silently overwritten.
+Whatever name you pick on first launch gets attached to everything you log.
+That's not an account of any kind - it's a plain text label, saved only on
+your own computer. It matters if more than one person is logging: if your
+report of something ever conflicts with someone else's (different numbers
+for the same thing), that name is what makes it possible to tell the two
+apart and sort out which is right, instead of one silently overwriting the
+other.
 
 Known limitations
 ------------------
