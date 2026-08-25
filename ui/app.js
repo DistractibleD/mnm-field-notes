@@ -44,6 +44,10 @@ function mockHostRespond(msg) {
           { name: 'Basa', tradeskill: 'Fishing', locations: ['Shaded Dunes'] },
           { name: 'Old Boot', tradeskill: 'Fishing', locations: ['Night Harbor'], note: 'A junk drop.' },
         ],
+        recipes: [
+          { name: 'Cooked Ashira Meat', tradeskill: 'Cooking' }, { name: 'Stuffed Peppers', tradeskill: 'Cooking' },
+          { name: 'Copper Ingot', tradeskill: 'Smelting' },
+        ],
         factions: ['Bends Garrison', 'Citizens of Night Harbor', 'Orcs', 'Pyrmos Mercenaries', 'Steel Talons', 'Ten Hooks', 'Vermahn\'s Brood'],
         zones: ['Night Harbor', 'Shaded Dunes', 'Sungreet Strand', 'Vale of Zintar', 'Evershade Weald'],
       });
@@ -71,7 +75,7 @@ function mockHostRespond(msg) {
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-const wikiData = { monsters: [], items: [], nodes: [], factions: [], zones: [] };
+const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [] };
 
 const session = {
   id: null,
@@ -359,7 +363,7 @@ profileModalCancel.addEventListener('click', closeProfileModal);
 // header/filename (e.g. "Session export - fishing") - independent of the
 // sessionType each logged entry carries (Fishing entries still log as
 // 'harvesting', matching Write-HarvestingBlock's grouping in MnMFieldNotes.ps1).
-const TAB_SESSION_TYPE = { combat: 'combat', harvest: 'harvesting', fishing: 'fishing', craft: 'crafting', multi: 'multi' };
+const TAB_SESSION_TYPE = { combat: 'combat', harvest: 'harvesting', fishing: 'fishing', craft: 'crafting', cooking: 'cooking', multi: 'multi' };
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
@@ -369,12 +373,15 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   if (TAB_SESSION_TYPE[t.dataset.tab]) {
     session.type = TAB_SESSION_TYPE[t.dataset.tab];
   }
-  // Kills/coin are meaningless on the Fishing tab, so it gets its own stats
+  // Kills/coin are meaningless on Fishing/Cooking, so each gets its own stats
   // bar rather than showing Combat numbers that don't apply.
   const isFishing = t.dataset.tab === 'fishing';
-  document.getElementById('stats-combat').style.display = isFishing ? 'none' : '';
+  const isCooking = t.dataset.tab === 'cooking';
+  document.getElementById('stats-combat').style.display = (isFishing || isCooking) ? 'none' : '';
   document.getElementById('stats-fishing').style.display = isFishing ? '' : 'none';
+  document.getElementById('stats-cooking').style.display = isCooking ? '' : 'none';
   if (isFishing) updateFishStats();
+  if (isCooking) updateCookingStats();
 }));
 
 // ---------------------------------------------------------------------------
@@ -452,6 +459,11 @@ onHostMessage((msg) => {
     activeNode = null;
     renderNodeRoster();
     renderNodeDetail();
+    dishRoster.clear();
+    activeDish = null;
+    renderDishRoster();
+    renderDishDetail();
+    updateCookingStats();
     stopKeyCounting();
     fishingSession.active = false;
     fishingSession.zone = '';
@@ -470,11 +482,13 @@ onHostMessage((msg) => {
     wikiData.monsters = msg.monsters || [];
     wikiData.items = msg.items || [];
     wikiData.nodes = msg.nodes || [];
+    wikiData.recipes = msg.recipes || [];
     wikiData.factions = msg.factions || [];
     wikiData.zones = msg.zones || [];
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
     refreshNodeList();
+    refreshDishList();
     renderFishPickGrid();
     if (msg.error) showToast('Wiki data unavailable — autocomplete limited (' + msg.error + ')');
   } else if (msg.type === 'profiles') {
@@ -857,6 +871,251 @@ function logHarvestBatch() {
 
   renderNodeRoster();
   renderNodeDetail();
+}
+
+// ---------------------------------------------------------------------------
+// Cooking - its own tab (2026-08-24), not folded into the generic Crafting
+// stub, because a dish can carry stat/resist/haste buffs the way any other
+// item does (see items.json's Food entries) and that needs its own fast
+// entry UI. Uses the same roster + active-detail pattern as Harvesting
+// (a cooking attempt is one discrete event, not the high-repetition case
+// Fishing was redesigned around) - own Map, own DOM ids, own state, nothing
+// shared with Fishing or Combat beyond generic UI helpers (checklistDropdown,
+// findItem, escapeHtml) and the wiki reference data itself.
+// ---------------------------------------------------------------------------
+const STAT_NAMES = ['STR', 'DEX', 'AGI', 'STA', 'WIS', 'INT', 'CHA', 'HP', 'MANA'];
+const RESIST_NAMES = ['POISON', 'FIRE', 'COLD', 'CORRUPTION', 'DISEASE', 'MAGIC', 'ELECTRIC', 'HOLY'];
+
+// dishRoster: Map of dish name -> { entries: [...], stats: {STR:2,...}, resists: {...}, haste: 0 }
+// stats/resists/haste live on the dish itself (what the finished food grants,
+// same shape items.json already uses for Food items) rather than per-attempt,
+// since a given recipe always produces the same buff regardless of how many
+// times it's cooked this session.
+const dishRoster = new Map();
+let activeDish = null;
+let pendingComponents = [];
+let ckStatsCtrl = null;
+let ckResistsCtrl = null;
+
+document.getElementById('add-dish').addEventListener('click', addDishFromInput);
+document.getElementById('new-dish').addEventListener('keydown', (e) => { if (e.key === 'Enter') addDishFromInput(); });
+
+function refreshDishList() {
+  const matches = wikiData.recipes.filter(r => r.tradeskill === 'Cooking');
+  document.getElementById('dish-list').innerHTML = matches.map(r => `<option value="${escapeHtml(r.name)}"></option>`).join('');
+}
+
+function addDishFromInput() {
+  const input = document.getElementById('new-dish');
+  const name = input.value.trim();
+  if (!name) return;
+  if (!session.id) { showToast('Start a session first'); return; }
+  if (!dishRoster.has(name)) dishRoster.set(name, { entries: [], stats: {}, resists: {}, haste: 0 });
+  selectDish(name);
+  input.value = '';
+}
+
+function selectDish(name) {
+  activeDish = name;
+  renderDishRoster();
+  renderDishDetail();
+}
+
+function renderDishRoster() {
+  const el = document.getElementById('dish-roster-list');
+  if (dishRoster.size === 0) {
+    el.innerHTML = '<div class="roster-empty">No dishes yet &mdash; add one above.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  for (const [name, data] of dishRoster) {
+    const successes = data.entries.filter(e => e.success).length;
+    const div = document.createElement('div');
+    div.className = 'roster-item' + (name === activeDish ? ' selected' : '');
+    div.innerHTML = `
+      <span class="roster-item-remove" data-name="${escapeHtml(name)}" title="Remove ${escapeHtml(name)} from this session">&times;</span>
+      <div class="name">${escapeHtml(name)}</div>
+      <div class="meta">${data.entries.length} attempt${data.entries.length === 1 ? '' : 's'} &middot; ${successes} success${successes === 1 ? '' : 'es'}</div>
+    `;
+    div.addEventListener('click', (e) => {
+      if (e.target.classList.contains('roster-item-remove')) return;
+      selectDish(name);
+    });
+    el.appendChild(div);
+  }
+  el.querySelectorAll('.roster-item-remove').forEach(x => x.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dishRoster.delete(x.dataset.name);
+    if (activeDish === x.dataset.name) activeDish = null;
+    renderDishRoster();
+    renderDishDetail();
+    updateCookingStats();
+  }));
+}
+
+function renderDishDetail() {
+  const el = document.getElementById('dish-detail-panel');
+  if (!activeDish) {
+    el.innerHTML = '<div class="detail-empty">Add a dish to the roster, then select it to start logging attempts.</div>';
+    return;
+  }
+  const data = dishRoster.get(activeDish);
+  pendingComponents = [];
+  el.innerHTML = `
+    <div class="detail-head"><h2>${escapeHtml(activeDish)}</h2><span class="zone-tag">Cooking</span></div>
+    <div class="field-grid">
+      <div><label>Your skill</label><input id="ck-skill" type="number" min="0" /></div>
+      <div><label>Difficulty</label>
+        <select id="ck-difficulty">
+          <option>Trivial</option><option>Green</option><option>Light Blue</option>
+          <option selected>Dark Blue</option><option>White</option><option>Yellow</option><option>Red</option>
+        </select>
+      </div>
+      <div><label>Outcome</label><select id="ck-outcome"><option value="1">Success</option><option value="0">Fail</option></select></div>
+    </div>
+    <label>Components used</label>
+    <div style="display:flex; gap:8px;">
+      <input id="ck-component" list="cook-item-list" placeholder="Search item name&hellip;" autocomplete="off" />
+      <datalist id="cook-item-list">${wikiData.items.map(i => `<option value="${escapeHtml(i.name)}"></option>`).join('')}</datalist>
+      <button class="mini-btn" id="ck-add-component" style="padding:0 14px;">Add</button>
+    </div>
+    <div class="chips" id="ck-component-chips"></div>
+
+    <label style="margin-top:14px; display:block;">What this dish grants <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:flex-start;">
+      ${checklistDropdownHTML('ck-stats', 'Stats', STAT_NAMES, { selected: Object.keys(data.stats), tip: 'Which stats this dish grants - add the amount for each after picking.' })}
+      ${checklistDropdownHTML('ck-resists', 'Resists', RESIST_NAMES, { selected: Object.keys(data.resists), tip: 'Which resists this dish grants - add the amount for each after picking.' })}
+      <div style="flex:1;"><input id="ck-haste" type="number" placeholder="Haste %" min="0" value="${data.haste || ''}" data-tip="A single haste value for the whole dish, same as gear's haste stat - not per stat/resist." /></div>
+    </div>
+    <div id="ck-stat-values"></div>
+
+    <div class="err" id="ck-err"></div>
+    <button class="primary-btn" id="log-cook-btn">Log attempt</button>
+    <div class="log">
+      <div class="log-title">Logged &mdash; ${escapeHtml(activeDish)}</div>
+      <div id="cook-log"></div>
+    </div>
+  `;
+  ckStatsCtrl = setupChecklistDropdown('ck-stats', { onChange: () => syncStatSelection('stats', ckStatsCtrl) });
+  ckResistsCtrl = setupChecklistDropdown('ck-resists', { onChange: () => syncStatSelection('resists', ckResistsCtrl) });
+  document.getElementById('ck-haste').addEventListener('input', e => { data.haste = Number(e.target.value) || 0; });
+  document.getElementById('ck-add-component').addEventListener('click', () => {
+    const input = document.getElementById('ck-component');
+    const v = input.value.trim();
+    if (!v) return;
+    pendingComponents.push(v);
+    input.value = '';
+    renderComponentChips();
+  });
+  document.getElementById('log-cook-btn').addEventListener('click', logCookAttempt);
+  renderStatValueInputs();
+  renderComponentChips();
+  renderCookLog();
+}
+
+// Toggling a stat/resist checkbox adds/removes it from the dish's own
+// stats/resists object (keeping any value already entered for a box that
+// gets re-checked isn't expected here - unchecking clears it, matching how
+// there's no "undo" concept elsewhere in this app either).
+function syncStatSelection(kind, ctrl) {
+  const data = dishRoster.get(activeDish);
+  if (!data || !ctrl) return;
+  const target = kind === 'stats' ? data.stats : data.resists;
+  const selected = ctrl.getSelected();
+  Object.keys(target).forEach(k => { if (!selected.includes(k)) delete target[k]; });
+  selected.forEach(k => { if (!(k in target)) target[k] = 0; });
+  renderStatValueInputs();
+}
+
+function renderStatValueInputs() {
+  const el = document.getElementById('ck-stat-values');
+  const data = activeDish ? dishRoster.get(activeDish) : null;
+  if (!el || !data) return;
+  const statEntries = Object.keys(data.stats).map(k => ({ k, v: data.stats[k], kind: 'stat' }));
+  const resistEntries = Object.keys(data.resists).map(k => ({ k, v: data.resists[k], kind: 'resist' }));
+  const all = [...statEntries, ...resistEntries];
+  if (all.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = all.map(e =>
+    `<span class="stat-value-input"><label>${escapeHtml(e.k)}${e.kind === 'resist' ? ' resist' : ''}</label><input type="number" data-kind="${e.kind}" data-key="${escapeHtml(e.k)}" value="${e.v || ''}" placeholder="0" /></span>`
+  ).join('');
+  el.querySelectorAll('input[data-key]').forEach(inp => inp.addEventListener('input', () => {
+    const target = inp.dataset.kind === 'stat' ? data.stats : data.resists;
+    target[inp.dataset.key] = Number(inp.value) || 0;
+  }));
+}
+
+function renderComponentChips() {
+  const el = document.getElementById('ck-component-chips');
+  if (!el) return;
+  el.innerHTML = pendingComponents.map((it, i) => {
+    const known = !!findItem(it);
+    return `<span class="chip${known ? '' : ' new'}">${escapeHtml(it)}${known ? '' : ' (new)'} <span class="x" data-i="${i}">&times;</span></span>`;
+  }).join('');
+  el.querySelectorAll('.x').forEach(x => x.addEventListener('click', () => {
+    pendingComponents.splice(+x.dataset.i, 1);
+    renderComponentChips();
+  }));
+}
+
+function renderCookLog() {
+  const el = document.getElementById('cook-log');
+  if (!el) return;
+  const data = dishRoster.get(activeDish);
+  if (!data || data.entries.length === 0) {
+    el.innerHTML = '<div class="roster-empty">Nothing logged yet.</div>';
+    return;
+  }
+  el.innerHTML = data.entries.slice().reverse().map(e => {
+    const when = new Date(e.loggedAt).toLocaleTimeString();
+    const outcome = e.success ? 'Success' : 'Fail';
+    const skillPart = e.skill != null ? `Skill ${e.skill} &middot; ` : '';
+    const componentsPart = e.components.length ? ' &middot; ' + e.components.map(escapeHtml).join(', ') : '';
+    return `<div class="log-row"><span>${skillPart}${escapeHtml(e.difficultyColor)} &middot; ${outcome}${componentsPart}</span><span class="when">${when}</span></div>`;
+  }).join('');
+}
+
+function logCookAttempt() {
+  const data = dishRoster.get(activeDish);
+  const entry = {
+    skill: document.getElementById('ck-skill').value ? Number(document.getElementById('ck-skill').value) : null,
+    difficultyColor: document.getElementById('ck-difficulty').value,
+    success: document.getElementById('ck-outcome').value === '1',
+    components: pendingComponents.slice(),
+    stats: Object.assign({}, data.stats),
+    resists: Object.assign({}, data.resists),
+    haste: data.haste || 0,
+    loggedAt: Date.now(),
+  };
+  data.entries.push(entry);
+
+  sendToHost({
+    type: 'logEntry',
+    sessionId: session.id,
+    sessionType: 'crafting',
+    entry: Object.assign({ target: activeDish, tradeskill: 'Cooking' }, entry),
+  });
+
+  renderDishRoster();
+  renderDishDetail();
+  updateCookingStats();
+}
+
+function updateCookingStats() {
+  let attempts = 0, successes = 0;
+  const uniqueDishes = new Set();
+  const knownDishes = wikiData.recipes.filter(r => r.tradeskill === 'Cooking').map(r => r.name.toLowerCase());
+  const newDishes = new Set();
+  for (const [name, data] of dishRoster) {
+    if (data.entries.length === 0) continue;
+    uniqueDishes.add(name);
+    attempts += data.entries.length;
+    successes += data.entries.filter(e => e.success).length;
+    if (!knownDishes.includes(name.toLowerCase())) newDishes.add(name);
+  }
+  document.getElementById('ck-attempts').textContent = attempts;
+  document.getElementById('ck-unique').textContent = uniqueDishes.size;
+  document.getElementById('ck-successes').textContent = successes;
+  document.getElementById('ck-new').textContent = newDishes.size;
 }
 
 // ---------------------------------------------------------------------------

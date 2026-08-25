@@ -60,7 +60,7 @@ html, body {
 }
 .tab:hover { background: var(--bg-raised); color: var(--text-primary); }
 .tab.active { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
-.tab.active[data-tab="harvest"], .tab.active[data-tab="fishing"], .tab.active[data-tab="craft"] { background: rgba(95,179,163,0.14); color: var(--accent-craft); border-color: var(--accent-craft-dim); }
+.tab.active[data-tab="harvest"], .tab.active[data-tab="fishing"], .tab.active[data-tab="craft"], .tab.active[data-tab="cooking"] { background: rgba(95,179,163,0.14); color: var(--accent-craft); border-color: var(--accent-craft-dim); }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
 .stat { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
@@ -137,6 +137,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 }
 .chip.new { border-color: var(--success); color: var(--success); }
 .chip .x { cursor: pointer; opacity: 0.6; }
+
+.stat-value-input {
+  display: inline-flex; align-items: center; gap: 5px; background: var(--bg-raised);
+  border: 1px solid var(--border-strong); border-radius: 6px; padding: 3px 8px 3px 10px;
+  margin: 0 6px 6px 0; font-size: 12px; color: var(--text-secondary);
+}
+.stat-value-input input { width: 46px; padding: 2px 4px; font-size: 12px; text-align: right; }
 .chip .x:hover { opacity: 1; }
 
 .primary-btn {

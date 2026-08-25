@@ -30,6 +30,7 @@
     <button class="tab" data-tab="harvest">Harvesting</button>
     <button class="tab" data-tab="fishing">Fishing</button>
     <button class="tab" data-tab="craft">Crafting</button>
+    <button class="tab" data-tab="cooking">Cooking</button>
     <button class="tab" data-tab="multi">Multi</button>
     <button class="tab" data-tab="lookup">Lookup</button>
   </div>
@@ -48,6 +49,13 @@
     <div class="stat"><div class="label">Total attempts</div><div class="val" id="fs-attempts">0</div></div>
     <div class="stat"><div class="label">Current skill</div><div class="val" id="fs-skill">0</div></div>
     <div class="stat"><div class="label">New for wiki</div><div class="val" id="fs-new" style="color:var(--success);">0</div></div>
+  </div>
+
+  <div class="stats" id="stats-cooking" style="display:none;">
+    <div class="stat"><div class="label">Attempts logged</div><div class="val" id="ck-attempts">0</div></div>
+    <div class="stat"><div class="label">Unique dishes</div><div class="val" id="ck-unique">0</div></div>
+    <div class="stat"><div class="label">Successes</div><div class="val" id="ck-successes">0</div></div>
+    <div class="stat"><div class="label">New for wiki</div><div class="val" id="ck-new" style="color:var(--success);">0</div></div>
   </div>
 
   <div class="panel-body active" id="panel-combat">
@@ -96,6 +104,24 @@
 
   <div class="panel-body" id="panel-craft">
     <div class="stub">Crafting logging isn't built yet. Planned: roster of <b>recipes attempted</b>, detail panel capturing <b>tradeskill, your skill, difficulty color, and components used</b>.</div>
+  </div>
+
+  <div class="panel-body" id="panel-cooking">
+    <div class="layout">
+      <div class="roster">
+        <div class="roster-title">This session</div>
+        <div class="roster-add">
+          <input id="new-dish" placeholder="Add dish&hellip;" list="dish-list" autocomplete="off" />
+          <datalist id="dish-list"></datalist>
+          <button class="mini-btn" id="add-dish">+</button>
+        </div>
+        <div id="dish-roster-list" style="margin-top:10px;"><div class="roster-empty">No dishes yet &mdash; add one above.</div></div>
+      </div>
+
+      <div class="detail" id="dish-detail-panel">
+        <div class="detail-empty">Add a dish to the roster, then select it to start logging attempts.</div>
+      </div>
+    </div>
   </div>
 
   <div class="panel-body" id="panel-multi">

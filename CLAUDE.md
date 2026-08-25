@@ -222,6 +222,8 @@ with its own con/level.
 - **Harvesting** → tradeskill (Mining/Lumberjacking/Herbalism/Foraging — Fishing has its own
   tab, see below), node name, zone, player skill, success/fail, result item.
 - **Crafting** → tradeskill, recipe name, player skill, difficulty color, components used.
+  Still just a stub tab (`#panel-craft`) for every tradeskill except Cooking, which got
+  pulled out into its own fully-built tab — see "Cooking" below.
 
 **The session-level export label (`session.type` in `app.js`, the "Session export - X" header
 and the export filename suffix) is derived from whichever tab is active at the moment "Start
@@ -353,6 +355,59 @@ explicitly). Two states in `renderFishingPanel()` (`ui/app.js`):
   that constraint was to not go anywhere near it. The pre-start screen's description text
   mentions this proactively too, so it isn't a surprise the first time it triggers.
 
+### Cooking — its own tab, roster + detail pattern (like Harvesting, not Fishing)
+
+Built 2026-08-24, split out of the generic Crafting stub specifically because **a dish can
+carry stat/resist/haste buffs the way any other item does** (`items.json`'s Food entries
+already use exactly this `stats`/`resists`/`haste` shape — confirmed by inspecting the wiki
+data directly rather than assuming a schema gap existed) and that needs its own fast entry
+UI, not something worth cramming into a one-size-fits-all Crafting form. Uses the **roster +
+active-detail pattern** (`dishRoster` Map, `activeDish`, mirroring Harvesting's `nodeRoster`
+almost exactly) rather than Fishing's zero-friction one-tap grid — a cooking attempt is one
+discrete, multi-field event (skill, difficulty, components), not the high-repetition case
+Fishing was redesigned around. **Deliberately has nothing shared with Fishing or Combat's
+own state** — own Map, own DOM ids (`ck-*`/`dish-*`), only reusing generic infrastructure
+(`checklistDropdownHTML`, `findItem`, `escapeHtml`) and the wiki reference data itself.
+
+- **`wikiData.recipes`** (2026-08-24) — `Get-WikiData` now also fetches `crafting.json`,
+  forwarded as `{name, tradeskill}` pairs (same minimal shape `nodes` originally had before
+  Fishing needed more). Used for the dish-name datalist (`refreshDishList()`, filtered to
+  `tradeskill === 'Cooking'`) and to flag "new for wiki" dishes in the stats bar, same
+  pattern as Fishing's known-fish check.
+- **Stats/resists/haste live on the dish itself, not per attempt** (`dishRoster.get(name) =
+  { entries, stats: {}, resists: {}, haste: 0 }`) — a given recipe always grants the same
+  buff regardless of how many times it's cooked this session, so recording it once per dish
+  (editable any time via the same checklist dropdowns) is both more accurate and far less
+  repetitive than asking on every attempt. `STAT_NAMES`/`RESIST_NAMES` in `app.js` are taken
+  directly from every distinct key actually used across `items.json`'s `stats`/`resists`
+  objects (STR/DEX/AGI/STA/WIS/INT/CHA/HP/MANA and POISON/FIRE/COLD/CORRUPTION/DISEASE/
+  MAGIC/ELECTRIC/HOLY) — `haste` is a single top-level number, not multi-select, matching
+  how gear's own `haste` field works (one scalar, never nested under `stats`).
+- **Checklist dropdown picks *which* stats apply; a small value input next to each checked
+  one captures *how much*** — `checklistDropdownHTML`/`setupChecklistDropdown` alone can't
+  express a value per selection, so `syncStatSelection()` keeps the dish's `stats`/`resists`
+  object in sync with the checklist's checked state (checking adds the key at `0`,
+  unchecking deletes it — no attempt to preserve a value behind an unchecked box, consistent
+  with there being no "undo" concept elsewhere in this app either) and `renderStatValueInputs()`
+  renders one compact `<input type="number">` per currently-selected key, wired to write
+  straight back into that same object on every keystroke.
+- **Difficulty color reuses the same con-color vocabulary as Combat's Con dropdown**
+  (Trivial/Green/Light Blue/Dark Blue/White/Yellow/Red) rather than inventing a separate
+  scale — it's the same underlying game concept, just applied to a crafting attempt instead
+  of a monster.
+- **Entries log as `sessionType: 'crafting'`** (not `'cooking'`) — matches the wiki-facing
+  bucket the original Crafting stub was always going to use, so Cooking's entries and any
+  future non-Cooking Crafting entries land in the same `--- crafting ---` export section,
+  grouped by dish/recipe name via the new `Write-CraftingBlock` in `MnMFieldNotes.ps1`. The
+  **session-level** export label is `'cooking'` though (`TAB_SESSION_TYPE.cooking`), so the
+  export filename/header stay descriptive of what was actually being logged - same split
+  Fishing already established (session label vs. entry `sessionType` are independent).
+  `Write-CraftingBlock` prints the dish's `Grants: ... | Resists: ... | Haste: ...` line
+  once per dish (from the first attempt, since it's the same for all of them), then each
+  attempt's skill/difficulty/outcome/components below it.
+- **Own stats bar** (`#stats-cooking`: Attempts logged / Unique dishes / Successes / New for
+  wiki), same reasoning as Fishing's — kills/coin from Combat's bar are meaningless here.
+
 A **Lookup** tab searches the wiki's already-gathered data (read-only, live from its JSON
 — see "Wiki data as a read-only reference" below), independent of session logging.
 
@@ -398,6 +453,12 @@ name/tag the guild member enters once, not per-entry) — lost provenance is wha
 "this conflicts with what Alice reported" impossible to say later. This is a per-session
 export concern, not a UI feature to build elaborate identity/accounts around — a plain text
 field is enough.
+
+**Also flag unnaturally high click/attempt counts on a Fishing entry** when reviewing a
+submission — the app's own key-spam guard (see "Fishing" above) catches the fast, obvious
+case client-side, but a softer, higher judgment call belongs here instead of as a hard
+client-side block. Exact threshold isn't defined — use judgment based on what's plausible
+for the session's stated duration.
 
 ## The To-Do folder
 

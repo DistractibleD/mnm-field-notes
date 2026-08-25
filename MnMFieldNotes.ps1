@@ -102,15 +102,17 @@ function Add-OrSetLastProfile {
 # see CLAUDE.md "Wiki data as a read-only reference")
 # ---------------------------------------------------------------------------
 function Get-WikiData {
-    $result = @{ monsters = @(); items = @(); nodes = @(); factions = @(); zones = @(); error = $null }
+    $result = @{ monsters = @(); items = @(); nodes = @(); recipes = @(); factions = @(); zones = @(); error = $null }
     try {
         $monsters = Invoke-RestMethod -Uri ($WikiBaseUrl + 'monsters.json') -TimeoutSec 10
         $items = Invoke-RestMethod -Uri ($WikiBaseUrl + 'items.json') -TimeoutSec 10
         $nodes = Invoke-RestMethod -Uri ($WikiBaseUrl + 'gathering-nodes.json') -TimeoutSec 10
+        $crafting = Invoke-RestMethod -Uri ($WikiBaseUrl + 'crafting.json') -TimeoutSec 10
         $maps = Invoke-RestMethod -Uri ($WikiBaseUrl + 'maps.json') -TimeoutSec 10
         $result.monsters = @($monsters | ForEach-Object { @{ name = $_.name } })
         $result.items = @($items | ForEach-Object { @{ name = $_.name } })
         $result.nodes = @($nodes | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill; locations = @($_.locations); note = $_.note } })
+        $result.recipes = @($crafting | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill } })
         $result.factions = @(
             $monsters | Where-Object { $_.factionEffects } |
                 ForEach-Object { $_.factionEffects } |
@@ -337,6 +339,38 @@ function Write-HarvestingBlock {
     }
 }
 
+function Write-CraftingBlock {
+    param($sb, $entries)
+    $grouped = $entries | Group-Object -Property target
+    foreach ($g in $grouped) {
+        $tradeskill = $g.Group[0].tradeskill
+        [void]$sb.AppendLine("== $($g.Name) ($tradeskill) ==")
+
+        # Stats/resists/haste live on the dish itself, not per-attempt (a
+        # recipe always grants the same buff), so print them once from the
+        # first attempt rather than repeating on every line.
+        $first = $g.Group[0]
+        $statsParts = @()
+        if ($first.stats) { $first.stats.PSObject.Properties | ForEach-Object { $statsParts += "$($_.Name) +$($_.Value)" } }
+        $resistParts = @()
+        if ($first.resists) { $first.resists.PSObject.Properties | ForEach-Object { $resistParts += "$($_.Name) +$($_.Value)" } }
+        if ($statsParts.Count -gt 0 -or $resistParts.Count -gt 0 -or $first.haste) {
+            $statsLine = if ($statsParts.Count -gt 0) { $statsParts -join ', ' } else { 'none' }
+            $resistLine = if ($resistParts.Count -gt 0) { $resistParts -join ', ' } else { 'none' }
+            $hasteLine = if ($first.haste) { "+$($first.haste)%" } else { 'none' }
+            [void]$sb.AppendLine("Grants: $statsLine | Resists: $resistLine | Haste: $hasteLine")
+        }
+
+        foreach ($e in $g.Group) {
+            $skillPart = if ($null -ne $e.skill) { "Skill: $($e.skill) | " } else { '' }
+            $outcome = if ($e.success) { 'Success' } else { 'Fail' }
+            $componentsPart = if ($e.components -and $e.components.Count -gt 0) { " | Components: $($e.components -join ', ')" } else { '' }
+            [void]$sb.AppendLine("- $($skillPart)Difficulty: $($e.difficultyColor) | Result: $outcome$componentsPart")
+        }
+        [void]$sb.AppendLine('')
+    }
+}
+
 function Write-SessionExport {
     param([string]$sessionId, [hashtable]$sessionInfo)
 
@@ -361,6 +395,7 @@ function Write-SessionExport {
         switch ($typeGroup.Name) {
             'combat' { Write-CombatBlock -sb $sb -entries $typeGroup.Group }
             'harvesting' { Write-HarvestingBlock -sb $sb -entries $typeGroup.Group }
+            'crafting' { Write-CraftingBlock -sb $sb -entries $typeGroup.Group }
             default { Write-CombatBlock -sb $sb -entries $typeGroup.Group }
         }
     }
@@ -448,7 +483,7 @@ $wv.add_CoreWebView2InitializationCompleted({
         switch ($msg.type) {
             'ready' {
                 $script:wikiData = Get-WikiData
-                Send-ToUI @{ type = 'wikiData'; monsters = $script:wikiData.monsters; items = $script:wikiData.items; nodes = $script:wikiData.nodes; factions = $script:wikiData.factions; zones = $script:wikiData.zones; error = $script:wikiData.error }
+                Send-ToUI @{ type = 'wikiData'; monsters = $script:wikiData.monsters; items = $script:wikiData.items; nodes = $script:wikiData.nodes; recipes = $script:wikiData.recipes; factions = $script:wikiData.factions; zones = $script:wikiData.zones; error = $script:wikiData.error }
                 $profileData = Get-Profiles
                 Send-ToUI @{ type = 'profiles'; profiles = $profileData.profiles; lastUsed = $profileData.lastUsed }
             }
