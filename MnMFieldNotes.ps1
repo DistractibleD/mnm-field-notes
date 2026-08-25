@@ -70,6 +70,9 @@ function Write-DebugLog {
 }
 
 $WikiBaseUrl = 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/'
+$script:AppVersion = 1
+$script:AppBuildDate = '2026-08-25'
+$UpdateCheckUrl = 'https://raw.githubusercontent.com/DistractibleD/mnm-field-notes-releases/main/latest.json'
 $AllTimeLogPath = Join-Path $dataDir 'AllTimeLog.jsonl'
 $ProfilesPath = Join-Path $dataDir 'Profiles.json'
 
@@ -129,6 +132,24 @@ function Get-WikiData {
         $result.error = $_.Exception.Message
     }
     return $result
+}
+
+# Date-based version strings (yyyy.MM.dd) sort correctly with a plain string
+# comparison, so no version-parsing library is needed.
+function Get-UpdateInfo {
+    try {
+        $latest = Invoke-RestMethod -Uri $UpdateCheckUrl -TimeoutSec 10
+        return @{
+            currentVersion = $script:AppVersion
+            buildDate = $script:AppBuildDate
+            latestVersion = $latest.version
+            url = $latest.url
+            available = [int]$latest.version -gt [int]$script:AppVersion
+            error = $null
+        }
+    } catch {
+        return @{ currentVersion = $script:AppVersion; buildDate = $script:AppBuildDate; latestVersion = $null; url = $null; available = $false; error = $_.Exception.Message }
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -486,6 +507,17 @@ $wv.add_CoreWebView2InitializationCompleted({
                 Send-ToUI @{ type = 'wikiData'; monsters = $script:wikiData.monsters; items = $script:wikiData.items; nodes = $script:wikiData.nodes; recipes = $script:wikiData.recipes; factions = $script:wikiData.factions; zones = $script:wikiData.zones; error = $script:wikiData.error }
                 $profileData = Get-Profiles
                 Send-ToUI @{ type = 'profiles'; profiles = $profileData.profiles; lastUsed = $profileData.lastUsed }
+                $update = Get-UpdateInfo
+                Send-ToUI @{ type = 'updateInfo'; currentVersion = $update.currentVersion; buildDate = $update.buildDate; latestVersion = $update.latestVersion; url = $update.url; available = $update.available; error = $update.error }
+            }
+            'checkForUpdates' {
+                $update = Get-UpdateInfo
+                Send-ToUI @{ type = 'updateInfo'; currentVersion = $update.currentVersion; buildDate = $update.buildDate; latestVersion = $update.latestVersion; url = $update.url; available = $update.available; error = $update.error; manual = $true }
+            }
+            'openUrl' {
+                if ($msg.url -match '^https?://') {
+                    Start-Process -FilePath $msg.url
+                }
             }
             'setProfile' {
                 Add-OrSetLastProfile -name $msg.name

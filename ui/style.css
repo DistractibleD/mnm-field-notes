@@ -45,6 +45,16 @@ html, body {
 .masthead h1 { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 24px; margin: 0; letter-spacing: -0.01em; color: var(--accent); }
 .masthead .sub { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
 .masthead .clock { font-family: Consolas, monospace; font-size: 14px; color: var(--text-secondary); }
+.version-row { display: flex; align-items: center; gap: 10px; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+.version-row a { color: var(--text-muted); text-decoration: underline; }
+.version-row a:hover { color: var(--accent); }
+
+.update-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 8px 14px; margin-bottom: 14px; font-size: 13px; color: var(--text-primary);
+}
+.update-banner a { color: var(--accent-strong); font-weight: 600; margin-left: 10px; }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; flex-wrap: wrap; }
 .tab {
@@ -180,7 +190,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .err { font-size: 13px; color: var(--danger); display: none; margin-bottom: 8px; }
 
 .toast {
-  position: fixed; bottom: 20px; right: 20px; background: var(--bg-raised); border: 1px solid var(--accent);
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: var(--bg-raised); border: 1px solid var(--accent);
   color: var(--text-primary); padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none;
 }
 

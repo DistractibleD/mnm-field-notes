@@ -1,527 +1,270 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this project. Read this in full before making any
-change here — the rules below are non-negotiable, not defaults to weigh against
-convenience. Design-decision history/superseded-attempt post-mortems live in
-`CLAUDE-HISTORY.md` instead (not auto-loaded — read on demand); this file is current
-rules/architecture only.
+Rules below = non-negotiable. History/postmortems → `CLAUDE-HISTORY.md` (on-demand, not
+autoloaded). This file = current rules/architecture only. Written compact for Claude's own
+parsing, not prose for human reading — user won't read/edit this file.
 
 ## What this is
 
-A personal, offline, second-monitor data-collection companion for *Monsters and
-Memories* ("MnM Field Notes" — see "Naming" below). Every field is typed by the user after
-observing it on screen, during or after play — the app never reads any file the game
-writes, never touches its process/memory, and never interacts with the game in any way.
-It's the equivalent of jotting notes in a notebook while playing, structured for two
-purposes: (1) fast live logging across Combat/Harvesting/Crafting sessions, and (2) a
-searchable lookup over data already gathered in the sibling wiki project. Session data
-gets curated into a plain-text summary the user hands to Claude to update that wiki.
+Personal 2nd-monitor manual-entry companion for *Monsters and Memories* ("MnM Field Notes").
+User types everything after observing on screen — app never reads game files/process/memory,
+never interacts with the game. = notebook, not a reader. Two jobs: (1) fast live logging
+(Combat/Harvesting/Crafting/Fishing/Cooking), (2) searchable lookup over sibling wiki data.
+Session data → plain-text export → user hands to Claude to update the wiki.
 
-**This design exists because the previous one (reading the game's own Ledger log files)
-conflicted with the game's actual Master User Agreement** — see "The EULA discovery" in
-`CLAUDE-HISTORY.md` before ever suggesting the app read anything the game itself writes.
-That door is closed, not just deprioritized.
+Exists because the prior design (reading the game's own Ledger log files) violated the
+game's EULA. See CLAUDE-HISTORY "EULA discovery." Door closed, not deprioritized.
 
-## Hard rules — never violate these
+## Hard rules
 
-1. **Zero interaction with the game, ever.** Never read any file `Monsters and Memories`
-   writes (its install folder, its save-data folder, log files, config, anything), never
-   access its process memory, never inject code or hook it in any way. This is the whole
-   basis for this app being EULA-safe — reintroducing any game-file read, even read-only,
-   reopens the exact conflict that ended the previous design. If a future request would
-   require this, stop and say so rather than finding a narrower workaround.
-2. **Writes stay inside this project's own folder.** Session data, the all-time log, and
-   session-export text files all live under this folder (see "File layout"). Never write
-   anywhere else.
-3. **Network calls only ever reach the published wiki site
-   (`https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/`) or, if ever
-   added, services unrelated to Niche Worlds Cult/Monsters and Memories.** Never add any
-   call to an NWC-operated endpoint, and never add telemetry/analytics/crash-reporting of
-   any kind. **No machine-to-machine networking of any kind between copies of this app** —
-   every copy (the user's own or a guild member's) only ever talks to that one public URL,
-   never to another user's computer. There is no server, listener, or open port anywhere in
-   this app.
+1. **Zero interaction with the game, ever.** No reading game files/install/save dirs/config,
+   no process memory access, no injection/hooking. This is the whole basis for the app's
+   EULA-safety — even read-only reopens the conflict. Stop and say so if a request would
+   need this rather than finding a narrower workaround. Never soften this rule regardless of
+   how anything else in this file evolves — tampering risks a real account ban.
+2. **Writes stay inside the project folder only** (see File layout).
 
-## Secrecy — private from the wiki/public, shareable with the user's guild
+## Naming
 
-**Motivation update (2026-08-24):** the original strict secrecy ("nothing about this app
-should ever be shared, I don't want anyone to know about or detect it") was driven by
-uncertainty over whether the app's existence conflicted with the game's ToS/EULA — resolved
-now, see `CLAUDE-HISTORY.md`. With that risk gone, the user cares much less about who knows
-what. Current actual scope: not fully public, but guild members are explicitly fine — see
-below. Don't read the older, stricter wording anywhere in memory as still fully in force;
-this section is the current, correct scope.
+"MnM Field Notes" — renamed from generic "Session Viewer"/`SessionViewer.ps1`. Old
+genericness = hiding from NWC devs specifically; moot now (user told NWC they can see the
+code). Current: window title (`$form.Text`), script file `MnMFieldNotes.ps1`, `<title>`/`<h1>`
+in `index.html`. Keep new UI naming consistent with this, don't revert to generic. `Start.vbs`
+keeps its own name (functional label, never part of the old generic-from-devs surface).
 
-- **Never mention this project anywhere in the separate Monsters and Memories Wiki
-  project** (`D:\Claude files\MonstersAndMemories-Wiki\`) — not in its `changelog.json`
-  ("Latest Changes" feed), not in a commit message, not in any file in that repo, not in
-  passing conversation while doing unrelated wiki work in that repo's session. Still
-  absolute, unaffected by the guild-sharing note below.
-- **Local-only, no remote.** This folder has its own local git repository
-  (`git init`, no `git remote`) — deliberately never connected to GitHub or any other
-  host. Do not add a remote, do not push, do not create an account or repo on any
-  hosting service for this project unless the user explicitly asks for that in this
-  project's own session, in the future, in clear terms.
-- **Guild sharing is confirmed in-scope (2026-08-24), distribution method = manual file
-  share** — the user intends to hand copies of this app to guild members so they can log
-  data too. This is a deliberate, confirmed exception to "nothing about this project
-  should be shared" — not a contradiction to flag again. Chosen specifically to avoid
-  needing a remote: the user zips/sends the folder directly (Discord, etc.), no hosting,
-  no accounts. If a private GitHub repo is ever wanted instead (e.g. the guild outgrows
-  manual sharing), that still needs the user's explicit ask per the no-remote rule above
-  — don't assume guild-sharing approval extends to that.
-- Beyond the guild, nothing about this project should be uploaded, synced, or shared
-  anywhere without the user explicitly asking for that specific action.
+## Visual style
 
-## Naming — "MnM Field Notes"
+`ui/style.css` `:root` palette/fonts (Sora headings, Inter body) copied from the wiki's own
+`style.css` `:root` — same var names, same hex values. `--accent-craft` (wiki's teal) =
+"different session type" marker, used for Harvesting/Crafting/Cooking active-tab state
+instead of gold. If the wiki's palette/fonts change, pull from there, don't invent new ones.
 
-**Renamed 2026-08-24** from the deliberately-generic "Session Viewer"/`SessionViewer.ps1`.
-The old genericness was a holdover from the pre-redesign era when the user wanted to stay
-hidden/anonymous from the *Monsters and Memories* developers specifically — that reasoning
-is gone: the user has told NWC they're welcome to see all the code, so there's no one left
-to stay generic *from*. "MnM Field Notes" is the current window title (`$form.Text`), the
-script filename (`MnMFieldNotes.ps1`), and the `<title>`/`<h1>` in `ui/index.html`. Keep new
-naming (error dialogs, future windows, etc.) consistent with this rather than reverting to
-generic phrasing — that instinct is exactly what's being deliberately undone here. See
-"Naming un-genericized" in `CLAUDE-HISTORY.md` for the full reasoning if this ever needs
-revisiting.
-
-**This does not change the Secrecy scope above** — the guild-only distribution, the
-no-remote rule, and "never mention this project in the wiki repo" are about a different
-audience (the public/the wiki) and a different concern (no hosting, no accounts) than the
-game-developer-specific hiding this naming change undoes. Don't read this as a signal that
-the project has gone more broadly public.
-
-`Start.vbs` (the launcher) keeps its own name — it was always a plain functional label, not
-part of the generic-from-developers surface, so there's nothing to rename there.
-
-## Visual style — matches the wiki, on purpose
-
-`ui/style.css`'s `:root` palette and fonts (Sora for headings, Inter for body) are lifted
-directly from the wiki project's own `style.css` `:root` block (`--bg`/`--bg-panel`/
-`--accent` etc., confirmed 2026-08-24) — same variable names in this app map to the wiki's
-exact hex values, so the two apps feel like one family rather than reskinning from scratch.
-`--accent-craft` (the wiki's teal, used there for recipe cards vs. gold item cards) carries
-the same "different session type" meaning here — Harvesting/Crafting's active tab state
-uses it instead of the default gold accent. **If the wiki's own palette or fonts ever
-change, pull the new values from there rather than picking new ones independently** — the
-whole point is staying visually paired with it.
-
-**Layout is responsive, tuned for a tall/narrow second monitor** (confirmed use case:
-1080×1920 portrait) while staying comfortable on a wide landscape one — `.layout` (roster +
-detail) stacks to one column below 900px width, `.stats`/`.field-grid` use
-`repeat(auto-fit, minmax(...))` so they reflow at any width without extra breakpoints, and
-`$form.Width`/`Height` in `MnMFieldNotes.ps1` (900×1500) default to a portrait-friendly
-shape — still freely resizable, this is just the out-of-box size.
+Responsive, tuned for portrait 2nd monitor (1080×1920) but fine landscape too. `.layout`
+stacks <900px width. `.stats`/`.field-grid` use `repeat(auto-fit,minmax(...))`.
+`$form.Width`/`Height` = 900×1500 default (resizable).
 
 ## Architecture
 
-**PowerShell 5.1 + WinForms hosting a WebView2 control** — a dedicated native app window
-(no browser chrome) whose UI is plain HTML/CSS/JS, verified working on this machine with
-no Node/npm/.NET SDK install (see `CLAUDE-HISTORY.md` for how — the short version:
-WebView2 Runtime already ships with Windows 11/Edge, and the three control assemblies were
-pulled straight from NuGet as a raw package, no SDK involved).
+PS 5.1 + WinForms hosting a WebView2 control (no browser chrome), HTML/CSS/JS UI. No
+Node/npm/.NET SDK needed — WebView2 Runtime ships with Win11/Edge, the 3 control assemblies
+pulled raw from NuGet. Setup details: CLAUDE-HISTORY.
 
-- The WinForms host (PowerShell) owns all file I/O: reading the wiki's JSON data, saving
-  the all-time log, writing the per-session export. The WebView2-hosted page is UI only —
-  a browser page can't write files on its own, so every save/log/export action round-trips
-  through the PowerShell host (via `WebMessageReceived`/`PostWebMessageAsString` or
-  equivalent — pick a message contract when implementing and keep it consistent).
-- `lib/webview2/*.dll` — gitignored, fetched redistributables, not source. Re-fetch from
-  NuGet's flat-container API if ever missing (see `CLAUDE-HISTORY.md` for the exact URL
-  pattern and the working `CreationProperties`/`EnsureCoreWebView2Async` initialization
-  pattern — don't reinvent the environment-setup sequence from scratch).
+- PS host owns ALL file I/O + networking (wiki fetch, all-time log, session export).
+  WebView2 page = UI only, round-trips via `WebMessageReceived`/`PostWebMessageAsString`.
+- `lib/webview2/*.dll` — gitignored redistributables. Re-fetch from NuGet's flat-container
+  API if missing (URL pattern + init sequence: CLAUDE-HISTORY).
 
-### PowerShell/WinForms gotcha — always `$script:`-scope a Timer created inside a nested handler
+### Gotcha: Timer inside a nested handler must be `$script:`-scoped
 
-**A `System.Windows.Forms.Timer` created *inside* another event handler's own scriptblock
-(e.g. inside `Add_Shown`, or inside a `WebMessageReceived` case) must be assigned with
-`$script:` scope, never a plain local variable** — `$timer.Add_Tick({ $timer.Stop(); ... })`
-silently resolves `$timer` to `$null` inside its own Tick closure when `$timer` itself was
-declared in a scriptblock nested two or more levels deep, throwing "cannot call a method on a
-null-valued expression" on every single tick (so it never actually stops, repeating forever).
-Caused two real crashes during development — see `CLAUDE-HISTORY.md` "Harvesting/Fishing
-keypress counter" for the full story and how it was isolated. A Timer created at true
-top-level script scope (one level of nesting) doesn't have this problem. When in doubt,
-`$script:` it — costs nothing, and the alternative is a silent, repeating failure that's hard
-to diagnose from the symptom alone.
+A Timer created inside another handler's own scriptblock (e.g. inside `Add_Shown` or a
+`WebMessageReceived` case) MUST be `$script:` scope, never local —
+`$timer.Add_Tick({$timer.Stop()...})` resolves `$timer` to `$null` inside its own closure
+when declared ≥2 levels nested → "cannot call method on null-valued expression" every tick,
+infinite loop. Caused 2 real crashes (CLAUDE-HISTORY "Harvesting/Fishing keypress counter").
+Top-level-scope Timers (1 level nesting) are fine. When in doubt: `$script:` it.
 
-**Any low-level Windows hook callback (`SetWindowsHookEx`) must do the absolute minimum** —
-flip a flag / bump a counter, nothing else. Never call `Send-ToUI` or anything else that
-could re-enter PowerShell/WebView2/COM code from inside the native callback itself; use a
-separate polling `Timer` (on the normal message loop, `$script:`-scoped per the rule above)
-to actually react to what the hook observed. Two independent reasons: it's what caused the
-first of the two crashes above, and Windows can silently uninstall a hook whose callback is
-slow regardless.
+### Gotcha: native hook callbacks must be minimal
+
+`SetWindowsHookEx` callback = flag/counter only, nothing else. NEVER call `Send-ToUI` or
+anything that re-enters PS/WebView2/COM from inside the native callback. Use a separate
+`$script:`-scoped polling Timer to actually react. Why: (1) caused the crash above, (2)
+Windows silently uninstalls slow hooks.
 
 ### Profiles
 
-Who's logging is a persisted concept (`Data\Profiles.json`, `Get-Profiles`/
-`Add-OrSetLastProfile` in `MnMFieldNotes.ps1`), not retyped every launch. First run (zero
-saved profiles) opens `#profile-modal` automatically; returning users get their last-used
-profile pre-selected in the session-bar dropdown (`#profile-select`). Adding another
-profile is available any time via that dropdown's "+ Add new profile…" entry, reusing the
-same modal. The dropdown is disabled while a session is running, same as every other
-session-scoped control — switching only takes effect for the *next* session, matching how
-`loggedBy` is already locked in server-side once a session starts. `sessionType`/export
-attribution ties directly to the active profile name.
+Persisted (`Data\Profiles.json`, `Get-Profiles`/`Add-OrSetLastProfile`). First run (0
+profiles) → `#profile-modal` auto-opens. Returning user → last-used pre-selected
+(`#profile-select`). "+ Add new profile…" entry reuses the modal. Dropdown disabled during a
+session (switch takes effect next session; `loggedBy` already locked server-side).
+`sessionType`/export attribution = active profile name.
 
-### Tooltips — `data-tip="..."`, no per-element wiring
+### Tooltips: `data-tip="..."`
 
-App-wide, added 2026-08-24. Any element gets a small themed hover/focus popup just by adding
-a `data-tip="explanation"` attribute — `setupTooltips()` in `app.js` delegates on `document`
-(`mouseover`/`mouseout`/`focusin`/`focusout`, matched via `closest('[data-tip]')`), so this
-keeps working for elements that get replaced by an `innerHTML` rebuild (fish-pick-grid
-buttons, roster rows, the faction dropdowns, etc.) without ever needing to re-register a
-listener after a re-render. `checklistDropdownHTML` accepts an optional `config.tip` that
-puts the attribute straight on the toggle button, for components built from that helper.
+Any element + `data-tip="text"` → themed hover/focus popup, no per-element wiring.
+`setupTooltips()` in `app.js` delegates on `document` (mouseover/out, focusin/out via
+`closest('[data-tip]')`) → survives `innerHTML` rebuilds. `checklistDropdownHTML` takes an
+optional `config.tip` → puts it on the toggle button.
 
-**Used deliberately sparingly, not on every element** — only where there's no adjacent text
-already explaining the same thing (e.g. skipped on the Fishing pre-start screen's "Listen for
-key" button, which already sits under a paragraph explaining exactly what it does). Current
-coverage: the session-bar Start/End buttons, the profile dropdown, Combat's two faction
-checklist dropdowns, and the Fishing Area field. Add more the same way as the app grows, but
-check first whether the surrounding UI already says it before adding a tooltip that would
-just repeat it.
+Used sparingly — skip where adjacent text already explains (e.g. Fishing's "Listen for key,"
+which has its own paragraph). Current coverage: session-bar Start/End, profile dropdown,
+Combat's 2 faction dropdowns, Fishing's Area field.
 
-### Checklist dropdown — the standard pattern for "pick any number, searchably"
+### Checklist dropdown — standard "pick any number, searchably" pattern
 
-`checklistDropdownHTML`/`setupChecklistDropdown` (generalized 2026-08-24 from what started
-as a faction-only component) is the app-wide answer to "select any number of items from a
-list" — a toggle button opening a small-font 2-column checkbox panel with a live search box
-at the top, auto-focused on open. **Use this, not a plain `<select>` or a hand-rolled
-checkbox list, for any future multi-pick control** — this was an explicit, general request
-("this should be a running theme for the app... find what we're looking for as fast as
-possible"), not scoped to just the faction dropdowns it started on.
+`checklistDropdownHTML`/`setupChecklistDropdown` = app-wide answer for multi-pick lists.
+Toggle button → 2-col checkbox panel + live search, auto-focused. **Use this for ANY future
+multi-pick control**, not a plain `<select>`/hand-rolled list — explicit standing request
+("running theme... find what we're looking for as fast as possible").
 
-Filtering hides non-matching `.checklist-option` labels (`filtered-out` class) rather than
-removing/regenerating them — this is deliberate: checked state lives on the actual
-`<input>` DOM nodes, so a filtered-out (hidden) option must stay in the DOM or a checked
-box would silently lose its state the moment the search text changed. Verified this holds
-(check while filtered, clear the search, the check survives) before considering this
-component done.
+Filtering hides non-matching `.checklist-option` (`filtered-out` class), doesn't remove —
+checked state lives on the `<input>` DOM nodes, removing would lose it. Verify: check while
+filtered, clear search, check survives.
 
 ### Session types and fields
 
-Combat/Harvesting/Crafting sessions use a **roster + active-detail** pattern: a session can
-involve several different monsters/nodes/recipes, each tracked separately (a sidebar list
-of what's been encountered this session; clicking one makes it "active" and quick-entry
-fields apply to it). A Multi session mixes all three kinds in one roster. This mirrors the
-wiki's own `conObservations` model directly — same species, multiple kill instances, each
-with its own con/level.
+Combat/Harvesting/Crafting = roster + active-detail pattern (sidebar of things encountered
+this session; click → active; quick-entry fields apply to it). Multi = mixes all 3 in one
+roster. Mirrors the wiki's `conObservations` model (same species, multiple kills, each own
+con/level).
 
-- **Combat** → monster name, zone, con color + player level, coin drop (total off the
-  corpse, not a party split), items looted, named y/n, and faction changes — two
-  independent multi-select dropdowns (positive/negative), each a small-font 2-column
-  checkbox panel populated from every distinct faction name across `monsters.json`'s
-  `factionEffects` (60+ as of 2026-08-24, so the panel scrolls). Logged as `factionChanges:
-  [{faction, effect: 'positive'|'negative'}, ...]` — deliberately the same shape as the
-  wiki's own `factionEffects`, so no translation is needed later. This dropdown uses the
-  general-purpose `checklistDropdownHTML`/`setupChecklistDropdown` component (see "Checklist
-  dropdown" above), not a faction-specific one — the naming there covers why.
-- **Harvesting** → tradeskill (Mining/Lumberjacking/Herbalism/Foraging — Fishing has its own
-  tab, see below), node name, zone, player skill, success/fail, result item.
-- **Crafting** → tradeskill, recipe name, player skill, difficulty color, components used.
-  Still just a stub tab (`#panel-craft`) for every tradeskill except Cooking, which got
-  pulled out into its own fully-built tab — see "Cooking" below.
+- **Combat**: monster, zone, con+level, coin (total off corpse), items, named y/n,
+  `factionChanges` (2 checklist dropdowns pos/neg, from `monsters.json` `factionEffects`,
+  60+ entries). Logged as `[{faction,effect}]` — same shape as the wiki's own.
+- **Harvesting**: tradeskill (Mining/Lumberjacking/Herbalism/Foraging; Fishing has its own
+  tab), node, zone, skill, success/fail, resultItem.
+- **Crafting**: tradeskill, recipe, skill, difficultyColor, components. Still a stub
+  (`#panel-craft`) for everything except Cooking (own tab, see below).
 
-**The session-level export label (`session.type` in `app.js`, the "Session export - X" header
-and the export filename suffix) is derived from whichever tab is active at the moment "Start
-session" is clicked** — `TAB_SESSION_TYPE` maps each tab to a label (`fishing`/`harvesting`
-kept distinct here even though both log entries with `sessionType: 'harvesting'`, since this
-label is purely a human-facing export title, not what `Write-SessionExport` groups entries
-by). **Bug fixed 2026-08-24**: `btnStart`'s click handler used to hard-code
-`session.type = 'combat'` unconditionally, silently overriding whatever tab was actually
-active — every export said "Session export - combat" regardless of session content. Now
-reads `document.querySelector('.tab.active')` at click time instead of trusting a value that
-could've drifted from an earlier, since-superseded fix attempt in the tab-click handler
-itself. If this ever breaks again, check both places `session.type` gets assigned, not just
-one.
+**Session-level export label** (`session.type` in `app.js`, export header/filename) derives
+from the active tab at "Start session" click time (`TAB_SESSION_TYPE` map — fishing/harvesting
+kept as distinct labels even though both log `sessionType:'harvesting'`; the label is
+display-only). Past bug: `btnStart` used to hardcode `session.type='combat'`, silently
+overriding the tab. Now reads `.tab.active` at click time. If this breaks again, check BOTH
+assignment sites (tab-click handler AND `btnStart`).
 
-### Fishing — its own tab, deliberately not the roster pattern
+### Fishing — own tab, NOT the roster pattern
 
-Fishing doesn't share Harvesting's roster UI — there's no discrete "node" the way an ore
-vein has one, and real use is high-repetition (cast, catch-or-not, repeat), so the whole
-tab is designed around minimum taps per action (redesigned 2026-08-24 around this goal
-explicitly). Two states in `renderFishingPanel()` (`ui/app.js`):
+No discrete "node" concept + high-repetition use (cast/catch/repeat) → designed for minimum
+taps. 2 states in `renderFishingPanel()`:
 
-- **Pre-start**: "Listen for key" (opens `#fish-key-modal`, sends `startKeyCapture`, same
-  passive-observation hook as before, see "PowerShell/WinForms gotcha" above), a short
-  description paragraph explaining what the key listener does (added 2026-08-24 — first-time
-  users had no way to know what "Listen for key" meant before clicking it), and "Start
-  fishing!". Nothing else renders here on purpose — don't add fields to this screen without
-  checking first, it's an explicit design choice, not an oversight.
-- **"Start fishing!" opens two modals in sequence, then auto-starts the session** (skill
-  modal 2026-08-24, zone modal + auto-start 2026-08-24) — `#fish-skill-modal` asks for
-  current skill first (its "Next" button sets `fishingSession.skill`, then opens
-  `#fish-zone-modal`, whose own `#fish-zone-modal-picker` is a searchable single-select
-  checklist built fresh each open from `wikiData.zones`, same component as the in-screen
-  zone dropdown). Zone was always optional here too — picking nothing doesn't block
-  proceeding. **Confirming the zone modal auto-starts the overall session if one isn't
-  already running**, reusing the same `startNewSession()` the top "Start session" button
-  calls, rather than joining a session started from another tab. This exists because
-  forgetting to press the separate top "Start session" button meant every fishing catch
-  silently failed to log (`logFishCatch()`'s `if (!session.id)` guard rejected it with an
-  easy-to-miss toast) — the user hit this for real once. **`startSession`'s reply is a real
-  async WebView2 round trip, not synchronous** — `startFishing()` is deliberately not called
-  right after `startNewSession()`; instead a `pendingFishingStart` flag defers it until the
-  `sessionStarted` message actually confirms `session.id`. Skipping that and calling
-  `startFishing()` immediately was tried and reproducibly sent `fishingStarted`/first-catch
-  messages with `sessionId: null` in testing — the race is real even though a human's actual
-  click-through speed makes it very unlikely to hit in practice.
-- **Active** (after both modals are confirmed and the session is running): a **single-select** zone control — the
-  general `checklistDropdownHTML`/`setupChecklistDropdown` component in `multi:false` (radio)
-  mode, not the multi-select checkbox mode the faction dropdowns use, since a player can only
-  be in one zone at a time (2026-08-24: was a plain `<select>` originally, converted to this
-  searchable component for consistency with the "running theme" pattern, and single-select
-  mode was generalized into the component specifically for this) — an attempts counter and a
-  skill counter (`#fish-counter-box`/`#fish-skill-box`, two *separate* small boxes, each
-  re-rendering only itself via `updateCounterBox()`/direct DOM mutation in `bindSkillEvents()`,
-  never the surrounding form — same lesson as before about a keypress landing
-  mid-interaction). The skill counter's value is a real `<input type="number">`
-  (`#fish-skill-input`) the user can type into directly, not just +/- buttons. A grid of
-  one-tap fish buttons (`renderFishPickGrid()`, sourced from `wikiData.nodes` filtered to
-  Fishing, plus any typed in via "+ Add" this session) — **clicking a fish logs immediately**,
-  no confirm step, no form to fill.
-- **An optional free-text Area field sits next to Zone** (2026-08-24) — a specific lake,
-  pond, or dock within a zone, since different bodies of water in the same zone can give
-  different results. Unlike Zone this has no wiki-sourced fixed list (the wiki data has no
-  sub-zone granularity for Fishing at all), so it's a plain `<input>` (`#fish-area`) with a
-  `<datalist>` autocompleting from areas typed/logged this session
-  (`refreshFishAreaDatalist()`). Deliberately not part of the pre-fishing modal flow — only
-  Zone was asked for explicitly, Area stays an in-screen-only convenience. `logFishCatch()`
-  and `flushPendingFishAttempts()` both read it fresh from the DOM at logging time, same
-  reasoning as the zone-staleness lesson (see `CLAUDE-HISTORY.md`). Exported as `Area: X` on
-  the entry line in `Write-HarvestingBlock` (`MnMFieldNotes.ps1`) when present, entirely
-  generic/optional — non-Fishing harvesting entries never send it and the line is unaffected.
-- **The fish-pick grid sorts/highlights by zone (and area) relevance and flags junk**
-  (2026-08-24). `Get-WikiData` in `MnMFieldNotes.ps1` forwards each Fishing node's
-  `locations` and `note` fields (previously only `name`/`tradeskill` were sent) so the client
-  has what it needs:
-  - **Junk has no structured field in the wiki data** — it only ever shows up as free text in
-    a node's `note` (e.g. "A junk drop."), so `renderFishPickGrid()` matches `/junk/i` against
-    it. Confirmed with the user 2026-08-24 as the intended approach over a hardcoded name list
-    or a manual per-catch toggle — accept that it'll miss junk items whose note doesn't use
-    that word (e.g. a "not a fish species" phrasing) until the wiki data gains a real field.
-  - **"Expected in this zone"** is the union of the wiki's own `locations` for the selected
-    zone *and* anything actually caught in that zone (and Area, see below - 2026-08-24) this
-    session (`fishingSession.entries` filtered to `success && zone === selectedZone && area
-    === selectedArea`) — a catch not yet reflected in the wiki's `locations` still surfaces
-    as expected from that point on, re-rendered immediately (`logFishCatch()` calls
-    `renderFishPickGrid()` after logging, and the zone dropdown's `onChange`/the area input's
-    `input` listener both re-render it too). The wiki-sourced half of "expected" stays
-    zone-only regardless of area, since the wiki data has no area granularity to filter by -
-    only the session-observed half is area-scoped. Expected fish sort to the top under a
-    "Expected in this zone" label; everything else sorts alphabetically below. Junk styling
-    (dashed border, muted color) is independent of this and applies wherever the item lands,
-    including inside the expected group.
-  - Each button also shows a running `×N` catch count for this session (from
-    `fishingSession.entries`), separate from the "new" badge (which means "not in the wiki's
-    node list yet", still tracked independently).
-- **No separate "No catch" button** (removed 2026-08-24) — a zero-catch cast is implied by
-  the attempts counter going up without a fish click following it. `flushPendingFishAttempts()`
-  sends whatever's accumulated in `fishingSession.liveAttempts` as a single `success:false`
-  entry when the session ends. **Must fire before `endSession` is sent, not in the
-  `sessionEnded` response handler** — the session no longer exists host-side by the time that
-  response arrives, so a late-arriving flush would be silently rejected. See the `btnEnd`
-  click handler in `ui/app.js`.
-- **Fishing gets its own stats bar** (`#stats-fishing`, swapped in for `#stats-combat` by the
-  tab-click handler) — kills/coin don't mean anything for a fishing session, so the tiles are
-  Catches logged / Unique fish / Total attempts / Current skill / New for wiki instead,
-  updated via `updateFishStats()` at every state change (catch, attempt, skill change, session
-  end).
-- **Skill is recorded once at session start and once at session end** (2026-08-24) —
-  `startFishing()` sends a `fishingStarted` message the first time it runs each session
-  (`fishingSession.startSkillSent` guards against repeats if the skill modal is reopened),
-  and the `btnEnd` click handler sends `fishingEnded` with the current skill (gated on
-  `fishingSession.startSkillSent`, so it's only sent if fishing was actually used this
-  session) — both fire before `endSession`, same ordering requirement as
-  `flushPendingFishAttempts()`, since the session must still exist host-side to accept them.
-  Stored as `fishingStartSkill`/`fishingEndSkill` on that session's info in
-  `$script:Sessions`. `Write-SessionExport` prints both as "Fishing skill at session
-  start"/"...end" lines in the export header, separate from the per-catch `skill` value
-  already on each harvesting entry. The end value exists specifically to catch skill-ups
-  that happened without a catch following them (e.g. skilled up right before ending the
-  session) — without it, that skill-up wouldn't show up anywhere in the export.
-- **Listening auto-pauses on a suspiciously fast key-press burst** (2026-08-24) — 3+
-  `keyCounted` messages within 1 second (a held-down or physically stuck key, not real
-  casts) triggers `checkKeySpam()` in `app.js`, which calls `stopKeyCounting()`, shows a
-  toast, and renders a persistent "Resume listening" banner in the active screen until the
-  user clicks it (`resumeKeyListening()`, reuses the already-known `keyState.configured` key
-  — no need to re-capture). **Deliberately implemented entirely client-side, not touching
-  the native hook or its poll timer in `MnMFieldNotes.ps1` at all** — those have to stay
-  minimal per the "PowerShell/WinForms gotcha" above, and there's no need to touch them
-  since the UI already gets one message per press to work with; the safest way to honor
-  that constraint was to not go anywhere near it. The pre-start screen's description text
-  mentions this proactively too, so it isn't a surprise the first time it triggers.
+- **Pre-start**: "Listen for key" (`#fish-key-modal`, `startKeyCapture`) + explainer
+  paragraph + "Start fishing!". Nothing else — deliberate, don't add fields without checking.
+- **"Start fishing!"** → skill modal → zone modal → auto-starts session if none running
+  (reuses `startNewSession()`). Zone optional. **Race note**: `startSession`'s reply is
+  ASYNC — `startFishing()` deferred via `pendingFishingStart` flag until `sessionStarted`
+  confirms `session.id`. Calling immediately reproducibly sent `sessionId:null` in testing.
+- **Active**: single-select zone (`checklistDropdownHTML` `multi:false`/radio, not
+  checkbox), attempts counter + skill counter (`#fish-counter-box`/`#fish-skill-box`,
+  self-re-rendering only, never the full form). Skill = real `<input type=number>`. Fish-pick
+  grid = one-tap buttons, click = instant log, no confirm step.
+- **Area field** (optional, free-text `#fish-area` + datalist from session history) — no
+  wiki data for sub-zone granularity exists. Read fresh from DOM at log time (zone-staleness
+  lesson, CLAUDE-HISTORY). Exports as `Area: X` when present.
+- **Fish-pick grid** sorts/highlights by zone+area relevance, flags junk. `Get-WikiData`
+  forwards `locations`+`note` per node.
+  - Junk = `/junk/i` match on `note` (no structured field exists). Will miss non-"junk"-worded
+    notes — accepted tradeoff.
+  - "Expected in zone" = wiki `locations` ∪ session catches in same zone+area. Session-catch
+    half is area-scoped; wiki half is zone-only (no area data exists). Sorts to top under a
+    label; junk styling is independent, applies wherever the item lands.
+  - Per-button `×N` catch count (session), separate from "new" badge (not in wiki yet).
+- **No "No catch" button** (removed) — implied by the attempts counter rising without a
+  catch. `flushPendingFishAttempts()` sends the remainder as `success:false` at session end.
+  MUST fire before `endSession` (session no longer exists server-side after).
+- **Own stats bar** (`#stats-fishing`): Catches/Unique fish/Attempts/Skill/New-for-wiki.
+- **Skill recorded at session start** (`fishingStarted`, once, guarded by `startSkillSent`)
+  **and end** (`fishingEnded`, same guard) — both fire before `endSession`. Catches
+  skill-ups with no catch following.
+- **Key-spam guard**: 3+ `keyCounted` messages within 1 second → `checkKeySpam()` pauses
+  listening, toast + "Resume listening" banner. Entirely client-side — do NOT touch the
+  native hook/poll timer for this (must stay minimal, see gotcha above).
 
-### Cooking — its own tab, roster + detail pattern (like Harvesting, not Fishing)
+### Cooking — own tab, roster+detail (like Harvesting, not Fishing)
 
-Built 2026-08-24, split out of the generic Crafting stub specifically because **a dish can
-carry stat/resist/haste buffs the way any other item does** (`items.json`'s Food entries
-already use exactly this `stats`/`resists`/`haste` shape — confirmed by inspecting the wiki
-data directly rather than assuming a schema gap existed) and that needs its own fast entry
-UI, not something worth cramming into a one-size-fits-all Crafting form. Uses the **roster +
-active-detail pattern** (`dishRoster` Map, `activeDish`, mirroring Harvesting's `nodeRoster`
-almost exactly) rather than Fishing's zero-friction one-tap grid — a cooking attempt is one
-discrete, multi-field event (skill, difficulty, components), not the high-repetition case
-Fishing was redesigned around. **Deliberately has nothing shared with Fishing or Combat's
-own state** — own Map, own DOM ids (`ck-*`/`dish-*`), only reusing generic infrastructure
-(`checklistDropdownHTML`, `findItem`, `escapeHtml`) and the wiki reference data itself.
+Split from the Crafting stub because dishes carry stat/resist/haste buffs (`items.json` Food
+entries already use this shape — verified against real data, not assumed). Roster+detail
+(cooking attempt = discrete multi-field event, not high-repetition). Own state (`dishRoster`
+Map, `ck-*`/`dish-*` DOM ids) — nothing shared with Fishing/Combat beyond generic helpers +
+wiki data.
 
-- **`wikiData.recipes`** (2026-08-24) — `Get-WikiData` now also fetches `crafting.json`,
-  forwarded as `{name, tradeskill}` pairs (same minimal shape `nodes` originally had before
-  Fishing needed more). Used for the dish-name datalist (`refreshDishList()`, filtered to
-  `tradeskill === 'Cooking'`) and to flag "new for wiki" dishes in the stats bar, same
-  pattern as Fishing's known-fish check.
-- **Stats/resists/haste live on the dish itself, not per attempt** (`dishRoster.get(name) =
-  { entries, stats: {}, resists: {}, haste: 0 }`) — a given recipe always grants the same
-  buff regardless of how many times it's cooked this session, so recording it once per dish
-  (editable any time via the same checklist dropdowns) is both more accurate and far less
-  repetitive than asking on every attempt. `STAT_NAMES`/`RESIST_NAMES` in `app.js` are taken
-  directly from every distinct key actually used across `items.json`'s `stats`/`resists`
-  objects (STR/DEX/AGI/STA/WIS/INT/CHA/HP/MANA and POISON/FIRE/COLD/CORRUPTION/DISEASE/
-  MAGIC/ELECTRIC/HOLY) — `haste` is a single top-level number, not multi-select, matching
-  how gear's own `haste` field works (one scalar, never nested under `stats`).
-- **Checklist dropdown picks *which* stats apply; a small value input next to each checked
-  one captures *how much*** — `checklistDropdownHTML`/`setupChecklistDropdown` alone can't
-  express a value per selection, so `syncStatSelection()` keeps the dish's `stats`/`resists`
-  object in sync with the checklist's checked state (checking adds the key at `0`,
-  unchecking deletes it — no attempt to preserve a value behind an unchecked box, consistent
-  with there being no "undo" concept elsewhere in this app either) and `renderStatValueInputs()`
-  renders one compact `<input type="number">` per currently-selected key, wired to write
-  straight back into that same object on every keystroke.
-- **Difficulty color reuses the same con-color vocabulary as Combat's Con dropdown**
-  (Trivial/Green/Light Blue/Dark Blue/White/Yellow/Red) rather than inventing a separate
-  scale — it's the same underlying game concept, just applied to a crafting attempt instead
-  of a monster.
-- **Entries log as `sessionType: 'crafting'`** (not `'cooking'`) — matches the wiki-facing
-  bucket the original Crafting stub was always going to use, so Cooking's entries and any
-  future non-Cooking Crafting entries land in the same `--- crafting ---` export section,
-  grouped by dish/recipe name via the new `Write-CraftingBlock` in `MnMFieldNotes.ps1`. The
-  **session-level** export label is `'cooking'` though (`TAB_SESSION_TYPE.cooking`), so the
-  export filename/header stay descriptive of what was actually being logged - same split
-  Fishing already established (session label vs. entry `sessionType` are independent).
-  `Write-CraftingBlock` prints the dish's `Grants: ... | Resists: ... | Haste: ...` line
-  once per dish (from the first attempt, since it's the same for all of them), then each
-  attempt's skill/difficulty/outcome/components below it.
-- **Own stats bar** (`#stats-cooking`: Attempts logged / Unique dishes / Successes / New for
-  wiki), same reasoning as Fishing's — kills/coin from Combat's bar are meaningless here.
+- `wikiData.recipes` — `Get-WikiData` fetches `crafting.json` too, `{name,tradeskill}`. Feeds
+  the dish datalist + new-for-wiki flag.
+- Stats/resists/haste live on the DISH (`dishRoster.get(name)={entries,stats:{},resists:{},
+  haste:0}`), not per-attempt — same buff every cook. `STAT_NAMES`/`RESIST_NAMES` = exact
+  keys from `items.json` (STR/DEX/AGI/STA/WIS/INT/CHA/HP/MANA; POISON/FIRE/COLD/CORRUPTION/
+  DISEASE/MAGIC/ELECTRIC/HOLY). Haste = single scalar, not multi-select (matches gear).
+- Checklist picks WHICH stat; a per-checked value `<input type=number>` captures HOW MUCH
+  (`syncStatSelection()` syncs check state ↔ object keys; `renderStatValueInputs()` renders
+  the inputs). Unchecking deletes the value (no undo elsewhere in this app either).
+- Difficulty color = same vocab as Combat's Con dropdown (Trivial/Green/Light Blue/Dark
+  Blue/White/Yellow/Red).
+- Entries log `sessionType:'crafting'` (wiki bucket shared with future non-Cooking Crafting
+  entries) via `Write-CraftingBlock`. Session-level label = `'cooking'`
+  (`TAB_SESSION_TYPE.cooking`) — independent of entry `sessionType`, same split as Fishing.
+- Own stats bar (`#stats-cooking`): Attempts/Unique dishes/Successes/New-for-wiki.
 
-A **Lookup** tab searches the wiki's already-gathered data (read-only, live from its JSON
-— see "Wiki data as a read-only reference" below), independent of session logging.
+Lookup tab = read-only wiki search, independent of session logging.
 
-### Data model
+### Data model — 3 stores, don't collapse
 
-Three distinct stores, not one — don't collapse them:
-
-1. **All-time local log** — everything ever logged, own file(s) under this project,
-   grows forever, is what the app's own Lookup/history features query. Not curated.
-   **Append-only, with one deliberate exception (2026-08-24)**: a still-running session's
-   Fishing entries can be edited (fix a missing zone, a misclicked skill/fish, etc.) via an
-   "Edit" button on each row in the Fishing tab's session log. Each entry gets a
-   client-generated `id` (`genId()` in `app.js`) at logging time specifically so it can be
-   referenced later; the `editEntry` message rewrites that one JSONL line in place
-   (`Edit-AllTimeLogEntry` in `MnMFieldNotes.ps1`) rather than appending a correction.
-   **Scoped to the entry's own still-running session on purpose** — once a session ends,
-   `Write-SessionExport` has already written the export file, and editing the all-time log
-   after that would silently desync from what was actually exported. Editing the `zone`
-   field also has to patch `target` (what `Write-HarvestingBlock` groups the export by) in
-   the same call, or the corrected entry stays grouped under the old zone's header. Combat
-   and Harvesting entries don't have this yet (no "Edit" affordance built for their
-   roster+detail UI) — the underlying mechanism is entry-type-agnostic, so extending it
-   there later is a UI-only addition, not a new host-side capability.
-2. **Per-session export** — one plain-text file per session (confirmed with the user
-   2026-08-24: one file per session, not an accumulating inbox-style file), containing
-   only wiki-relevant fields — no session metrics like elapsed time or click counts.
-   Grouped in a way that's easy for Claude to read and act on directly.
-3. **Live session state** — in-memory while a session is running (the roster, stats bar,
-   active-detail panel); becomes (1) and (2) when the session ends.
+1. **All-time log** — append-only, ONE exception: still-running-session Fishing entries are
+   editable via a client-generated `id` (`genId()`) + `editEntry` → `Edit-AllTimeLogEntry`
+   rewrites that JSONL line in place. Scoped to the active session only (export already
+   written once ended). Editing `zone` must also patch `target` (the export's grouping
+   field) or the corrected entry stays under the old zone's header. Combat/Harvesting have
+   no edit UI yet — mechanism is generic, just needs UI.
+2. **Per-session export** — 1 txt file/session, wiki-relevant fields only (no
+   elapsed-time/click-count metrics).
+3. **Live session state** — in-memory, becomes #1+#2 at session end.
 
 ## Guild data trust model
 
-Once shared, other guild members' exports are a second kind of input alongside the user's
-own. Confirmed 2026-08-24: **trust guild-submitted data by default** — write it in the same
-as the user's own, don't gate every entry behind a confirmation step. **Exception: if a
-guild member's entry conflicts with something already recorded** (an existing wiki value,
-or a different guild member's own report), **flag it for the user rather than silently
-picking a side** — note the conflict and suggest further in-game testing to resolve it,
-same spirit as the wiki's own "flag rather than guess" convention for ambiguous data.
+Guild exports = trusted by default, same as the user's own, no confirmation gate. Exception:
+conflicts with existing data → flag for the user, don't silently pick a side (note the
+conflict, suggest in-game retest). Every export records who logged it (plain text field) —
+needed to identify conflicts later.
 
-To make conflicts identifiable at all, **every export should record who logged it** (a
-name/tag the guild member enters once, not per-entry) — lost provenance is what would make
-"this conflicts with what Alice reported" impossible to say later. This is a per-session
-export concern, not a UI feature to build elaborate identity/accounts around — a plain text
-field is enough.
+Also flag unnaturally-high Fishing click counts during review (soft judgment call, separate
+from the app's own client-side spam guard) — no fixed threshold, judge against the stated
+session duration.
 
-**Also flag unnaturally high click/attempt counts on a Fishing entry** when reviewing a
-submission — the app's own key-spam guard (see "Fishing" above) catches the fast, obvious
-case client-side, but a softer, higher judgment call belongs here instead of as a hard
-client-side block. Exact threshold isn't defined — use judgment based on what's plausible
-for the session's stated duration.
+## To-Do folder
 
-## The To-Do folder
-
-`To-Do/` (repo root) = user-requested future features not being built yet — mirrors the
-wiki project's own `To-Do/` convention. Read `To-Do/planned-features.md` before starting
-unscoped "keep building" work, so a half-formed idea from a past session doesn't get
-silently skipped; when the user names something specific, build that instead of picking
-from this list. Never treat an entry here as a current spec — each one still needs its own
-scoping/confirmation pass when it's actually picked up.
+`To-Do/planned-features.md` = future features, not current spec. Check before unscoped
+"keep building." Named requests override the list. Each item still needs its own scoping
+pass when picked up.
 
 ## File layout
 
-- `MnMFieldNotes.ps1` — the WinForms host: WebView2 initialization, the keypress-counter
-  hook, and all message handlers (session lifecycle, log entries, export, wiki fetch). Owns
-  every bit of file I/O and networking in the app.
-- `ui/` — the actual UI: `index.html` + `style.css` + `app.js`, served into the WebView2
-  control via `SetVirtualHostNameToFolderMapping` (virtual origin `appassets.local`, not
-  `file://`). `app.js` has a `hasHost` check with a dev-only mock host
-  (`mockHostRespond`) so the UI can be iterated on/previewed in a plain browser via
-  `lib/serve-ui.ps1` — the mock branch never runs inside the real app.
-- `Start.vbs` — silent launcher (runs the script with no console window).
-- `lib/webview2/` — gitignored fetched DLLs (see Architecture above).
-- `lib/serve-ui.ps1` — throwaway static file server for previewing `ui/` in a plain browser
-  during development (not used by the shipped app at all).
-- `lib/webview2-smoketest.ps1`, `lib/keyhook-spike*.ps1` — standalone diagnostic scripts kept
-  as reference for how the WebView2 init sequence and the keyboard hook were validated in
-  isolation. Not part of the app; safe to ignore unless this area breaks again.
-- `README.txt` — user-facing docs. Keep in sync with actual behavior.
-- `Data\` — gitignored; `AllTimeLog.jsonl` (append-only, every entry ever logged),
-  `Profiles.json` (saved profile names + last-used, see "Profiles" above),
-  `WebView2UserData\` (WebView2's own profile folder), `error.log` (written by the global
-  `ThreadException` handler — see "PowerShell/WinForms gotcha" above).
-- `Sessions\` — gitignored; per-session export `.txt` files land here.
+- `MnMFieldNotes.ps1` — WinForms host, all file I/O + networking, all message handlers.
+- `ui/` — `index.html`+`style.css`+`app.js`, served via `SetVirtualHostNameToFolderMapping`
+  (origin `appassets.local`, not `file://`). `hasHost` check + dev mock (`mockHostRespond`)
+  for browser preview via `lib/serve-ui.ps1` (mock never runs in the real app).
+- `Start.vbs` — silent launcher.
+- `lib/webview2/` — gitignored DLLs.
+- `lib/serve-ui.ps1` — dev-only preview server, not shipped.
+- `lib/webview2-smoketest.ps1`, `lib/keyhook-spike*.ps1` — isolated diagnostic scripts,
+  reference only.
+- `README.txt` — user docs, keep in sync.
+- `Data\` (gitignored): `AllTimeLog.jsonl`, `Profiles.json`, `WebView2UserData\`,
+  `error.log` (ThreadException handler).
+- `Sessions\` (gitignored): per-session export txts.
 
-## Wiki data as a read-only reference
+## Update checking
 
-The wiki's structured JSON data — `items.json`, `monsters.json`, `crafting.json`,
-`gathering-nodes.json`, `vendors.json`, `trainers.json`, `maps.json`, `companions.json`,
-`spells.json`, `tradeskills.json`, `gemstones.json` — is used two different ways, over two
-different channels. Don't conflate them:
+Version = plain incrementing integer (`$script:AppVersion` in `MnMFieldNotes.ps1`), compared
+with `[int]`, never `[string]` — string comparison breaks once a segment hits 2 digits
+(`"10" < "9"` lexicographically). Integer + numeric comparison sorts correctly forever, no
+padding/bookkeeping. A date-based scheme was tried first and dropped: same day = same
+version string = second same-day release never triggers a prompt for anyone already on the
+first. `$script:AppBuildDate` (separate constant, `yyyy-MM-dd`) is shown alongside the
+version in the masthead purely for human "how stale is this" context — not used in the
+comparison at all. Checked against
+`https://raw.githubusercontent.com/DistractibleD/mnm-field-notes-releases/main/latest.json`
+(`{version,url}`) via `Get-UpdateInfo`, called automatically on `ready` and manually via
+`checkForUpdates` msg (the "Check for updates" link in the masthead). Never blocks, never
+auto-applies — result rendered as a dismissible `#update-banner` (only when a newer version
+exists) or a toast (manual check only, so silent background checks don't nag). "View
+release" sends `openUrl` to the host (`Start-Process`, `http(s)://` validated first) rather
+than a plain `<a target=_blank>` — avoids WebView2 popup-window quirks, always opens the
+system browser. Releases repo (`mnm-field-notes-releases`, separate from this repo and from
+the wiki repo, git identity = GitHub noreply email) holds only `latest.json` + release zips,
+no app source. No self-update — download/replace is manual, deliberately, given the
+trust-boundary jump of an app downloading+running its own replacement code.
 
-1. **Claude, while building/debugging this app**: reads the local repo directly at
-   `D:\Claude files\MonstersAndMemories-Wiki\` — ordinary same-machine file access (`Read`/
-   `Grep`/`Glob`), same as reading any other file on this computer. Nothing to do with the
-   app's own runtime behavior below.
-2. **The running app itself, at runtime** (Lookup tab, autocomplete while logging): always
-   fetches from the **published site**,
-   `https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/<file>.json`,
-   over ordinary HTTPS — the same request any browser makes visiting the live wiki. This is
-   deliberately the *only* data-source path in the app's own code, for every user including
-   the project owner — no local-file-path special case, confirmed 2026-08-24 specifically
-   to keep the mental model simple: **one copy of this app never talks to another copy, or
-   to anyone else's computer, under any circumstance.** The only network endpoint the app's
-   own code ever touches is that one public URL. The one tradeoff: a wiki edit not yet
-   pushed/deployed won't show up in the app until it is — acceptable, don't try to work
-   around it with a local-file fallback.
+## Wiki data — read-only reference
 
-**Read-only, both channels, always.** Never create, edit, or delete anything in the local
-wiki repo from this project — no exceptions, and this project's own git history/commits
-must never touch that repo or its remote. The published site is fetched with a plain GET,
-never written to. That repo's own `CLAUDE.md` documents its full data schema/conventions if
-a lookup needs more context than the raw JSON gives.
+Wiki JSON files: items/monsters/crafting/gathering-nodes/vendors/trainers/maps/companions/
+spells/tradeskills/gemstones `.json`. Two channels, don't conflate:
 
-This does not weaken the Secrecy rules above — the relationship is strictly one-directional
-(this project may read the wiki's data; the wiki repo itself must never gain any file,
-commit, or text mentioning this project).
+1. **Claude (dev-time)**: reads the local repo directly
+   (`D:\Claude files\MonstersAndMemories-Wiki\`), ordinary file access.
+2. **Running app (runtime)**: ALWAYS fetches the published site
+   (`https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/<file>.json`)
+   over HTTPS, never a local path — same for every user including the owner, keeps behavior
+   identical across machines. Tradeoff: unpushed wiki edits are invisible until deployed —
+   accepted, no local fallback.
+
+**Read-only, both channels, always** — never create/edit/delete in the wiki repo, never let
+this project's git history touch it or its remote. Published site = `GET` only, never
+written to. One-directional: this project reads wiki data, never the reverse.

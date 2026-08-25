@@ -52,6 +52,11 @@ function mockHostRespond(msg) {
         zones: ['Night Harbor', 'Shaded Dunes', 'Sungreet Strand', 'Vale of Zintar', 'Evershade Weald'],
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
+      deliverFromHost({ type: 'updateInfo', currentVersion: 1, buildDate: '2026-08-25', latestVersion: 2, url: 'https://github.com/DistractibleD/mnm-field-notes-releases/releases/latest', available: true, error: null });
+    } else if (msg.type === 'checkForUpdates') {
+      deliverFromHost({ type: 'updateInfo', currentVersion: 1, buildDate: '2026-08-25', latestVersion: 2, url: 'https://github.com/DistractibleD/mnm-field-notes-releases/releases/latest', available: true, error: null, manual: true });
+    } else if (msg.type === 'openUrl') {
+      console.log('[mock host] would open URL', msg.url);
     } else if (msg.type === 'setProfile') {
       if (!mockProfiles.profiles.includes(msg.name)) mockProfiles.profiles.push(msg.name);
       mockProfiles.lastUsed = msg.name;
@@ -294,6 +299,28 @@ function showToast(text) {
   showToast._h = setTimeout(() => { t.style.display = 'none'; }, 4500);
 }
 
+// Update available banner - dismissible, never blocking. "View release"
+// round-trips through the host (openUrl) rather than a plain <a target=_blank>
+// so it always opens the system browser, not a bare WebView2 popup.
+function showUpdateBanner(version, url) {
+  const el = document.getElementById('update-banner');
+  el.innerHTML = `<span>Version ${escapeHtml(version)} is available.</span><span><a href="#" id="update-banner-view">View release</a><a href="#" id="update-banner-dismiss">Dismiss</a></span>`;
+  el.style.display = 'flex';
+  document.getElementById('update-banner-view').addEventListener('click', e => {
+    e.preventDefault();
+    sendToHost({ type: 'openUrl', url });
+  });
+  document.getElementById('update-banner-dismiss').addEventListener('click', e => {
+    e.preventDefault();
+    el.style.display = 'none';
+  });
+}
+
+document.getElementById('check-updates-link').addEventListener('click', e => {
+  e.preventDefault();
+  sendToHost({ type: 'checkForUpdates' });
+});
+
 // ---------------------------------------------------------------------------
 // Profiles: who's logging. Persisted host-side (Data\Profiles.json) so the
 // name doesn't need retyping every launch. First run (zero saved profiles)
@@ -500,6 +527,15 @@ onHostMessage((msg) => {
       profileState.active = (msg.lastUsed && profileState.profiles.includes(msg.lastUsed))
         ? msg.lastUsed : profileState.profiles[0];
       renderProfileSelect();
+    }
+  } else if (msg.type === 'updateInfo') {
+    document.getElementById('app-version').textContent = 'v' + msg.currentVersion + ' · built ' + msg.buildDate;
+    if (msg.error) {
+      if (msg.manual) showToast('Could not check for updates: ' + msg.error);
+    } else if (msg.available) {
+      showUpdateBanner(msg.latestVersion, msg.url);
+    } else if (msg.manual) {
+      showToast('You\'re on the latest version.');
     }
   } else if (msg.type === 'error') {
     showToast('Error: ' + msg.message);

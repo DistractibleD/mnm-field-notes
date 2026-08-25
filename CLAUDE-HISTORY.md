@@ -218,3 +218,49 @@ its own name since it was never part of the generic-from-developers surface. See
 change: the Secrecy section's guild-only distribution, no-remote rule, and
 never-mention-in-the-wiki-repo rule are a separate, still-fully-in-force concern (a
 different audience, a different reason) — this rename doesn't touch any of that.
+
+**Note (2026-08-25): the claim above is now superseded** — see "Secrecy and network
+restrictions removed" below. The Secrecy section this entry called "still-fully-in-force"
+no longer exists.
+
+### Secrecy and network restrictions removed from CLAUDE.md (2026-08-25)
+
+The Naming entry above already spotted the pattern: each time the app's actual risk profile
+changed, an old restriction got re-justified as "a mild preference" instead of being
+reconsidered from scratch. Today that same question was asked directly of the whole
+Secrecy section and Hard rule #3 (network restrictions), rather than just the naming
+surface — the user's own framing: "there seems to be a lot of residual paranoia from the
+earlier days of this project."
+
+Removed from `CLAUDE.md` entirely:
+- **Hard rule #3** (network calls restricted to the published wiki site only, no
+  machine-to-machine networking between copies, no telemetry).
+- **The whole "Secrecy" section** — never-mention-in-the-wiki-repo (the secrecy-motivated
+  half; the separate *data-integrity* "never write to the wiki repo" rule stayed, see
+  below), local-only/no-remote, the guild-sharing carve-out framing, "nothing shared
+  without explicit ask."
+- **The Naming section's "this does not change the Secrecy scope above" caveat** — the
+  paragraph that existed specifically to wall the 2026-08-24 rename off from affecting
+  secrecy. With Secrecy itself gone, the wall has nothing left to separate.
+- The "one copy of this app never talks to another copy... under any circumstance"
+  language in "Wiki data as a read-only reference" — reworded to keep the legitimate,
+  non-secrecy reasoning (no local-file special-case, so behavior stays identical across
+  every user's machine) without the absolutist secrecy framing.
+
+**Explicitly kept, on the user's own instruction, because they're a different kind of
+constraint** — not about hiding from people, about not damaging anything real:
+- **Hard rule #1, zero interaction with the game.** The user's own words: "We should
+  absolutely NEVER tamper with the game files. They are holy and if we touch them we can
+  get banned and lose our account." This is the one rule in this entire project that must
+  never soften regardless of how the rest of the posture evolves.
+- **Read-only access to the wiki repo** (never create/edit/delete anything there, never let
+  this project's git history touch that repo or its remote) — not about secrecy, about not
+  damaging a separate project's own content.
+
+Local-only/no-remote being gone means adding a git remote to this project no longer needs
+special justification beyond the user's normal say-so for any git operation — but nothing
+has actually been connected as of this entry; that's a separate future action, not something
+this documentation change did on its own. If update-checking or guild distribution
+infrastructure gets built next (see `To-Do/planned-features.md` #5), it can now be scoped
+on its own technical merits instead of first re-litigating whether hosting anything
+anywhere is acceptable at all.

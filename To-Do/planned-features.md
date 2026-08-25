@@ -72,27 +72,22 @@ shared beyond generic UI helpers and the wiki reference data. Verified in the mo
 adding a dish, picking/unpicking stats, logging an attempt, and confirming the roster/stats
 bar/log all update correctly; a live run confirmed `crafting.json` fetches cleanly.
 
-## 5. Auto-update check (2026-08-24)
+## 5. ~~Update check~~ — done (2026-08-25)
 
-The app checks for and downloads a newer version itself, rather than the user always
-getting updates as a fresh manual zip. Real motivation: once guild members have their own
-copies (see the guild-sharing decision in `CLAUDE.md`), keeping everyone in sync without
-re-sending a zip every time gets old fast — this is worth building once there's an actual
-guild rollout to keep in sync, not just a nice-to-have.
+Version check + prompt built (see "Update checking" in `CLAUDE.md`). Deliberately NOT a
+self-updater — "View release" opens the releases page, user downloads/replaces manually.
+Hosting: new repo `mnm-field-notes-releases` (public, separate from app source and from the
+wiki repo), holding just `latest.json` + release zips. Git identity on that repo uses the
+GitHub noreply email, same as the wiki repo, so the user's real email stays off any public
+commit.
 
-Open questions/dependencies, not decided yet — this one has more unresolved shape than the
-others above:
-- **No version source exists yet.** The app has no version number at all today (not in
-  `MnMFieldNotes.ps1`, not anywhere) — a real prerequisite before "check for updates" means
-  anything is picking a versioning scheme in the first place.
-- **Where would the app check *against*?** This project is deliberately local-only, no git
-  remote (see "Secrecy" in `CLAUDE.md`) — there's no hosted "latest version" location today.
-  Solving this needs the same kind of explicit, deliberate decision the GitHub-push idea (#1
-  above) needs, and may end up sharing infrastructure with it (or may not — a private
-  update-check endpoint and a public-facing submission endpoint aren't necessarily the same
-  thing). Don't assume they're the same decision without asking.
-- **Downloading and running new code is a meaningfully bigger trust boundary than anything
-  this app does today** — every existing network call is a read-only `GET` of JSON data;
-  auto-update means pulling in and executing new code. Whatever design this ends up with
-  needs real integrity/trust safeguards (e.g. the user confirming an update before it
-  applies, not a silent auto-run), not just "download and replace the files."
+Still open, not needed for the check/prompt itself but for actually distributing updates:
+- **No release has been cut yet** — `latest.json`'s `url` points at `/releases/latest`, but
+  no GitHub Release/zip exists there yet. First real update will need one tagged, with
+  `lib/webview2/*.dll` included in the zip (see the Installer note below — those are
+  gitignored in this dev repo but a distributable zip needs them present).
+- **No installer, and intentionally so** — the app is portable (no registry/Program
+  Files/services), so "install" = unzip + run `Start.vbs`, "uninstall" = delete the folder.
+  A traditional installer would add real downsides (unsigned `.exe` triggers SmartScreen)
+  for no real benefit at guild scale. Still needs an `INSTALL.txt` in the distributed zip
+  explaining what's inside and why, for guild members who aren't the project owner.
