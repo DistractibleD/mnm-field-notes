@@ -193,7 +193,9 @@ taps. 2 states in `renderFishingPanel()`:
 - **Key-spam guard**: 3+ `keyCounted` messages within 1 second → `checkKeySpam()` pauses
   listening, toast + "Resume listening" banner. Entirely client-side — do NOT touch the
   native hook/poll timer for this (must stay minimal, see gotcha above).
-- **Rarity bars** (2026-08-27, collapsed by default behind a "Show rarity estimate" toggle,
+- **Rarity bars** (2026-08-27, expanded by default — collapsible via a "Hide rarity estimate"
+  toggle, `fishRarityPanelExpanded` starts `true` since this is exactly the kind of feature
+  meant to be found, not hidden behind a toggle most users never click — see
   `#fish-rarity-panel`/`renderFishRarityPanel()`) — an EMPIRICAL guess from this app's own
   logged data, not the wiki's Common/Uncommon/Rare/Very Rare label (may switch to that
   instead later per the user — this was the first cut). `Get-FishRarity` in

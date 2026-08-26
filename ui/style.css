@@ -314,10 +314,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-btn.tier-orange { background: #6b3f1f; color: #ffcfa8; border-color: #6b3f1f; }
 .fish-pick-btn.tier-red { background: #6b1f1f; color: #ffb3b3; border-color: #6b1f1f; }
 
-/* ---------- Fishing rarity bars - collapsed by default (toggle button,
-   .rarity-panel only rendered while expanded), horizontal bars since this
-   app's layout is tuned for a narrow portrait 2nd monitor where side-by-side
-   vertical bars would run out of width fast. ---------- */
+/* ---------- Fishing rarity bars - expanded by default (toggle button,
+   .rarity-panel only rendered while expanded, collapsible for anyone who'd
+   rather not see it), horizontal bars since this app's layout is tuned for
+   a narrow portrait 2nd monitor where side-by-side vertical bars would run
+   out of width fast. ---------- */
 .rarity-panel {
   margin-top: 8px; padding: 10px 12px; background: var(--bg-raised);
   border: 1px solid var(--border-strong); border-radius: 8px;

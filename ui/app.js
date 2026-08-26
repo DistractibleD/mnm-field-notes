@@ -1955,11 +1955,13 @@ function addCustomFish() {
 // Rarity bars (2026-08-27) - an empirical guess at how rare each fish is in
 // the current zone, from the app's own logged attempts/catches rather than
 // the wiki's Common/Uncommon/Rare label (may switch to that instead later,
-// this is the first cut). Collapsed by default - useful, but not part of
-// the fast tap-and-log loop, so it shouldn't compete for space with it.
+// this is the first cut). Expanded by default (2026-08-27) - features like
+// this are exactly what makes the app worth using beyond a plain logging
+// form, so it shouldn't be hidden behind a toggle most users never find.
+// Collapsible for anyone who'd rather not see it.
 // ---------------------------------------------------------------------------
 const MIN_RARITY_ATTEMPTS = 20; // below this the ratio is too noisy to show with a straight face
-let fishRarityPanelExpanded = false;
+let fishRarityPanelExpanded = true;
 
 // Combines the all-time baseline (frozen at 'ready', so it excludes anything
 // caught THIS session) with fishingSession's own entries plus any attempts
