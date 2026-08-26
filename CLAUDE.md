@@ -184,6 +184,24 @@ fishing spots), junk detection (no wiki concept of "junk" for gathering material
   `bindGatherSkillEvents`, no attempts counter) + node-type grid (`renderGatherNodeGrid`,
   same expected/new/×N-count sort+badge logic as Fishing's fish-pick grid, `+Add` for a
   custom node type).
+- **Difficulty guess** (2026-08-26): each node button gets a background/text color from
+  `gatherDifficultyTier(node, skill)` — an ESTIMATE, not measured data. The wiki's
+  `gathering-nodes.json` gives only two points per node (`minSkill`/`trivialSkill`, ~28% of
+  nodes have neither — those get no tier, no data in means no color guessed out); the range
+  between is split into 7 even bands using the wiki's own `.badge-difficulty-*` hex pairs
+  (`style.css` `.tier-green` through `.tier-red` — same colors the wiki uses for recipe
+  trivial ranges, copied over so a node reads the same way it does there). Green = at/above
+  `trivialSkill` (no more skill gain), Red = at/near `minSkill` (hardest, freshest skill
+  gain) — opposite direction from Combat's Con scale, don't mix the two up. Re-renders live
+  on every skill change (`bindGatherSkillEvents` calls `renderGatherNodeGrid()` on all three
+  skill inputs) since the guess is skill-relative. `data-tip` on the button spells out the
+  guess is an estimate, not measured.
+  - Freed up a channel to do this: `.expected` ("expected in this zone") used to be
+    text/border color, now a `box-shadow` ring (`--accent-craft`) so it doesn't compete with
+    the difficulty color on the same button. Shared CSS with Fishing's fish-pick grid, so
+    this changed Fishing's "expected" styling too (ring instead of gold text) — deliberate,
+    not a Gathering-only tweak.
+  - `Get-WikiData` forwards `minSkill`/`trivialSkill` per node (added alongside `results`).
 - **Tapping a node type** opens `#gather-material-modal` (`openGatherMaterialModal`) — a
   second `.fish-pick-grid` scoped to that one node's materials: wiki `results` (flattened by
   `Get-WikiData`, which mixes plain strings and `{family,label}` objects — display label

@@ -39,9 +39,9 @@ function mockHostRespond(msg) {
         nodes: [
           { name: 'Lionleaf', tradeskill: 'Herbalism', locations: ['Vale of Zintar', 'Evershade Weald'], results: ['Lionleaf Bloom', 'Plant Fiber'] },
           { name: 'Ghost Poppy', tradeskill: 'Herbalism', locations: ['Evershade Weald'], results: ['Ghost Poppy Petal'] },
-          { name: 'Copper Vein', tradeskill: 'Mining', locations: ['Shaded Dunes', 'Sungreet Strand'], results: ['Copper Ore', 'Rough Stone'] },
-          { name: 'Limestone Deposit', tradeskill: 'Mining', locations: ['Shaded Dunes'], results: ['Limestone', 'Rough Stone'] },
-          { name: 'Old Oak', tradeskill: 'Lumberjacking', locations: ['Evershade Weald', 'Vale of Zintar'], results: ['Oak Log', 'Tree Sap'] },
+          { name: 'Copper Vein', tradeskill: 'Mining', locations: ['Shaded Dunes', 'Sungreet Strand'], results: ['Copper Ore', 'Rough Stone'], minSkill: 1, trivialSkill: 50 },
+          { name: 'Limestone Deposit', tradeskill: 'Mining', locations: ['Shaded Dunes'], results: ['Limestone', 'Rough Stone'], minSkill: 40, trivialSkill: 75 },
+          { name: 'Old Oak', tradeskill: 'Lumberjacking', locations: ['Evershade Weald', 'Vale of Zintar'], results: ['Oak Log', 'Tree Sap'], minSkill: 1, trivialSkill: 40 },
           { name: 'Whitefish', tradeskill: 'Fishing', locations: ['Night Harbor', 'Shaded Dunes'] },
           { name: 'Grouper', tradeskill: 'Fishing', locations: ['Night Harbor', 'Sungreet Strand'] },
           { name: 'Basa', tradeskill: 'Fishing', locations: ['Shaded Dunes'] },
@@ -958,15 +958,38 @@ function bindGatherSkillEvents() {
   document.getElementById('gather-skill-minus').addEventListener('click', () => {
     gatheringSession.skill = Math.max(0, gatheringSession.skill - 1);
     input.value = gatheringSession.skill;
+    renderGatherNodeGrid();
   });
   document.getElementById('gather-skill-plus').addEventListener('click', () => {
     gatheringSession.skill = gatheringSession.skill + 1;
     input.value = gatheringSession.skill;
+    renderGatherNodeGrid();
   });
   input.addEventListener('input', () => {
     const v = parseInt(input.value, 10);
     gatheringSession.skill = isNaN(v) ? 0 : Math.max(0, v);
+    renderGatherNodeGrid();
   });
+}
+
+// Difficulty guess for a node at the player's current skill - an estimate,
+// not measured data: the wiki only gives us two points (minSkill = can't
+// attempt below it, trivialSkill = no more skill-ups at/above it), so the
+// range between is split into 7 even bands using the wiki's own recipe
+// difficulty vocabulary/colors (see .tier-* in style.css). Null when the
+// node has no min/trivial skill in the wiki (true for a real chunk of
+// nodes, mostly Mining) - no data in, no color guessed out.
+function gatherDifficultyTier(node, skill) {
+  if (!node || node.minSkill == null || node.trivialSkill == null) return null;
+  const min = node.minSkill, trivial = node.trivialSkill;
+  const pct = trivial > min ? (skill - min) / (trivial - min) : (skill >= trivial ? 1 : 0);
+  if (pct >= 6 / 7) return 'green';
+  if (pct >= 5 / 7) return 'light-blue';
+  if (pct >= 4 / 7) return 'dark-blue';
+  if (pct >= 3 / 7) return 'white';
+  if (pct >= 2 / 7) return 'yellow';
+  if (pct >= 1 / 7) return 'orange';
+  return 'red';
 }
 
 // Sorts/highlights the same way Fishing's fish-pick-grid does: known node
@@ -992,12 +1015,18 @@ function renderGatherNodeGrid() {
   });
 
   function renderBtn(f) {
+    const nodeData = wikiData.nodes.find(n => n.tradeskill === gatheringSession.tradeskill && n.name === f);
+    const tier = gatherDifficultyTier(nodeData, gatheringSession.skill);
     const classes = ['fish-pick-btn'];
     if (!known.includes(f)) classes.push('new');
     if (expectedNames.has(f)) classes.push('expected');
+    if (tier) classes.push('tier-' + tier);
     const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
     const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
-    return `<button class="${classes.join(' ')}" data-node="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
+    const tip = tier
+      ? ` data-tip="Guessed difficulty at skill ${gatheringSession.skill}, from this node's ${nodeData.minSkill}-${nodeData.trivialSkill} skill range in the wiki - not measured."`
+      : '';
+    return `<button class="${classes.join(' ')}"${tip} data-node="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
   }
 
   const expected = all.filter(f => expectedNames.has(f)).sort();

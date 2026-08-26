@@ -281,7 +281,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-btn:active { transform: scale(0.97); }
 .fish-pick-btn.new { border-color: var(--success); }
 .fish-pick-new-badge { font-size: 10px; color: var(--success); vertical-align: 2px; margin-left: 2px; }
-.fish-pick-btn.expected { color: var(--accent-strong); border-color: var(--accent); font-weight: 600; }
+/* "Expected here" is a ring, not a text/border color - color is reserved for
+   Gathering's difficulty-tier guess below, so the two signals never compete
+   for the same channel on the same button. */
+.fish-pick-btn.expected { box-shadow: 0 0 0 2px var(--accent-craft); font-weight: 600; }
 .fish-pick-btn.junk { color: var(--text-muted); border-color: var(--text-muted); border-style: dashed; font-weight: 400; }
 .fish-pick-btn.picked { background: var(--accent-craft); border-color: var(--accent-craft); color: var(--bg-page); font-weight: 600; }
 .fish-pick-count { font-size: 11px; color: var(--text-secondary); margin-left: 4px; }
@@ -290,6 +293,20 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   flex-basis: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-secondary); margin: 2px 0 -2px;
 }
+
+/* ---------- Gathering node difficulty guess - same hex pairs as the wiki's
+   own .badge-difficulty-* (recipe trivial-skill tiers), reused here so a
+   node reads the same "how far below trivial am I" way it does on the wiki.
+   Green = at/above trivialSkill (no more skill gain), Red = at/near minSkill
+   (hardest, freshest skill gain). An estimate from minSkill/trivialSkill,
+   not a measured result - see the node button's tooltip. ---------- */
+.fish-pick-btn.tier-green { background: #2e5c33; color: #b6f2b6; border-color: #2e5c33; }
+.fish-pick-btn.tier-light-blue { background: #1f4d66; color: #b6e6ff; border-color: #1f4d66; }
+.fish-pick-btn.tier-dark-blue { background: #1f3f66; color: #b6d0ff; border-color: #1f3f66; }
+.fish-pick-btn.tier-white { background: #4a4a4a; color: #ffffff; border-color: #4a4a4a; }
+.fish-pick-btn.tier-yellow { background: #6b5c1f; color: #ffe9a8; border-color: #6b5c1f; }
+.fish-pick-btn.tier-orange { background: #6b3f1f; color: #ffcfa8; border-color: #6b3f1f; }
+.fish-pick-btn.tier-red { background: #6b1f1f; color: #ffb3b3; border-color: #6b1f1f; }
 
 /* ---------- Responsive: optimized for a tall/narrow (portrait) second
    monitor, still comfortable on a wide landscape one. ---------- */

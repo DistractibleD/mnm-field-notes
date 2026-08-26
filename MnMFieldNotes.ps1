@@ -119,7 +119,7 @@ function Get-WikiData {
             # ({family:"Chipped", label:"Chipped Gems"}) - flatten both to the
             # display label so the client only ever deals with plain strings.
             $flatResults = @($_.results | ForEach-Object { if ($_.label) { $_.label } else { $_ } })
-            @{ name = $_.name; tradeskill = $_.tradeskill; locations = @($_.locations); note = $_.note; results = $flatResults }
+            @{ name = $_.name; tradeskill = $_.tradeskill; locations = @($_.locations); note = $_.note; results = $flatResults; minSkill = $_.minSkill; trivialSkill = $_.trivialSkill }
         })
         $result.recipes = @($crafting | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill } })
         $result.factions = @(
