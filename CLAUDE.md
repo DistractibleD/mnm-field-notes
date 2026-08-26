@@ -235,12 +235,15 @@ pass when picked up.
 
 ## Update checking
 
-Version = plain incrementing integer (`$script:AppVersion` in `MnMFieldNotes.ps1`), compared
-with `[int]`, never `[string]` — string comparison breaks once a segment hits 2 digits
-(`"10" < "9"` lexicographically). Integer + numeric comparison sorts correctly forever, no
-padding/bookkeeping. A date-based scheme was tried first and dropped: same day = same
-version string = second same-day release never triggers a prompt for anyone already on the
-first. `$script:AppBuildDate` (separate constant, `yyyy-MM-dd`) is shown alongside the
+Version = `major.minor` string (`$script:AppVersion` in `MnMFieldNotes.ps1`), starting at
+`0.1` — 0.x means alpha, `1.0` is reserved for an actual finished product, not just "the
+next release." Compared via `Compare-AppVersion` (splits on `.`, compares each segment as a
+real `[int]`), never as a single numeric cast (can't parse a dotted string) or a plain
+string comparison (`"0.10" < "0.9"` lexicographically, wrong both ways). A plain incrementing
+integer was tried first and dropped once the alpha/1.0 framing came up; a date-based scheme
+before that was dropped too: same day = same version string = second same-day release never
+triggers a prompt for anyone already on the first. `$script:AppBuildDate` (separate constant,
+`yyyy-MM-dd`) is shown alongside the
 version in the masthead purely for human "how stale is this" context — not used in the
 comparison at all. Checked against
 `https://raw.githubusercontent.com/DistractibleD/mnm-field-notes-releases/main/latest.json`

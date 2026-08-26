@@ -52,9 +52,9 @@ function mockHostRespond(msg) {
         zones: ['Night Harbor', 'Shaded Dunes', 'Sungreet Strand', 'Vale of Zintar', 'Evershade Weald'],
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
-      deliverFromHost({ type: 'updateInfo', currentVersion: 1, buildDate: '2026-08-25', latestVersion: 2, url: 'https://github.com/DistractibleD/mnm-field-notes-releases/releases/latest', available: true, error: null });
+      deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes-releases/releases/latest', available: true, error: null });
     } else if (msg.type === 'checkForUpdates') {
-      deliverFromHost({ type: 'updateInfo', currentVersion: 1, buildDate: '2026-08-25', latestVersion: 2, url: 'https://github.com/DistractibleD/mnm-field-notes-releases/releases/latest', available: true, error: null, manual: true });
+      deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes-releases/releases/latest', available: true, error: null, manual: true });
     } else if (msg.type === 'openUrl') {
       console.log('[mock host] would open URL', msg.url);
     } else if (msg.type === 'setProfile') {

@@ -86,6 +86,15 @@ Still open, not needed for the check/prompt itself but for actually distributing
   no GitHub Release/zip exists there yet. First real update will need one tagged, with
   `lib/webview2/*.dll` included in the zip (see the Installer note below — those are
   gitignored in this dev repo but a distributable zip needs them present).
+- **Dev folder stays named `MnM Loot Tracker` on disk (2026-08-26)** — renaming it to match
+  the app's current name was considered and explicitly declined, not worth the session
+  disruption (this folder is the hard-anchored working directory for the whole dev session).
+  This means **whoever builds the release zip must not just zip this folder as-is** — the
+  zip's own top-level folder/file naming needs to reflect "MnM Field Notes", not "MnM Loot
+  Tracker", regardless of what the source directory on disk is called. The user's own words:
+  "As long as the install my org mates get contains the real app name and not this old one
+  i am happy" — the dev folder's name is exempt from that, only the distributed artifact
+  isn't.
 - **No installer, and intentionally so** — the app is portable (no registry/Program
   Files/services), so "install" = unzip + run `Start.vbs`, "uninstall" = delete the folder.
   A traditional installer would add real downsides (unsigned `.exe` triggers SmartScreen)

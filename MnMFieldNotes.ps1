@@ -70,7 +70,7 @@ function Write-DebugLog {
 }
 
 $WikiBaseUrl = 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/'
-$script:AppVersion = 1
+$script:AppVersion = '0.1'
 $script:AppBuildDate = '2026-08-25'
 $UpdateCheckUrl = 'https://raw.githubusercontent.com/DistractibleD/mnm-field-notes-releases/main/latest.json'
 $AllTimeLogPath = Join-Path $dataDir 'AllTimeLog.jsonl'
@@ -144,12 +144,24 @@ function Get-UpdateInfo {
             buildDate = $script:AppBuildDate
             latestVersion = $latest.version
             url = $latest.url
-            available = [int]$latest.version -gt [int]$script:AppVersion
+            available = (Compare-AppVersion -a $latest.version -b $script:AppVersion) -gt 0
             error = $null
         }
     } catch {
         return @{ currentVersion = $script:AppVersion; buildDate = $script:AppBuildDate; latestVersion = $null; url = $null; available = $false; error = $_.Exception.Message }
     }
+}
+
+# "major.minor", e.g. "0.1" pre-1.0 (still alpha), "1.0" = first finished
+# release. Compared as real integers per segment, never as strings/whole-value
+# casts - "0.10" vs "0.9" would be wrong both ways otherwise (string: "1" <
+# "9"; a single [int] cast can't parse a dotted string at all).
+function Compare-AppVersion {
+    param([string]$a, [string]$b)
+    $aParts = $a -split '\.' | ForEach-Object { [int]$_ }
+    $bParts = $b -split '\.' | ForEach-Object { [int]$_ }
+    if ($aParts[0] -ne $bParts[0]) { return $aParts[0] - $bParts[0] }
+    return $aParts[1] - $bParts[1]
 }
 
 # ---------------------------------------------------------------------------
