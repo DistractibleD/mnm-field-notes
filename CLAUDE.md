@@ -315,10 +315,10 @@ repo from the project's earlier secrecy phase. Once that phase ended (see "Namin
 split no longer served a purpose, so `mnm-field-notes-releases` was renamed to
 `mnm-field-notes` (GitHub repo rename preserves existing tags/release zips/download URLs
 automatically) and this repo's own history was merged into it (`git merge
---allow-unrelated-histories`, preserving both commit histories). `raw.githubusercontent.com`
-does NOT reliably follow a repo rename the way `github.com` web URLs do, so
-`$UpdateCheckUrl` and `latest.json`'s own `url` field both had to be repointed by hand — if
-this repo is ever renamed again, check both. No self-update — download/replace is manual,
+--allow-unrelated-histories`, preserving both commit histories). `$UpdateCheckUrl` and
+`latest.json`'s own `url` field were both repointed to the new name anyway even though
+`raw.githubusercontent.com` turned out to redirect the old one fine — don't lean on that
+redirect for a future rename, repoint both by hand and verify. No self-update — download/replace is manual,
 deliberately, given the
 trust-boundary jump of an app downloading+running its own replacement code.
 
