@@ -86,8 +86,8 @@ Any element + `data-tip="text"` → themed hover/focus popup, no per-element wir
 optional `config.tip` → puts it on the toggle button.
 
 Used sparingly — skip where adjacent text already explains (e.g. Fishing's "Listen for key,"
-which has its own paragraph). Current coverage: session-bar Start/End, profile dropdown,
-Combat's 2 faction dropdowns, Fishing's Area field.
+which has its own paragraph). Current coverage: session-bar's start/end button, profile
+dropdown, Combat's 2 faction dropdowns, Fishing's Area field.
 
 ### Checklist dropdown — standard "pick any number, searchably" pattern
 
@@ -99,6 +99,33 @@ multi-pick control**, not a plain `<select>`/hand-rolled list — explicit stand
 Filtering hides non-matching `.checklist-option` (`filtered-out` class), doesn't remove —
 checked state lives on the `<input>` DOM nodes, removing would lose it. Verify: check while
 filtered, clear search, check survives.
+
+### Starting a session — one button, state-dependent (2026-08-27)
+
+`#btn-session-action` (`btnSession` in app.js) is the ONLY session start/end control — used to
+be two separate buttons (`btnStart`/`btnEnd`), collapsed into one because the plain "Start
+session" button could bypass Fishing/Gathering's own prompt flow entirely: clicking it while
+on either tab started a session with no zone/skill/tradeskill ever collected, leaving that
+tab's own active-screen state out of sync with a session that technically existed underneath.
+Label/tooltip/click-behavior all just follow `session.id` (`setSessionButtonState(running)`
+sets both label+tooltip together, called from the `sessionStarted`/`sessionEnded` handlers
+and once at init):
+
+- **No session running** → "Start new session". Click checks `profileState.active` first
+  (toasts + bails if missing, same message `startNewSession()` itself would show — checked
+  here too so a tab with its own prompt flow doesn't walk the user through 3 modals only to
+  fail on the last one, and so this button doesn't sit disabled forever with nothing left to
+  re-enable it, since the entry-point functions below don't report back whether they ever
+  reach that call). Then reads `.tab.active` FRESH at click time (not cached — same reasoning
+  as the export-label bug below) and looks it up in `TAB_START_ENTRY` = `{fishing:
+  openFishSkillModal, gathering: openGatherZoneModal}` — tabs with their own prompt flow hand
+  off to that flow's entry point instead of starting a plain session immediately, same
+  pattern those tabs' own pre-start screens already use. Tabs without an entry yet
+  (Combat/Crafting/Cooking/Multi) fall through to `startNewSession()` directly, unchanged
+  from before. **Extend `TAB_START_ENTRY` as more tabs get their own prompt flow** — the plan
+  is for every tab to eventually work this way, per the user.
+- **Session running** → "End session & export". Unchanged from the old `btnEnd` handler
+  (flush pending fish attempts, report skill-at-end for Fishing/Gathering, `endSession`).
 
 ### Session types and fields
 
@@ -114,11 +141,11 @@ Gathering/Fishing are NOT this pattern — see their own sections below.
   (`#panel-craft`) for everything except Cooking (own tab, see below).
 
 **Session-level export label** (`session.type` in `app.js`, export header/filename) derives
-from the active tab at "Start session" click time (`TAB_SESSION_TYPE` map — fishing/gathering
-kept as distinct labels even though both log `sessionType:'harvesting'`; the label is
-display-only). Past bug: `btnStart` used to hardcode `session.type='combat'`, silently
+from the active tab at click time (`TAB_SESSION_TYPE` map — fishing/gathering kept as
+distinct labels even though both log `sessionType:'harvesting'`; the label is display-only).
+Past bug: the session-start button used to hardcode `session.type='combat'`, silently
 overriding the tab. Now reads `.tab.active` at click time. If this breaks again, check BOTH
-assignment sites (tab-click handler AND `btnStart`).
+assignment sites (tab-click handler AND `startNewSession()`).
 
 ### Fishing — own tab, NOT the roster pattern
 

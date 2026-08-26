@@ -683,7 +683,7 @@ $wv.add_CoreWebView2InitializationCompleted({
   function setVal(id, v) { byId(id).value = v; }
   setVal('profile-modal-input', 'AutoTestUser');
   byId('profile-modal-save').click();
-  byId('btn-start-session').click();
+  byId('btn-session-action').click(); // Combat has no prompt flow, so this starts immediately
   setTimeout(function() {
     setVal('new-mob', 'a test dummy');
     byId('add-mob').click();
@@ -802,7 +802,7 @@ $wv.add_CoreWebView2InitializationCompleted({
     }, 200);
   }, 7900);
 
-  setTimeout(function() { byId('btn-end-session').click(); }, 8500);
+  setTimeout(function() { byId('btn-session-action').click(); }, 8500); // session is running by now, so this ends it
 })();
 '@
             Start-Sleep -Milliseconds 500

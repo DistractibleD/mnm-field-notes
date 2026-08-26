@@ -428,15 +428,40 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 }));
 
 // ---------------------------------------------------------------------------
-// Session start/end
+// Session start/end - one button, state-dependent (2026-08-27). Used to be
+// two separate buttons, but the plain "Start session" one could bypass
+// Fishing/Gathering's own prompt flow entirely (clicking it there started a
+// session with no zone/skill/tradeskill ever collected, leaving the tab's
+// own active-screen state out of sync with a session that technically
+// existed). One button removes that wrong path: while no session is
+// running it starts one, handing off to the active tab's own prompt flow
+// if it has one (TAB_START_ENTRY); while a session IS running it ends +
+// exports. Label/tooltip/click-behavior all just follow session.id.
 // ---------------------------------------------------------------------------
-const btnStart = document.getElementById('btn-start-session');
-const btnEnd = document.getElementById('btn-end-session');
+const btnSession = document.getElementById('btn-session-action');
 
-// Shared by the top "Start session" button and the fishing start-up flow
-// (which auto-starts a session once skill+zone are entered, rather than
-// making the user separately remember to press "Start session" first).
-// Returns false (and toasts why) if a session couldn't be started.
+// Tabs with their own prompt-driven start flow hand off to that flow's
+// entry point instead of starting a plain session immediately - same
+// pattern Fishing/Gathering's own pre-start screens already use. Tabs
+// without one yet fall back to startNewSession() directly below. Extend
+// this as more tabs get their own prompt flow.
+const TAB_START_ENTRY = { fishing: openFishSkillModal, gathering: openGatherZoneModal };
+
+function setSessionButtonState(running) {
+  btnSession.disabled = false;
+  if (running) {
+    btnSession.textContent = 'End session & export';
+    btnSession.setAttribute('data-tip', 'Writes everything logged since the session started to a text file in Sessions\\, ready to hand to Claude for a wiki update.');
+  } else {
+    btnSession.textContent = 'Start new session';
+    btnSession.setAttribute('data-tip', 'Starts a new session. On tabs with their own prompts (Fishing, Gathering), this walks you through those first.');
+  }
+}
+
+// Shared by the button's "no session running" branch and Fishing/Gathering's
+// own prompt-chain end point (they collect zone/skill/tradeskill first, then
+// call this to actually start). Returns false (and toasts why) if a session
+// couldn't be started.
 function startNewSession() {
   if (!profileState.active) {
     showToast('Pick or add a profile first');
@@ -456,33 +481,46 @@ function startNewSession() {
   return true;
 }
 
-btnStart.addEventListener('click', startNewSession);
-
-btnEnd.addEventListener('click', () => {
-  if (!session.id) { showToast('No session running'); return; }
-  // Disable immediately rather than waiting for the async 'sessionEnded'
-  // reply - otherwise a rapid double-click fires this handler twice before
-  // the first round trip lands, and the second click's now-orphaned
-  // messages surface a confusing "Error: Unknown session" toast even though
-  // nothing was actually lost (the host already rejects them safely).
-  btnEnd.disabled = true;
-  flushPendingFishAttempts(); // must happen before endSession - the session still needs to exist host-side to accept this last entry
-  if (fishingSession.startSkillSent) {
-    // Record the skill as of session end too, in case the player skilled up
-    // but didn't happen to catch anything after the last logged entry.
-    sendToHost({ type: 'fishingEnded', sessionId: session.id, skill: fishingSession.skill });
+btnSession.addEventListener('click', () => {
+  if (session.id) {
+    // Disable immediately rather than waiting for the async 'sessionEnded'
+    // reply - otherwise a rapid double-click fires this handler twice before
+    // the first round trip lands, and the second click's now-orphaned
+    // messages surface a confusing "Error: Unknown session" toast even though
+    // nothing was actually lost (the host already rejects them safely).
+    btnSession.disabled = true;
+    flushPendingFishAttempts(); // must happen before endSession - the session still needs to exist host-side to accept this last entry
+    if (fishingSession.startSkillSent) {
+      // Record the skill as of session end too, in case the player skilled up
+      // but didn't happen to catch anything after the last logged entry.
+      sendToHost({ type: 'fishingEnded', sessionId: session.id, skill: fishingSession.skill });
+    }
+    if (gatheringSession.startSkillSent) {
+      sendToHost({ type: 'gatheringEnded', sessionId: session.id, skill: gatheringSession.skill });
+    }
+    sendToHost({ type: 'endSession', sessionId: session.id });
+    return;
   }
-  if (gatheringSession.startSkillSent) {
-    sendToHost({ type: 'gatheringEnded', sessionId: session.id, skill: gatheringSession.skill });
+  // Checked here (not left to startNewSession()'s own check) so a tab with
+  // its own prompt flow doesn't walk the user through 3 modals only to fail
+  // silently-ish on the last one - and so this button doesn't sit disabled
+  // forever with nothing left to re-enable it, since TAB_START_ENTRY's
+  // functions don't report back whether they ever actually reach that call.
+  if (!profileState.active) {
+    showToast('Pick or add a profile first');
+    return;
   }
-  sendToHost({ type: 'endSession', sessionId: session.id });
+  btnSession.disabled = true;
+  // Read fresh at click time, not cached - the active tab can change between
+  // renders (same reasoning as startNewSession()'s own tab.active read).
+  const entry = TAB_START_ENTRY[document.querySelector('.tab.active').dataset.tab];
+  if (entry) { entry(); } else { startNewSession(); }
 });
 
 onHostMessage((msg) => {
   if (msg.type === 'sessionStarted') {
     session.id = msg.sessionId;
-    btnStart.disabled = true;
-    btnEnd.disabled = false;
+    setSessionButtonState(true);
     profileSelect.disabled = true;
     document.getElementById('session-sub').textContent = 'Session running · logged by ' + session.loggedBy;
     if (pendingFishingStart) {
@@ -497,8 +535,7 @@ onHostMessage((msg) => {
     showToast('Exported ' + msg.entryCount + ' entries to ' + msg.exportFileName);
     session.id = null;
     session.startedAt = null;
-    btnStart.disabled = false;
-    btnEnd.disabled = true;
+    setSessionButtonState(false);
     profileSelect.disabled = false;
     document.getElementById('session-sub').textContent = 'No session running';
     roster.clear();
@@ -579,7 +616,7 @@ onHostMessage((msg) => {
     // hit a real problem rather than this being a harmless redundant
     // double-click response), don't leave "End session" stuck disabled with
     // no way to retry.
-    if (session.id) btnEnd.disabled = false;
+    if (session.id) btnSession.disabled = false;
   }
 });
 
@@ -2210,4 +2247,5 @@ renderDetail();
 renderFishingPanel();
 renderGatheringPanel();
 updateStats();
+setSessionButtonState(false);
 sendToHost({ type: 'ready' });
