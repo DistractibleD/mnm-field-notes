@@ -16,25 +16,9 @@ How it works
 Everything in this app is manual entry. It never reads any file the game
 writes, never touches the game's process or memory, and never interacts with
 the game in any way - it's the equivalent of keeping a notebook open next to
-the game, not a tool that watches the game for you.
-
-This app:
-  - NEVER reads any file Monsters and Memories writes (install folder, save
-    data, log files, config, anything).
-  - NEVER reads game process memory, and NEVER injects code/DLLs into the
-    game.
-  - NEVER writes to anything inside the game's install or save folders - all
-    of its own data lives under this project's own Data\ and Sessions\
-    folders.
-  - The only network connection it ever makes is a read-only fetch of
-    already-public data (monsters, items, gathering nodes, zones) from the
-    published wiki site, used for autocomplete and the Lookup tab. It never
-    talks to any Niche Worlds Cult server, never sends telemetry, and never
-    talks to another copy of this app on anyone else's computer.
-
-This is not a cheat tool. It doesn't change anything about how the game
-plays, doesn't automate any action, and doesn't give you any information you
-didn't type in yourself.
+the game, not a tool that watches the game for you. Its only network
+connection is a read-only fetch of already-public wiki data (monsters, items,
+zones) for autocomplete and the Lookup tab.
 
 How to run it
 --------------
