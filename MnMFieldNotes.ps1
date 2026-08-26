@@ -70,8 +70,8 @@ function Write-DebugLog {
 }
 
 $WikiBaseUrl = 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/'
-$script:AppVersion = '0.1'
-$script:AppBuildDate = '2026-08-25'
+$script:AppVersion = '0.2'
+$script:AppBuildDate = '2026-08-26'
 $UpdateCheckUrl = 'https://raw.githubusercontent.com/DistractibleD/mnm-field-notes-releases/main/latest.json'
 $AllTimeLogPath = Join-Path $dataDir 'AllTimeLog.jsonl'
 $ProfilesPath = Join-Path $dataDir 'Profiles.json'
