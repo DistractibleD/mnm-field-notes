@@ -33,7 +33,7 @@
 
   <div class="tabs">
     <button class="tab active" data-tab="combat">Combat</button>
-    <button class="tab" data-tab="harvest">Harvesting</button>
+    <button class="tab" data-tab="gathering">Gathering</button>
     <button class="tab" data-tab="fishing">Fishing</button>
     <button class="tab" data-tab="craft">Crafting</button>
     <button class="tab" data-tab="cooking">Cooking</button>
@@ -64,6 +64,13 @@
     <div class="stat"><div class="label">New for wiki</div><div class="val" id="ck-new" style="color:var(--success);">0</div></div>
   </div>
 
+  <div class="stats" id="stats-gathering" style="display:none;">
+    <div class="stat"><div class="label">Gathers logged</div><div class="val" id="gt-logged">0</div></div>
+    <div class="stat"><div class="label">Unique node types</div><div class="val" id="gt-unique">0</div></div>
+    <div class="stat"><div class="label">Successes</div><div class="val" id="gt-successes">0</div></div>
+    <div class="stat"><div class="label">New for wiki</div><div class="val" id="gt-new" style="color:var(--success);">0</div></div>
+  </div>
+
   <div class="panel-body active" id="panel-combat">
     <div class="layout">
       <div class="roster">
@@ -82,29 +89,7 @@
     </div>
   </div>
 
-  <div class="panel-body" id="panel-harvest">
-    <div class="layout">
-      <div class="roster">
-        <div class="roster-title">This session</div>
-        <div class="roster-add" style="flex-direction:column; gap:6px;">
-          <select id="new-node-tradeskill">
-            <option>Mining</option><option>Lumberjacking</option><option>Herbalism</option>
-            <option>Foraging</option>
-          </select>
-          <div style="display:flex; gap:6px;">
-            <input id="new-node" placeholder="Add node&hellip;" list="node-list" autocomplete="off" />
-            <button class="mini-btn" id="add-node">+</button>
-          </div>
-        </div>
-        <datalist id="node-list"></datalist>
-        <div id="node-roster-list" style="margin-top:10px;"><div class="roster-empty">No nodes yet &mdash; add one above.</div></div>
-      </div>
-
-      <div class="detail" id="node-detail-panel">
-        <div class="detail-empty">Add a node to the roster, then select it to start logging attempts.</div>
-      </div>
-    </div>
-  </div>
+  <div class="panel-body" id="panel-gathering"></div>
 
   <div class="panel-body" id="panel-fishing"></div>
 
@@ -202,6 +187,78 @@
     <div id="fish-zone-modal-picker"></div>
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="primary-btn" id="fish-zone-modal-go" style="margin:0;">Start fishing!</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gather-zone-modal">
+  <div class="modal-box">
+    <h2>Where are you gathering?</h2>
+    <p>Pick the zone you're in &mdash; you can change it any time from the Zone dropdown once you're gathering.</p>
+    <div id="gather-zone-modal-picker"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="gather-zone-modal-go" style="margin:0;">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gather-tradeskill-modal">
+  <div class="modal-box">
+    <h2>What are you gathering?</h2>
+    <p>Pick a tradeskill to get started.</p>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <button class="secondary-btn" id="gather-tradeskill-mining" style="margin:0;">Mining</button>
+      <button class="secondary-btn" id="gather-tradeskill-lumberjacking" style="margin:0;">Lumberjacking</button>
+      <button class="secondary-btn" id="gather-tradeskill-herbalism" style="margin:0;">Herbalism</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gather-skill-modal">
+  <div class="modal-box">
+    <h2>Before you start</h2>
+    <p id="gather-skill-modal-body">What's your current skill? You can adjust it any time once you're gathering.</p>
+    <input type="number" id="gather-skill-modal-input" min="0" placeholder="Skill level" />
+    <div class="err" id="gather-skill-modal-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="gather-skill-modal-go" style="margin:0;">Let's start gathering!</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gather-material-modal">
+  <div class="modal-box">
+    <h2 id="gather-material-modal-title">What did you get?</h2>
+    <p>Click each item you found &mdash; click it again for every extra one (2 copper ore and 1
+      brittle stone? Click Copper Ore, Copper Ore, Brittle Stone). Then log it.</p>
+    <div class="fish-pick-grid" id="gather-material-grid"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <input id="gather-material-new" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
+      <button class="mini-btn" id="gather-material-add-btn" style="padding:0 14px;">+ Add</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="gather-material-log" style="margin:0;">Log it</button>
+      <button class="secondary-btn" id="gather-material-reset" style="margin:0;">Reset</button>
+      <button class="secondary-btn" id="gather-material-cancel" style="margin:0;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gather-edit-modal">
+  <div class="modal-box">
+    <h2>Edit entry</h2>
+    <p>Fix a typo or misclick &mdash; this only updates entries in the session that's still
+      running.</p>
+    <div class="field-grid">
+      <div><label>Zone</label><input id="gather-edit-zone" /></div>
+      <div><label>Node type</label><input id="gather-edit-node" /></div>
+      <div><label>Skill</label><input type="number" id="gather-edit-skill" min="0" /></div>
+      <div><label>Result <span style="color:var(--text-muted); font-weight:400;">(blank = no result)</span></label><input id="gather-edit-result" /></div>
+    </div>
+    <div class="err" id="gather-edit-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="gather-edit-save" style="margin:0;">Save</button>
+      <button class="secondary-btn" id="gather-edit-cancel">Cancel</button>
     </div>
   </div>
 </div>

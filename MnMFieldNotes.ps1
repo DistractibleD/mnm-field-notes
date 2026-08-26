@@ -114,7 +114,13 @@ function Get-WikiData {
         $maps = Invoke-RestMethod -Uri ($WikiBaseUrl + 'maps.json') -TimeoutSec 10
         $result.monsters = @($monsters | ForEach-Object { @{ name = $_.name } })
         $result.items = @($items | ForEach-Object { @{ name = $_.name } })
-        $result.nodes = @($nodes | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill; locations = @($_.locations); note = $_.note } })
+        $result.nodes = @($nodes | ForEach-Object {
+            # results can mix plain strings ("Copper Ore") and family objects
+            # ({family:"Chipped", label:"Chipped Gems"}) - flatten both to the
+            # display label so the client only ever deals with plain strings.
+            $flatResults = @($_.results | ForEach-Object { if ($_.label) { $_.label } else { $_ } })
+            @{ name = $_.name; tradeskill = $_.tradeskill; locations = @($_.locations); note = $_.note; results = $flatResults }
+        })
         $result.recipes = @($crafting | ForEach-Object { @{ name = $_.name; tradeskill = $_.tradeskill } })
         $result.factions = @(
             $monsters | Where-Object { $_.factionEffects } |
@@ -420,6 +426,12 @@ function Write-SessionExport {
     if ($sessionInfo.ContainsKey('fishingEndSkill')) {
         [void]$sb.AppendLine("Fishing skill at session end: $($sessionInfo.fishingEndSkill)")
     }
+    if ($sessionInfo.ContainsKey('gatheringStartSkill')) {
+        [void]$sb.AppendLine("Gathering skill at session start: $($sessionInfo.gatheringStartSkill)")
+    }
+    if ($sessionInfo.ContainsKey('gatheringEndSkill')) {
+        [void]$sb.AppendLine("Gathering skill at session end: $($sessionInfo.gatheringEndSkill)")
+    }
     [void]$sb.AppendLine('')
 
     $byType = $entries | Group-Object -Property sessionType
@@ -596,6 +608,16 @@ $wv.add_CoreWebView2InitializationCompleted({
                     $script:Sessions[$msg.sessionId].fishingEndSkill = $msg.skill
                 }
             }
+            'gatheringStarted' {
+                if ($script:Sessions.ContainsKey($msg.sessionId)) {
+                    $script:Sessions[$msg.sessionId].gatheringStartSkill = $msg.skill
+                }
+            }
+            'gatheringEnded' {
+                if ($script:Sessions.ContainsKey($msg.sessionId)) {
+                    $script:Sessions[$msg.sessionId].gatheringEndSkill = $msg.skill
+                }
+            }
             'editEntry' {
                 # Only entries in a still-running session are editable - once
                 # a session's ended and exported, the export file is already
@@ -698,8 +720,58 @@ $wv.add_CoreWebView2InitializationCompleted({
       setVal('fish-edit-skill', '99');
       byId('fish-edit-save').click();
     }
-    setTimeout(function() { byId('btn-end-session').click(); }, 300);
   }, 6400);
+
+  // Gathering (added 2026-08-26, modal order + multi-pick material step
+  // reworked 2026-08-26) - a session is already running by this point, so
+  // this exercises the "join the existing session" branch of the skill-modal
+  // handler, plus the real 'gatheringStarted'/'gatheringEnded' PS handlers
+  // and Write-HarvestingBlock's export formatting. Modal chain is now
+  // zone -> tradeskill -> skill (skill last, asked fresh every time).
+  setTimeout(function() {
+    document.querySelector('.tab[data-tab="gathering"]').click();
+    byId('gather-start-btn').click();
+  }, 6900);
+
+  setTimeout(function() {
+    byId('gather-zone-modal-toggle').click();
+    var firstZoneModalOption = document.querySelector('#gather-zone-modal-grid input[type=radio]');
+    if (firstZoneModalOption) firstZoneModalOption.click();
+    byId('gather-zone-modal-go').click();
+  }, 7100);
+
+  setTimeout(function() {
+    byId('gather-tradeskill-mining').click();
+  }, 7300);
+
+  setTimeout(function() {
+    setVal('gather-skill-modal-input', '5');
+    byId('gather-skill-modal-go').click();
+  }, 7500);
+
+  // Two units in one go, exercising the multi-pick-with-quantity material
+  // modal: a custom node, then a custom material clicked twice plus a second
+  // custom material clicked once, confirmed with a single "Log it".
+  setTimeout(function() {
+    byId('gather-skill-plus').click();
+    setVal('gather-new-node', 'Autotest Node');
+    byId('gather-add-node-btn').click();
+    var nodeBtn = document.querySelector('#gather-node-grid [data-node="Autotest Node"]');
+    if (nodeBtn) nodeBtn.click();
+    setTimeout(function() {
+      setVal('gather-material-new', 'Autotest Material');
+      byId('gather-material-add-btn').click();
+      // +Add clears the box after adding once - the new material now has its
+      // own grid button, tap it again for a second unit of the same thing.
+      var m1 = document.querySelector('#gather-material-grid [data-material="Autotest Material"]');
+      if (m1) m1.click();
+      setVal('gather-material-new', 'Second Material');
+      byId('gather-material-add-btn').click();
+      byId('gather-material-log').click();
+    }, 200);
+  }, 7900);
+
+  setTimeout(function() { byId('btn-end-session').click(); }, 8500);
 })();
 '@
             Start-Sleep -Milliseconds 500

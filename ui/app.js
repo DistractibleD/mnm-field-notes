@@ -37,8 +37,11 @@ function mockHostRespond(msg) {
         monsters: [{ name: 'a corrupted outrider' }, { name: 'a smuggler' }, { name: 'Onis the Elder' }],
         items: [{ name: 'Ashira War Tooth' }, { name: 'Corroded Bronze Chain Boots' }],
         nodes: [
-          { name: 'Lionleaf', tradeskill: 'Herbalism' }, { name: 'Ghost Poppy', tradeskill: 'Herbalism' },
-          { name: 'Copper Vein', tradeskill: 'Mining' }, { name: 'Limestone Deposit', tradeskill: 'Mining' },
+          { name: 'Lionleaf', tradeskill: 'Herbalism', locations: ['Vale of Zintar', 'Evershade Weald'], results: ['Lionleaf Bloom', 'Plant Fiber'] },
+          { name: 'Ghost Poppy', tradeskill: 'Herbalism', locations: ['Evershade Weald'], results: ['Ghost Poppy Petal'] },
+          { name: 'Copper Vein', tradeskill: 'Mining', locations: ['Shaded Dunes', 'Sungreet Strand'], results: ['Copper Ore', 'Rough Stone'] },
+          { name: 'Limestone Deposit', tradeskill: 'Mining', locations: ['Shaded Dunes'], results: ['Limestone', 'Rough Stone'] },
+          { name: 'Old Oak', tradeskill: 'Lumberjacking', locations: ['Evershade Weald', 'Vale of Zintar'], results: ['Oak Log', 'Tree Sap'] },
           { name: 'Whitefish', tradeskill: 'Fishing', locations: ['Night Harbor', 'Shaded Dunes'] },
           { name: 'Grouper', tradeskill: 'Fishing', locations: ['Night Harbor', 'Sungreet Strand'] },
           { name: 'Basa', tradeskill: 'Fishing', locations: ['Shaded Dunes'] },
@@ -224,7 +227,6 @@ function setupChecklistDropdown(idPrefix, config) {
   const root = document.getElementById(`${idPrefix}-dropdown`);
   const toggle = document.getElementById(`${idPrefix}-toggle`);
   const toggleLabel = document.getElementById(`${idPrefix}-toggle-label`);
-  const baseLabel = toggleLabel.textContent;
   const panel = document.getElementById(`${idPrefix}-panel`);
   const countEl = document.getElementById(`${idPrefix}-count`);
   const clearLink = document.getElementById(`${idPrefix}-clear`);
@@ -278,7 +280,11 @@ function setupChecklistDropdown(idPrefix, config) {
   inputs.forEach(cb => cb.addEventListener('change', () => {
     updateCount();
     if (!multi && cb.checked) {
-      toggleLabel.textContent = baseLabel + ': ' + cb.value;
+      // Plain value, not "baseLabel: value" - baseLabel is only captured once
+      // at setup time, so on a panel that re-renders with the current value
+      // already showing (Fishing/Gathering's zone dropdown), concatenating
+      // would keep appending onto whatever was already selected.
+      toggleLabel.textContent = cb.value;
       root.classList.remove('open');
     }
     if (config.onChange) config.onChange();
@@ -390,7 +396,7 @@ profileModalCancel.addEventListener('click', closeProfileModal);
 // header/filename (e.g. "Session export - fishing") - independent of the
 // sessionType each logged entry carries (Fishing entries still log as
 // 'harvesting', matching Write-HarvestingBlock's grouping in MnMFieldNotes.ps1).
-const TAB_SESSION_TYPE = { combat: 'combat', harvest: 'harvesting', fishing: 'fishing', craft: 'crafting', cooking: 'cooking', multi: 'multi' };
+const TAB_SESSION_TYPE = { combat: 'combat', gathering: 'gathering', fishing: 'fishing', craft: 'crafting', cooking: 'cooking', multi: 'multi' };
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
@@ -400,15 +406,18 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   if (TAB_SESSION_TYPE[t.dataset.tab]) {
     session.type = TAB_SESSION_TYPE[t.dataset.tab];
   }
-  // Kills/coin are meaningless on Fishing/Cooking, so each gets its own stats
-  // bar rather than showing Combat numbers that don't apply.
+  // Kills/coin are meaningless on Fishing/Cooking/Gathering, so each gets its
+  // own stats bar rather than showing Combat numbers that don't apply.
   const isFishing = t.dataset.tab === 'fishing';
   const isCooking = t.dataset.tab === 'cooking';
-  document.getElementById('stats-combat').style.display = (isFishing || isCooking) ? 'none' : '';
+  const isGathering = t.dataset.tab === 'gathering';
+  document.getElementById('stats-combat').style.display = (isFishing || isCooking || isGathering) ? 'none' : '';
   document.getElementById('stats-fishing').style.display = isFishing ? '' : 'none';
   document.getElementById('stats-cooking').style.display = isCooking ? '' : 'none';
+  document.getElementById('stats-gathering').style.display = isGathering ? '' : 'none';
   if (isFishing) updateFishStats();
   if (isCooking) updateCookingStats();
+  if (isGathering) updateGatherStats();
 }));
 
 // ---------------------------------------------------------------------------
@@ -456,6 +465,9 @@ btnEnd.addEventListener('click', () => {
     // but didn't happen to catch anything after the last logged entry.
     sendToHost({ type: 'fishingEnded', sessionId: session.id, skill: fishingSession.skill });
   }
+  if (gatheringSession.startSkillSent) {
+    sendToHost({ type: 'gatheringEnded', sessionId: session.id, skill: gatheringSession.skill });
+  }
   sendToHost({ type: 'endSession', sessionId: session.id });
 });
 
@@ -470,6 +482,10 @@ onHostMessage((msg) => {
       pendingFishingStart = false;
       startFishing();
     }
+    if (pendingGatheringStart) {
+      pendingGatheringStart = false;
+      startGathering();
+    }
   } else if (msg.type === 'sessionEnded') {
     showToast('Exported ' + msg.entryCount + ' entries to ' + msg.exportFileName);
     session.id = null;
@@ -482,10 +498,15 @@ onHostMessage((msg) => {
     activeTarget = null;
     renderRoster();
     renderDetail();
-    nodeRoster.clear();
-    activeNode = null;
-    renderNodeRoster();
-    renderNodeDetail();
+    gatheringSession.active = false;
+    gatheringSession.tradeskill = '';
+    gatheringSession.zone = '';
+    gatheringSession.skill = 0;
+    gatheringSession.entries = [];
+    gatheringSession.customNodes = [];
+    gatheringSession.startSkillSent = false;
+    renderGatheringPanel();
+    updateGatherStats();
     dishRoster.clear();
     activeDish = null;
     renderDishRoster();
@@ -514,9 +535,9 @@ onHostMessage((msg) => {
     wikiData.zones = msg.zones || [];
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
-    refreshNodeList();
     refreshDishList();
     renderFishPickGrid();
+    if (gatheringSession.active) renderGatherNodeGrid();
     if (msg.error) showToast('Wiki data unavailable — autocomplete limited (' + msg.error + ')');
   } else if (msg.type === 'profiles') {
     profileState.profiles = msg.profiles || [];
@@ -768,145 +789,420 @@ function logKill(target, entry) {
 }
 
 // ---------------------------------------------------------------------------
-// Harvesting (Mining / Lumberjacking / Herbalism / Foraging - Fishing has its
-// own tab, see below, since it doesn't really have "nodes" the way these do)
+// Gathering (Mining / Lumberjacking / Herbalism - Foraging excluded for now,
+// barely implemented in the wiki). Redesigned 2026-08-26 to follow Fishing's
+// pattern instead of the roster+detail pattern: pick tradeskill, pick zone,
+// auto-start, then fast one-tap logging. Deliberately NO attempts counter and
+// NO key-listener - unlike Fishing's cast-and-see-what-you-get loop (which
+// needs an attempts count to measure drop/skill-threshold rates), a gathering
+// node is a discrete, deliberate interaction, so a manual skill counter is
+// the only counting-buttons piece that carries over.
 // ---------------------------------------------------------------------------
-// nodeRoster: Map of node name -> { tradeskill, entries: [ {zone, skill, success, resultItem, loggedAt} ] }
-const nodeRoster = new Map();
-let activeNode = null;
+const GATHER_TRADESKILLS = ['Mining', 'Lumberjacking', 'Herbalism'];
 
-document.getElementById('add-node').addEventListener('click', addNodeFromInput);
-document.getElementById('new-node').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNodeFromInput(); });
-document.getElementById('new-node-tradeskill').addEventListener('change', refreshNodeList);
+// gatheringSession.entries: {id, target (node type name), zone, skill,
+// success, resultItem (material), loggedAt}. Two-tap flow to log one: tap a
+// node type, then tap which material it gave (or "No result") - a node type
+// can yield several different materials per the wiki data, so tapping the
+// node alone can't be the whole answer the way tapping a fish is for Fishing.
+const gatheringSession = {
+  active: false,
+  tradeskill: '',
+  zone: '',
+  skill: 0,
+  entries: [],
+  customNodes: [],
+  startSkillSent: false,
+};
 
-// Node autocomplete is scoped to whichever tradeskill is currently selected
-// - a Herbalism node name shouldn't show up while adding a Mining node.
-function refreshNodeList() {
-  const tradeskill = document.getElementById('new-node-tradeskill').value;
-  const matches = wikiData.nodes.filter(n => n.tradeskill === tradeskill);
-  document.getElementById('node-list').innerHTML = matches.map(n => `<option value="${escapeHtml(n.name)}"></option>`).join('');
-}
+let gatherZoneCtrl = null;
+let gatherZoneModalCtrl = null;
+let pendingGatheringNode = null; // which node type the material modal is currently open for
+let pendingGatheringStart = false; // session was just requested for gathering - start it once 'sessionStarted' confirms
+let editingGatherEntryId = null;
 
-function addNodeFromInput() {
-  const input = document.getElementById('new-node');
-  const name = input.value.trim();
-  if (!name) return;
-  if (!session.id) { showToast('Start a session first'); return; }
-  const tradeskill = document.getElementById('new-node-tradeskill').value;
-  if (!nodeRoster.has(name)) nodeRoster.set(name, { tradeskill, entries: [] });
-  selectNode(name);
-  input.value = '';
-}
+function renderGatheringPanel() {
+  const el = document.getElementById('panel-gathering');
 
-function selectNode(name) {
-  activeNode = name;
-  renderNodeRoster();
-  renderNodeDetail();
-}
-
-function renderNodeRoster() {
-  const el = document.getElementById('node-roster-list');
-  if (nodeRoster.size === 0) {
-    el.innerHTML = '<div class="roster-empty">No nodes yet &mdash; add one above.</div>';
+  if (!gatheringSession.active) {
+    el.innerHTML = `
+      <div class="detail" style="text-align:center; padding: 48px 20px;">
+        <p style="font-size:13px; color:var(--text-secondary); max-width:38ch; margin:0 auto 20px;">
+          Pick what you're gathering and where &mdash; the app will show you what's expected
+          to find there, from the wiki's own data.
+        </p>
+        <button class="primary-btn" id="gather-start-btn" style="max-width:260px; margin:0 auto;">Let's start gathering!</button>
+      </div>
+    `;
+    document.getElementById('gather-start-btn').addEventListener('click', openGatherZoneModal);
     return;
   }
-  el.innerHTML = '';
-  for (const [name, data] of nodeRoster) {
-    const catches = data.entries.filter(e => e.success).length;
-    const div = document.createElement('div');
-    div.className = 'roster-item' + (name === activeNode ? ' selected' : '');
-    div.innerHTML = `
-      <span class="roster-item-remove" data-name="${escapeHtml(name)}" title="Remove ${escapeHtml(name)} from this session">&times;</span>
-      <div class="name">${escapeHtml(name)}</div>
-      <div class="meta">${data.tradeskill} &middot; ${catches} catch${catches === 1 ? '' : 'es'}</div>
-    `;
-    div.addEventListener('click', (e) => {
-      if (e.target.classList.contains('roster-item-remove')) return;
-      selectNode(name);
-    });
-    el.appendChild(div);
+
+  el.innerHTML = `
+    <div class="detail">
+      <p style="text-align:center; font-size:13.5px; color:var(--text-secondary); margin:0 0 14px;">
+        Gathering <b style="color:var(--text-primary);">${escapeHtml(gatheringSession.tradeskill)}</b>.
+        Tap a node type below to log what you found there.
+      </p>
+      <div class="field-grid" style="margin-bottom:4px;">
+        <div><label>Zone</label>${checklistDropdownHTML('gather-zone', gatheringSession.zone ? gatheringSession.zone : 'Select zone', wikiData.zones, { multi: false, selected: gatheringSession.zone ? [gatheringSession.zone] : [] })}</div>
+      </div>
+      ${renderGatherSkillCounterHTML(gatheringSession)}
+      <label>Click the node type you found</label>
+      <div class="fish-pick-grid" id="gather-node-grid"></div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <input id="gather-new-node" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
+        <button class="mini-btn" id="gather-add-node-btn" style="padding:0 14px;">+ Add</button>
+      </div>
+      <div class="log" style="margin-top:18px;">
+        <div class="log-title">Logged this session</div>
+        <div id="gather-log"></div>
+      </div>
+    </div>
+  `;
+  gatherZoneCtrl = setupChecklistDropdown('gather-zone', { multi: false, onChange: () => { gatheringSession.zone = gatherZoneCtrl.getValue(); renderGatherNodeGrid(); } });
+  bindGatherSkillEvents();
+  renderGatherNodeGrid();
+  document.getElementById('gather-add-node-btn').addEventListener('click', addCustomGatherNode);
+  document.getElementById('gather-new-node').addEventListener('keydown', e => { if (e.key === 'Enter') addCustomGatherNode(); });
+  renderGatherLog();
+}
+
+// Modal chain order (2026-08-26): zone, then tradeskill, then skill - skill
+// last so it's the freshest thing asked right before logging starts, since
+// forgetting to set it (and pushing finds at skill 0) was a real problem.
+function openGatherZoneModal() {
+  document.getElementById('gather-zone-modal-picker').innerHTML = checklistDropdownHTML(
+    'gather-zone-modal', gatheringSession.zone ? gatheringSession.zone : 'Select zone', wikiData.zones,
+    { multi: false, selected: gatheringSession.zone ? [gatheringSession.zone] : [] }
+  );
+  gatherZoneModalCtrl = setupChecklistDropdown('gather-zone-modal', { multi: false });
+  document.getElementById('gather-zone-modal').classList.add('open');
+}
+
+document.getElementById('gather-zone-modal-go').addEventListener('click', () => {
+  // Zone is optional, same reasoning as Fishing's zone modal.
+  gatheringSession.zone = gatherZoneModalCtrl ? gatherZoneModalCtrl.getValue() : '';
+  document.getElementById('gather-zone-modal').classList.remove('open');
+  openGatherTradeskillModal();
+});
+
+function openGatherTradeskillModal() {
+  document.getElementById('gather-tradeskill-modal').classList.add('open');
+}
+function chooseGatherTradeskill(tradeskill) {
+  gatheringSession.tradeskill = tradeskill;
+  document.getElementById('gather-tradeskill-modal').classList.remove('open');
+  openGatherSkillModal();
+}
+document.getElementById('gather-tradeskill-mining').addEventListener('click', () => chooseGatherTradeskill('Mining'));
+document.getElementById('gather-tradeskill-lumberjacking').addEventListener('click', () => chooseGatherTradeskill('Lumberjacking'));
+document.getElementById('gather-tradeskill-herbalism').addEventListener('click', () => chooseGatherTradeskill('Herbalism'));
+
+function openGatherSkillModal() {
+  document.getElementById('gather-skill-modal-body').textContent =
+    `What's your current ${gatheringSession.tradeskill} skill? You can adjust it any time once you're gathering.`;
+  document.getElementById('gather-skill-modal-input').value = gatheringSession.skill || '';
+  document.getElementById('gather-skill-modal-err').style.display = 'none';
+  document.getElementById('gather-skill-modal').classList.add('open');
+  document.getElementById('gather-skill-modal-input').focus();
+}
+
+document.getElementById('gather-skill-modal-go').addEventListener('click', () => {
+  const input = document.getElementById('gather-skill-modal-input');
+  const v = parseInt(input.value, 10);
+  if (input.value.trim() && (isNaN(v) || v < 0)) {
+    document.getElementById('gather-skill-modal-err').textContent = 'Enter a valid skill number';
+    document.getElementById('gather-skill-modal-err').style.display = 'block';
+    return;
   }
-  el.querySelectorAll('.roster-item-remove').forEach(x => x.addEventListener('click', (e) => {
-    e.stopPropagation();
-    nodeRoster.delete(x.dataset.name);
-    if (activeNode === x.dataset.name) activeNode = null;
-    renderNodeRoster();
-    renderNodeDetail();
+  gatheringSession.skill = isNaN(v) ? 0 : v;
+  document.getElementById('gather-skill-modal').classList.remove('open');
+  if (session.id) {
+    // A session is already running (e.g. started from another tab) - join it.
+    startGathering();
+    return;
+  }
+  // Same async-race reasoning as Fishing: startSession's reply is a real
+  // round trip, so don't call startGathering() until 'sessionStarted' confirms.
+  if (!startNewSession()) return;
+  pendingGatheringStart = true;
+});
+document.getElementById('gather-skill-modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('gather-skill-modal-go').click(); });
+
+function startGathering() {
+  gatheringSession.active = true;
+  if (!gatheringSession.startSkillSent) {
+    gatheringSession.startSkillSent = true;
+    sendToHost({ type: 'gatheringStarted', sessionId: session.id, skill: gatheringSession.skill });
+  }
+  renderGatheringPanel();
+}
+
+function renderGatherSkillCounterHTML(data) {
+  return `
+    <div id="gather-skill-box" style="background: var(--bg-raised); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px;">
+      <label style="margin:0 0 8px;">Your skill &mdash; bump this (or type it) the moment you skill up</label>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="mini-btn" id="gather-skill-minus">-</button>
+        <input type="number" id="gather-skill-input" min="0" value="${data.skill}"
+          style="font-family:Consolas,monospace; font-size:26px; font-weight:600; width:80px; text-align:center; padding:4px;" />
+        <button class="mini-btn" id="gather-skill-plus">+</button>
+      </div>
+    </div>
+  `;
+}
+
+function bindGatherSkillEvents() {
+  const input = document.getElementById('gather-skill-input');
+  document.getElementById('gather-skill-minus').addEventListener('click', () => {
+    gatheringSession.skill = Math.max(0, gatheringSession.skill - 1);
+    input.value = gatheringSession.skill;
+  });
+  document.getElementById('gather-skill-plus').addEventListener('click', () => {
+    gatheringSession.skill = gatheringSession.skill + 1;
+    input.value = gatheringSession.skill;
+  });
+  input.addEventListener('input', () => {
+    const v = parseInt(input.value, 10);
+    gatheringSession.skill = isNaN(v) ? 0 : Math.max(0, v);
+  });
+}
+
+// Sorts/highlights the same way Fishing's fish-pick-grid does: known node
+// types for this tradeskill, "expected in this zone" (wiki locations ∪
+// anything actually found here this session) sorted to the top, a running
+// catch count per node type, and a "new" badge for anything not in the wiki.
+function renderGatherNodeGrid() {
+  const el = document.getElementById('gather-node-grid');
+  if (!el) return;
+  const known = wikiData.nodes.filter(n => n.tradeskill === gatheringSession.tradeskill).map(n => n.name);
+  const all = [...known, ...gatheringSession.customNodes.filter(f => !known.includes(f))];
+
+  const selectedZone = gatherZoneCtrl ? gatherZoneCtrl.getValue() : gatheringSession.zone;
+  const wikiExpected = wikiData.nodes
+    .filter(n => n.tradeskill === gatheringSession.tradeskill && selectedZone && (n.locations || []).includes(selectedZone))
+    .map(n => n.name);
+  const sessionGatheredHere = gatheringSession.entries.filter(e => e.success && e.zone === selectedZone).map(e => e.target);
+  const expectedNames = new Set([...wikiExpected, ...sessionGatheredHere]);
+
+  const catchCounts = {};
+  gatheringSession.entries.forEach(e => {
+    if (e.success) catchCounts[e.target] = (catchCounts[e.target] || 0) + 1;
+  });
+
+  function renderBtn(f) {
+    const classes = ['fish-pick-btn'];
+    if (!known.includes(f)) classes.push('new');
+    if (expectedNames.has(f)) classes.push('expected');
+    const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
+    const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
+    return `<button class="${classes.join(' ')}" data-node="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
+  }
+
+  const expected = all.filter(f => expectedNames.has(f)).sort();
+  const rest = all.filter(f => !expectedNames.has(f)).sort();
+  let html = '';
+  if (expected.length > 0) {
+    html += '<div class="fish-pick-section-label">Expected in this zone</div>';
+    html += expected.map(renderBtn).join('');
+  }
+  html += rest.map(renderBtn).join('');
+  el.innerHTML = html;
+  el.querySelectorAll('.fish-pick-btn[data-node]').forEach(btn => btn.addEventListener('click', () => openGatherMaterialModal(btn.dataset.node)));
+}
+
+function addCustomGatherNode() {
+  const input = document.getElementById('gather-new-node');
+  const name = input.value.trim();
+  if (!name) return;
+  if (!gatheringSession.customNodes.includes(name)) gatheringSession.customNodes.push(name);
+  input.value = '';
+  renderGatherNodeGrid();
+}
+
+// The second tap: which material(s) this particular gather gave, from the
+// node's own wiki `results` union'd with whatever's actually been logged for
+// this node type this session - same "session observations feed back into
+// expected" reasoning as Fishing's zone-expected fish. No "no result" option
+// here (2026-08-26) - not interesting enough for these node types to track.
+// Multi-pick with quantity: each click bumps a pending count for that
+// material (`pendingMaterialCounts`), nothing is actually logged until "Log
+// it" - lets the user click Copper Ore, Copper Ore, Brittle Stone, then
+// confirm all three in one go instead of one modal round trip per unit.
+let pendingMaterialCounts = {};
+
+function openGatherMaterialModal(nodeType) {
+  pendingGatheringNode = nodeType;
+  pendingMaterialCounts = {};
+  document.getElementById('gather-material-modal-title').textContent = `What did you get from ${nodeType}?`;
+  renderGatherMaterialGrid();
+  document.getElementById('gather-material-new').value = '';
+  document.getElementById('gather-material-modal').classList.add('open');
+}
+
+function renderGatherMaterialGrid() {
+  const nodeData = wikiData.nodes.find(n => n.tradeskill === gatheringSession.tradeskill && n.name === pendingGatheringNode);
+  const wikiMaterials = nodeData ? (nodeData.results || []) : [];
+  const sessionMaterials = gatheringSession.entries.filter(e => e.target === pendingGatheringNode).map(e => e.resultItem);
+  const pendingMaterials = Object.keys(pendingMaterialCounts).filter(m => pendingMaterialCounts[m] > 0);
+  const allMaterials = [...new Set([...wikiMaterials, ...sessionMaterials, ...pendingMaterials])].sort();
+
+  const sessionCounts = {};
+  gatheringSession.entries.forEach(e => {
+    if (e.target === pendingGatheringNode) sessionCounts[e.resultItem] = (sessionCounts[e.resultItem] || 0) + 1;
+  });
+
+  const grid = document.getElementById('gather-material-grid');
+  grid.innerHTML = allMaterials.map(m => {
+    const isNew = !wikiMaterials.includes(m);
+    const pendingCount = pendingMaterialCounts[m] || 0;
+    const sessionCount = sessionCounts[m] || 0;
+    const classes = ['fish-pick-btn'];
+    if (isNew) classes.push('new');
+    if (pendingCount) classes.push('picked');
+    const pendingBadge = pendingCount ? `<span class="fish-pick-count pending">+${pendingCount}</span>` : '';
+    const sessionBadge = sessionCount ? `<span class="fish-pick-count">&times;${sessionCount}</span>` : '';
+    const newBadge = isNew ? '<span class="fish-pick-new-badge">new</span>' : '';
+    return `<button class="${classes.join(' ')}" data-material="${escapeHtml(m)}">${escapeHtml(m)}${pendingBadge}${sessionBadge}${newBadge}</button>`;
+  }).join('');
+  grid.querySelectorAll('[data-material]').forEach(btn => btn.addEventListener('click', () => {
+    const m = btn.dataset.material;
+    pendingMaterialCounts[m] = (pendingMaterialCounts[m] || 0) + 1;
+    renderGatherMaterialGrid();
   }));
 }
 
-function renderNodeDetail() {
-  const el = document.getElementById('node-detail-panel');
-  if (!activeNode) {
-    el.innerHTML = '<div class="detail-empty">Add a node to the roster, then select it to start logging attempts.</div>';
-    return;
-  }
-  const data = nodeRoster.get(activeNode);
-
-  el.innerHTML = `
-    <div class="detail-head"><h2>${escapeHtml(activeNode)}</h2><span class="zone-tag">${escapeHtml(data.tradeskill)}</span></div>
-    <div class="field-grid">
-      <div><label>Zone</label><input id="h-zone" placeholder="e.g. Shaded Dunes" /></div>
-      <div><label>Your skill</label><input id="h-skill" type="number" min="0" /></div>
-      <div><label>Outcome</label><select id="h-success"><option value="1">Success</option><option value="0">No catch/result</option></select></div>
-      <div><label>Result item</label><input id="h-item" list="item-list" placeholder="if successful" autocomplete="off" /></div>
-    </div>
-    <div class="err" id="h-err"></div>
-    <button class="primary-btn" id="log-harvest-btn">Log attempt</button>
-    <div class="log">
-      <div class="log-title">Logged &mdash; ${escapeHtml(activeNode)}</div>
-      <div id="harvest-log"></div>
-    </div>
-  `;
-
-  document.getElementById('log-harvest-btn').addEventListener('click', logHarvestBatch);
-
-  renderHarvestLog();
+function closeGatherMaterialModal() {
+  document.getElementById('gather-material-modal').classList.remove('open');
+  pendingGatheringNode = null;
+  pendingMaterialCounts = {};
 }
 
-function renderHarvestLog() {
-  const el = document.getElementById('harvest-log');
-  if (!el) return;
-  const data = nodeRoster.get(activeNode);
-  if (!data || data.entries.length === 0) {
-    el.innerHTML = '<div class="roster-empty">Nothing logged yet.</div>';
-    return;
-  }
-  el.innerHTML = data.entries.slice().reverse().map(e => {
-    const when = new Date(e.loggedAt).toLocaleTimeString();
-    const result = e.success ? escapeHtml(e.resultItem || 'success') : 'no catch';
-    return `<div class="log-row"><span>Skill ${e.skill != null ? e.skill : '?'} &middot; ${result}</span><span class="when">${when}</span></div>`;
-  }).join('');
-}
+document.getElementById('gather-material-cancel').addEventListener('click', closeGatherMaterialModal);
+document.getElementById('gather-material-reset').addEventListener('click', () => {
+  pendingMaterialCounts = {};
+  renderGatherMaterialGrid();
+});
+document.getElementById('gather-material-add-btn').addEventListener('click', () => {
+  const input = document.getElementById('gather-material-new');
+  const v = input.value.trim();
+  if (!v) return;
+  pendingMaterialCounts[v] = (pendingMaterialCounts[v] || 0) + 1;
+  input.value = '';
+  renderGatherMaterialGrid();
+});
+document.getElementById('gather-material-log').addEventListener('click', () => {
+  const nodeType = pendingGatheringNode;
+  const counts = pendingMaterialCounts;
+  const totalUnits = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (totalUnits === 0) { closeGatherMaterialModal(); return; }
+  Object.keys(counts).forEach(material => {
+    for (let i = 0; i < counts[material]; i++) {
+      logGatherAttempt(nodeType, material);
+    }
+  });
+  showToast(`Logged ${totalUnits} item${totalUnits === 1 ? '' : 's'} from ${nodeType}`);
+  closeGatherMaterialModal();
+});
 
-function logHarvestBatch() {
-  const err = document.getElementById('h-err');
-  const zone = document.getElementById('h-zone').value.trim();
-  if (!zone) {
-    err.textContent = 'Enter a zone first';
-    err.style.display = 'block';
-    return;
-  }
-  err.style.display = 'none';
-  const data = nodeRoster.get(activeNode);
+function logGatherAttempt(nodeType, resultItem) {
+  if (!session.id) { showToast('Start a session first'); return; }
   const entry = {
-    zone,
-    skill: document.getElementById('h-skill').value ? Number(document.getElementById('h-skill').value) : null,
-    success: document.getElementById('h-success').value === '1',
-    resultItem: document.getElementById('h-item').value.trim(),
+    id: genId(),
+    target: nodeType,
+    zone: gatherZoneCtrl ? gatherZoneCtrl.getValue() : gatheringSession.zone,
+    skill: gatheringSession.skill,
+    success: true,
+    resultItem: resultItem,
     loggedAt: Date.now(),
   };
-  data.entries.push(entry);
+  gatheringSession.zone = entry.zone;
+  gatheringSession.entries.push(entry);
 
   sendToHost({
     type: 'logEntry',
     sessionId: session.id,
     sessionType: 'harvesting',
-    entry: Object.assign({ target: activeNode, tradeskill: data.tradeskill }, entry),
+    entry: Object.assign({ tradeskill: gatheringSession.tradeskill }, entry),
   });
 
-  renderNodeRoster();
-  renderNodeDetail();
+  renderGatherLog();
+  renderGatherNodeGrid(); // catch just fed back into this zone's "expected" set - reflect it now
+  updateGatherStats();
+}
+
+function renderGatherLog() {
+  const el = document.getElementById('gather-log');
+  if (!el) return;
+  if (gatheringSession.entries.length === 0) {
+    el.innerHTML = '<div class="roster-empty">Nothing logged yet.</div>';
+    return;
+  }
+  el.innerHTML = gatheringSession.entries.slice().reverse().map(e => {
+    const when = new Date(e.loggedAt).toLocaleTimeString();
+    const result = e.success ? escapeHtml(e.resultItem || 'success') : 'no result';
+    return `<div class="log-row"><span>${escapeHtml(e.zone || '(no zone)')} &middot; ${escapeHtml(e.target)} &middot; Skill ${e.skill} &middot; ${result}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span><button class="mini-btn" data-edit-id="${escapeHtml(e.id)}">Edit</button></span></div>`;
+  }).join('');
+  el.querySelectorAll('[data-edit-id]').forEach(btn => btn.addEventListener('click', () => openGatherEditModal(btn.dataset.editId)));
+}
+
+// Editing, same reasoning/scope as Fishing's: only entries in the still-running
+// session, and changing the node type has to patch `target` too (what
+// Write-HarvestingBlock groups the export by), same zone-staleness-style lesson.
+function openGatherEditModal(id) {
+  const entry = gatheringSession.entries.find(e => e.id === id);
+  if (!entry) return;
+  editingGatherEntryId = id;
+  document.getElementById('gather-edit-zone').value = entry.zone || '';
+  document.getElementById('gather-edit-node').value = entry.target || '';
+  document.getElementById('gather-edit-skill').value = entry.skill;
+  document.getElementById('gather-edit-result').value = entry.success ? (entry.resultItem || '') : '';
+  document.getElementById('gather-edit-err').style.display = 'none';
+  document.getElementById('gather-edit-modal').classList.add('open');
+}
+
+document.getElementById('gather-edit-cancel').addEventListener('click', () => {
+  document.getElementById('gather-edit-modal').classList.remove('open');
+  editingGatherEntryId = null;
+});
+
+document.getElementById('gather-edit-save').addEventListener('click', () => {
+  const entry = gatheringSession.entries.find(e => e.id === editingGatherEntryId);
+  if (!entry) { document.getElementById('gather-edit-modal').classList.remove('open'); return; }
+  const skillVal = parseInt(document.getElementById('gather-edit-skill').value, 10);
+  if (isNaN(skillVal) || skillVal < 0) {
+    document.getElementById('gather-edit-err').textContent = 'Skill must be a valid number';
+    document.getElementById('gather-edit-err').style.display = 'block';
+    return;
+  }
+  const resultVal = document.getElementById('gather-edit-result').value.trim();
+  const patch = {
+    zone: document.getElementById('gather-edit-zone').value.trim(),
+    target: document.getElementById('gather-edit-node').value.trim(),
+    skill: skillVal,
+    success: !!resultVal,
+    resultItem: resultVal,
+  };
+  Object.assign(entry, patch);
+  sendToHost({ type: 'editEntry', sessionId: session.id, entryId: editingGatherEntryId, patch });
+  document.getElementById('gather-edit-modal').classList.remove('open');
+  editingGatherEntryId = null;
+  renderGatherLog();
+  renderGatherNodeGrid();
+  updateGatherStats();
+});
+
+function updateGatherStats() {
+  const logged = gatheringSession.entries.length;
+  const uniqueNodes = new Set(gatheringSession.entries.map(e => e.target)).size;
+  const successes = gatheringSession.entries.filter(e => e.success).length;
+  const knownNodes = wikiData.nodes.filter(n => n.tradeskill === gatheringSession.tradeskill).map(n => n.name.toLowerCase());
+  const newForWiki = new Set(gatheringSession.entries.filter(e => !knownNodes.includes((e.target || '').toLowerCase())).map(e => e.target)).size;
+  document.getElementById('gt-logged').textContent = logged;
+  document.getElementById('gt-unique').textContent = uniqueNodes;
+  document.getElementById('gt-successes').textContent = successes;
+  document.getElementById('gt-new').textContent = newForWiki;
 }
 
 // ---------------------------------------------------------------------------
@@ -1723,5 +2019,6 @@ document.getElementById('lookup-input').addEventListener('input', e => renderLoo
 renderRoster();
 renderDetail();
 renderFishingPanel();
+renderGatheringPanel();
 updateStats();
 sendToHost({ type: 'ready' });

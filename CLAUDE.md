@@ -9,7 +9,7 @@ parsing, not prose for human reading — user won't read/edit this file.
 Personal 2nd-monitor manual-entry companion for *Monsters and Memories* ("MnM Field Notes").
 User types everything after observing on screen — app never reads game files/process/memory,
 never interacts with the game. = notebook, not a reader. Two jobs: (1) fast live logging
-(Combat/Harvesting/Crafting/Fishing/Cooking), (2) searchable lookup over sibling wiki data.
+(Combat/Gathering/Crafting/Fishing/Cooking), (2) searchable lookup over sibling wiki data.
 Session data → plain-text export → user hands to Claude to update the wiki.
 
 Exists because the prior design (reading the game's own Ledger log files) violated the
@@ -36,7 +36,7 @@ keeps its own name (functional label, never part of the old generic-from-devs su
 
 `ui/style.css` `:root` palette/fonts (Sora headings, Inter body) copied from the wiki's own
 `style.css` `:root` — same var names, same hex values. `--accent-craft` (wiki's teal) =
-"different session type" marker, used for Harvesting/Crafting/Cooking active-tab state
+"different session type" marker, used for Gathering/Fishing/Crafting/Cooking active-tab state
 instead of gold. If the wiki's palette/fonts change, pull from there, don't invent new ones.
 
 Responsive, tuned for portrait 2nd monitor (1080×1920) but fine landscape too. `.layout`
@@ -102,21 +102,19 @@ filtered, clear search, check survives.
 
 ### Session types and fields
 
-Combat/Harvesting/Crafting = roster + active-detail pattern (sidebar of things encountered
-this session; click → active; quick-entry fields apply to it). Multi = mixes all 3 in one
-roster. Mirrors the wiki's `conObservations` model (same species, multiple kills, each own
-con/level).
+Combat/Crafting = roster + active-detail pattern (sidebar of things encountered this session;
+click → active; quick-entry fields apply to it). Multi = mixes them in one roster. Mirrors
+the wiki's `conObservations` model (same species, multiple kills, each own con/level).
+Gathering/Fishing are NOT this pattern — see their own sections below.
 
 - **Combat**: monster, zone, con+level, coin (total off corpse), items, named y/n,
   `factionChanges` (2 checklist dropdowns pos/neg, from `monsters.json` `factionEffects`,
   60+ entries). Logged as `[{faction,effect}]` — same shape as the wiki's own.
-- **Harvesting**: tradeskill (Mining/Lumberjacking/Herbalism/Foraging; Fishing has its own
-  tab), node, zone, skill, success/fail, resultItem.
 - **Crafting**: tradeskill, recipe, skill, difficultyColor, components. Still a stub
   (`#panel-craft`) for everything except Cooking (own tab, see below).
 
 **Session-level export label** (`session.type` in `app.js`, export header/filename) derives
-from the active tab at "Start session" click time (`TAB_SESSION_TYPE` map — fishing/harvesting
+from the active tab at "Start session" click time (`TAB_SESSION_TYPE` map — fishing/gathering
 kept as distinct labels even though both log `sessionType:'harvesting'`; the label is
 display-only). Past bug: `btnStart` used to hardcode `session.type='combat'`, silently
 overriding the tab. Now reads `.tab.active` at click time. If this breaks again, check BOTH
@@ -159,7 +157,62 @@ taps. 2 states in `renderFishingPanel()`:
   listening, toast + "Resume listening" banner. Entirely client-side — do NOT touch the
   native hook/poll timer for this (must stay minimal, see gotcha above).
 
-### Cooking — own tab, roster+detail (like Harvesting, not Fishing)
+### Gathering — own tab, node→material(s) two-tier pick (redesigned 2026-08-26)
+
+Mining/Lumberjacking/Herbalism only — Foraging excluded (barely implemented in the wiki).
+Follows Fishing's pre-start/active + modal-chain pattern, NOT roster+detail, but a node type
+can yield several different materials per the wiki's `gathering-nodes.json` `results` (and
+more than one of the same material per gather), so logging one catch is a 2-tap-plus-confirm
+flow (node type, then each material tapped once per unit, then "Log it") instead of Fishing's
+single tap. Deliberately did NOT port: attempts counter (only meaningful for measuring
+rarity/dropchance off high-repetition casts, which gathering isn't), the native
+key-listener/hook (a gathering node is a deliberate discrete interaction, not spammed), the
+Area field (no wiki data supports sub-zone granularity for gathering the way it might for
+fishing spots), junk detection (no wiki concept of "junk" for gathering materials).
+
+- **Pre-start**: explainer + "Let's start gathering!" → 3-step modal chain, in this exact
+  order — `#gather-zone-modal` → `#gather-tradeskill-modal` (Mining/Lumberjacking/Herbalism)
+  → `#gather-skill-modal`. Skill is deliberately LAST, asked fresh every time right before
+  the session starts — forgetting to set it and logging finds at skill 0 was a real problem
+  that motivated this ordering; don't reorder without checking that reasoning still holds.
+  Confirming the skill modal auto-starts the session if none running (reuses
+  `startNewSession()`, same `pendingGatheringStart`-deferred-until-`sessionStarted`
+  async-race pattern as Fishing's `pendingFishingStart` — don't call `startGathering()`
+  synchronously after `startNewSession()`).
+- **Active**: single-select zone dropdown (same `checklistDropdownHTML`/`multi:false`
+  pattern as Fishing) + skill-only counter box (`renderGatherSkillCounterHTML`/
+  `bindGatherSkillEvents`, no attempts counter) + node-type grid (`renderGatherNodeGrid`,
+  same expected/new/×N-count sort+badge logic as Fishing's fish-pick grid, `+Add` for a
+  custom node type).
+- **Tapping a node type** opens `#gather-material-modal` (`openGatherMaterialModal`) — a
+  second `.fish-pick-grid` scoped to that one node's materials: wiki `results` (flattened by
+  `Get-WikiData`, which mixes plain strings and `{family,label}` objects — display label
+  only) ∪ session-observed materials for that same node. NOT single-tap-and-close: each tap
+  bumps a local `pendingMaterialCounts[material]` (shown as a `+N` badge, `.picked` CSS
+  class) — nothing is actually logged until "Log it", which fires one `logEntry` per unit
+  across every material tapped (2 Copper Ore + 1 Brittle Stone → 3 entries, all
+  `success:true`). "Reset" zeroes the pending counts without closing the modal. No "No
+  result" option (removed 2026-08-26 — not interesting for these node types). `+Add` a
+  custom material once, then tap its new grid button for additional units of it.
+- **Editable entries** (`openGatherEditModal`/`gather-edit-save`) — same generic
+  `editEntry`/`Edit-AllTimeLogEntry` mechanism as Fishing, scoped to the still-running
+  session. Editing the node type must also patch `target` (export grouping field, same
+  zone-staleness-style lesson as Fishing's zone edit). The edit modal's Result field can
+  still be blanked to mark a correction as no-result — that's a correction tool for an
+  already-logged entry, unrelated to the material modal no longer offering it going forward.
+- **Skill recorded at session start** (`gatheringStarted`, guarded by `startSkillSent`) **and
+  end** (`gatheringEnded`, same guard) — mirrors Fishing exactly, both fire before
+  `endSession`.
+- **Own stats bar** (`#stats-gathering`): Gathers logged/Unique node types/Successes/
+  New-for-wiki. Successes will now track ≈1:1 with Gathers logged going forward (every
+  material-modal entry is `success:true`) — kept anyway since a post-hoc edit can still
+  produce `success:false`.
+- Entries log `sessionType:'harvesting'` (unchanged bucket name, `Write-HarvestingBlock`
+  groups by `target` = node type name, same as the old Harvesting tab it replaced) via
+  `logGatherAttempt`. Session-level label = `'gathering'` (`TAB_SESSION_TYPE.gathering`) —
+  independent of entry `sessionType`, same split as Fishing/Cooking.
+
+### Cooking — own tab, roster+detail (like the old Harvesting tab, not Fishing)
 
 Split from the Crafting stub because dishes carry stat/resist/haste buffs (`items.json` Food
 entries already use this shape — verified against real data, not assumed). Roster+detail
@@ -187,12 +240,13 @@ Lookup tab = read-only wiki search, independent of session logging.
 
 ### Data model — 3 stores, don't collapse
 
-1. **All-time log** — append-only, ONE exception: still-running-session Fishing entries are
-   editable via a client-generated `id` (`genId()`) + `editEntry` → `Edit-AllTimeLogEntry`
-   rewrites that JSONL line in place. Scoped to the active session only (export already
-   written once ended). Editing `zone` must also patch `target` (the export's grouping
-   field) or the corrected entry stays under the old zone's header. Combat/Harvesting have
-   no edit UI yet — mechanism is generic, just needs UI.
+1. **All-time log** — append-only, ONE exception: still-running-session Fishing/Gathering
+   entries are editable via a client-generated `id` (`genId()`) + `editEntry` →
+   `Edit-AllTimeLogEntry` rewrites that JSONL line in place. Scoped to the active session only
+   (export already written once ended). Editing the grouping field (`zone` for Fishing,
+   node-type `target` for Gathering) must also patch `target` (the export's grouping field)
+   or the corrected entry stays under the old header. Combat/Crafting have no edit UI yet —
+   mechanism is generic, just needs UI.
 2. **Per-session export** — 1 txt file/session, wiki-relevant fields only (no
    elapsed-time/click-count metrics).
 3. **Live session state** — in-memory, becomes #1+#2 at session end.

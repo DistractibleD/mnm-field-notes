@@ -70,7 +70,7 @@ html, body {
 }
 .tab:hover { background: var(--bg-raised); color: var(--text-primary); }
 .tab.active { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
-.tab.active[data-tab="harvest"], .tab.active[data-tab="fishing"], .tab.active[data-tab="craft"], .tab.active[data-tab="cooking"] { background: rgba(95,179,163,0.14); color: var(--accent-craft); border-color: var(--accent-craft-dim); }
+.tab.active[data-tab="gathering"], .tab.active[data-tab="fishing"], .tab.active[data-tab="craft"], .tab.active[data-tab="cooking"] { background: rgba(95,179,163,0.14); color: var(--accent-craft); border-color: var(--accent-craft-dim); }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
 .stat { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
@@ -283,7 +283,9 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-new-badge { font-size: 10px; color: var(--success); vertical-align: 2px; margin-left: 2px; }
 .fish-pick-btn.expected { color: var(--accent-strong); border-color: var(--accent); font-weight: 600; }
 .fish-pick-btn.junk { color: var(--text-muted); border-color: var(--text-muted); border-style: dashed; font-weight: 400; }
+.fish-pick-btn.picked { background: var(--accent-craft); border-color: var(--accent-craft); color: var(--bg-page); font-weight: 600; }
 .fish-pick-count { font-size: 11px; color: var(--text-secondary); margin-left: 4px; }
+.fish-pick-count.pending { color: inherit; font-weight: 700; }
 .fish-pick-section-label {
   flex-basis: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-secondary); margin: 2px 0 -2px;
