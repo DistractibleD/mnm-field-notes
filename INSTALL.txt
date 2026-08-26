@@ -9,8 +9,9 @@ What's inside
 --------------
 - Start.vbs / MnMFieldNotes.ps1 - the app itself.
 - ui\ - the window's interface (HTML/CSS/JS), loaded by the app.
-- lib\webview2\ - browser-engine files the app runs on. Already included in
-  this zip, nothing to download separately.
+- lib\webview2\ - small loader files the app needs to talk to the WebView2
+  Runtime (see "If something goes wrong" below). Already included in this
+  zip, nothing to download separately.
 - README.txt - what the app does and how to use it once it's running.
 
 What shows up after you first run it
@@ -40,3 +41,10 @@ If something goes wrong
 --------------------------
 If the app shows an error message, check Data\error.log - it has more detail
 than the popup does.
+
+If the very first launch fails with a message about the "WebView2 Runtime"
+or the embedded browser not starting: this app needs Microsoft's WebView2
+Runtime, which ships built into Windows 11 and almost every up-to-date
+Windows 10 PC already (it comes with Edge), so this is unlikely - but if it
+happens, install it free from Microsoft at
+https://developer.microsoft.com/microsoft-edge/webview2/ and try again.
