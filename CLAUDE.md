@@ -247,11 +247,14 @@ fishing spots), junk detection (no wiki concept of "junk" for gathering material
   gain) — opposite direction from Combat's Con scale, don't mix the two up. Re-renders live
   on every skill change (`bindGatherSkillEvents` calls `renderGatherNodeGrid()` on all three
   skill inputs) since the guess is skill-relative.
-  - Freed up a channel to do this: `.expected` ("expected in this zone") used to be
-    text/border color, now a `box-shadow` ring (`--accent-craft`) so it doesn't compete with
-    the difficulty color on the same button. Shared CSS with Fishing's fish-pick grid, so
-    this changed Fishing's "expected" styling too (ring instead of gold text) — deliberate,
-    not a Gathering-only tweak.
+  - Freed up a channel to do this: "expected in this zone" isn't a per-button marker any
+    more (went through text/border color, then a `box-shadow` ring — neither read clearly
+    enough at a glance per user feedback), it's a bordered/tinted **group container**
+    (`.fish-pick-expected-box`/`.fish-pick-expected-label` in style.css, `--accent-craft`
+    border) that the expected buttons render INSIDE — see `renderGatherNodeGrid`. Individual
+    buttons carry zero "expected" styling now, so there's no channel competition with the
+    difficulty color at all. Shared CSS with Fishing's fish-pick grid, so this changed
+    Fishing's "expected" styling too — deliberate, not a Gathering-only tweak.
   - `Get-WikiData` forwards `minSkill`/`trivialSkill` per node (added alongside `results`).
   - **Tooltip** (`data-tip`, one combined string, only when there's something to say):
     difficulty guess text + the wiki's own `note` if the node has one (2026-08-27) + the

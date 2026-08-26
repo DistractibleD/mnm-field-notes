@@ -281,17 +281,23 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-btn:active { transform: scale(0.97); }
 .fish-pick-btn.new { border-color: var(--success); }
 .fish-pick-new-badge { font-size: 10px; color: var(--success); vertical-align: 2px; margin-left: 2px; }
-/* "Expected here" is a ring, not a text/border color - color is reserved for
-   Gathering's difficulty-tier guess below, so the two signals never compete
-   for the same channel on the same button. */
-.fish-pick-btn.expected { box-shadow: 0 0 0 2px var(--accent-craft); font-weight: 600; }
 .fish-pick-btn.junk { color: var(--text-muted); border-color: var(--text-muted); border-style: dashed; font-weight: 400; }
 .fish-pick-btn.picked { background: var(--accent-craft); border-color: var(--accent-craft); color: var(--bg-page); font-weight: 600; }
 .fish-pick-count { font-size: 11px; color: var(--text-secondary); margin-left: 4px; }
 .fish-pick-count.pending { color: inherit; font-weight: 700; }
-.fish-pick-section-label {
+/* "Expected here" (2026-08-27, replaces a per-button ring - wasn't visible
+   enough at a glance) is a bordered/tinted box enclosing the whole group of
+   expected buttons, not a marker on each one individually - color stays
+   free on the buttons themselves for Gathering's difficulty-tier guess. */
+.fish-pick-expected-box {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 2px 0 2px; padding: 10px 10px 8px;
+  border: 2px solid var(--accent-craft); border-radius: 14px;
+  background: rgba(95, 179, 163, 0.1);
+}
+.fish-pick-expected-label {
   flex-basis: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--text-secondary); margin: 2px 0 -2px;
+  color: var(--accent-craft); font-weight: 700; margin: 0 0 1px;
 }
 
 /* ---------- Gathering node difficulty guess - same hex pairs as the wiki's

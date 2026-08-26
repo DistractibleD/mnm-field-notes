@@ -1100,7 +1100,6 @@ function renderGatherNodeGrid() {
     const tier = gatherDifficultyTier(nodeData, gatheringSession.skill);
     const classes = ['fish-pick-btn'];
     if (!known.includes(f)) classes.push('new');
-    if (expectedNames.has(f)) classes.push('expected');
     if (tier) classes.push('tier-' + tier);
     const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
     const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
@@ -1127,8 +1126,7 @@ function renderGatherNodeGrid() {
   const rest = all.filter(f => !expectedNames.has(f)).sort();
   let html = '';
   if (expected.length > 0) {
-    html += '<div class="fish-pick-section-label">Expected in this zone</div>';
-    html += expected.map(renderBtn).join('');
+    html += `<div class="fish-pick-expected-box"><div class="fish-pick-expected-label">Expected in this zone</div>${expected.map(renderBtn).join('')}</div>`;
   }
   html += rest.map(renderBtn).join('');
   el.innerHTML = html;
@@ -1914,7 +1912,6 @@ function renderFishPickGrid() {
     const nodeData = fishNodes.find(n => n.name === f);
     const classes = ['fish-pick-btn'];
     if (!known.includes(f)) classes.push('new');
-    if (expectedNames.has(f)) classes.push('expected');
     if (junkNames.has(f)) classes.push('junk');
     const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
     const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
@@ -1938,8 +1935,7 @@ function renderFishPickGrid() {
   const rest = all.filter(f => !expectedNames.has(f)).sort();
   let html = '';
   if (expected.length > 0) {
-    html += '<div class="fish-pick-section-label">Expected in this zone</div>';
-    html += expected.map(renderBtn).join('');
+    html += `<div class="fish-pick-expected-box"><div class="fish-pick-expected-label">Expected in this zone</div>${expected.map(renderBtn).join('')}</div>`;
   }
   html += rest.map(renderBtn).join('');
   el.innerHTML = html;
