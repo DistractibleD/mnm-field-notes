@@ -76,16 +76,13 @@ bar/log all update correctly; a live run confirmed `crafting.json` fetches clean
 
 Version check + prompt built (see "Update checking" in `CLAUDE.md`). Deliberately NOT a
 self-updater — "View release" opens the releases page, user downloads/replaces manually.
-Hosting: new repo `mnm-field-notes-releases` (public, separate from app source and from the
-wiki repo), holding just `latest.json` + release zips. Git identity on that repo uses the
-GitHub noreply email, same as the wiki repo, so the user's real email stays off any public
-commit.
+Hosting: `mnm-field-notes` repo (public, git identity = GitHub noreply email so the user's
+real email stays off any public commit) — originally a separate `mnm-field-notes-releases`
+repo holding just `latest.json` + release zips, merged into the app source repo 2026-08-26
+once keeping source private stopped mattering (see "Update checking" in `CLAUDE.md` for the
+full story). v0.1 and v0.2 have both been cut and published.
 
-Still open, not needed for the check/prompt itself but for actually distributing updates:
-- **No release has been cut yet** — `latest.json`'s `url` points at `/releases/latest`, but
-  no GitHub Release/zip exists there yet. First real update will need one tagged, with
-  `lib/webview2/*.dll` included in the zip (see the Installer note below — those are
-  gitignored in this dev repo but a distributable zip needs them present).
+Still open:
 - **Dev folder stays named `MnM Loot Tracker` on disk (2026-08-26)** — renaming it to match
   the app's current name was considered and explicitly declined, not worth the session
   disruption (this folder is the hard-anchored working directory for the whole dev session).

@@ -300,16 +300,26 @@ triggers a prompt for anyone already on the first. `$script:AppBuildDate` (separ
 `yyyy-MM-dd`) is shown alongside the
 version in the masthead purely for human "how stale is this" context — not used in the
 comparison at all. Checked against
-`https://raw.githubusercontent.com/DistractibleD/mnm-field-notes-releases/main/latest.json`
+`https://raw.githubusercontent.com/DistractibleD/mnm-field-notes/main/latest.json`
 (`{version,url}`) via `Get-UpdateInfo`, called automatically on `ready` and manually via
 `checkForUpdates` msg (the "Check for updates" link in the masthead). Never blocks, never
 auto-applies — result rendered as a dismissible `#update-banner` (only when a newer version
 exists) or a toast (manual check only, so silent background checks don't nag). "View
 release" sends `openUrl` to the host (`Start-Process`, `http(s)://` validated first) rather
 than a plain `<a target=_blank>` — avoids WebView2 popup-window quirks, always opens the
-system browser. Releases repo (`mnm-field-notes-releases`, separate from this repo and from
-the wiki repo, git identity = GitHub noreply email) holds only `latest.json` + release zips,
-no app source. No self-update — download/replace is manual, deliberately, given the
+system browser. GitHub repo = `mnm-field-notes` (public, git identity = GitHub noreply
+email) — this repo, holding both app source and `latest.json`/release zips. Until
+2026-08-26 this repo had no GitHub remote at all, and a separate `mnm-field-notes-releases`
+repo held only `latest.json` + release zips — split existed to keep source off a public
+repo from the project's earlier secrecy phase. Once that phase ended (see "Naming"), the
+split no longer served a purpose, so `mnm-field-notes-releases` was renamed to
+`mnm-field-notes` (GitHub repo rename preserves existing tags/release zips/download URLs
+automatically) and this repo's own history was merged into it (`git merge
+--allow-unrelated-histories`, preserving both commit histories). `raw.githubusercontent.com`
+does NOT reliably follow a repo rename the way `github.com` web URLs do, so
+`$UpdateCheckUrl` and `latest.json`'s own `url` field both had to be repointed by hand — if
+this repo is ever renamed again, check both. No self-update — download/replace is manual,
+deliberately, given the
 trust-boundary jump of an app downloading+running its own replacement code.
 
 ## Wiki data — read-only reference
