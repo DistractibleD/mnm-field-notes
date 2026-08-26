@@ -146,6 +146,16 @@ taps. 2 states in `renderFishingPanel()`:
     half is area-scoped; wiki half is zone-only (no area data exists). Sorts to top under a
     label; junk styling is independent, applies wherever the item lands.
   - Per-button `×N` catch count (session), separate from "new" badge (not in wiki yet).
+  - **Location matching is lenient, not exact** (2026-08-27, `locationMatchesZone()` in
+    app.js, shared with Gathering's node grid): wiki `locations` entries aren't always the
+    bare zone name — "Night Harbor (West Gate, North Gate)", "Shaded Dunes, on the way to
+    Tel'Ekir" — so a straight `.includes(zone)` silently missed those. Matches on the zone
+    name being a genuine prefix followed by a word boundary (space/comma/paren/dash), not
+    just any substring. `extractLocationDetail()` pulls the sub-area part back out for the
+    tooltip (below) rather than just discarding it now that the match doesn't need it exact.
+  - **Tooltip** (`data-tip`, only when there's something to say): wiki `note` text (often a
+    skill-threshold caveat, e.g. "First encountered at fishing skill 77") + the sub-area
+    detail from whichever matched location pulled this fish into "expected".
 - **No "No catch" button** (removed) — implied by the attempts counter rising without a
   catch. `flushPendingFishAttempts()` sends the remainder as `success:false` at session end.
   MUST fire before `endSession` (session no longer exists server-side after).
@@ -156,6 +166,21 @@ taps. 2 states in `renderFishingPanel()`:
 - **Key-spam guard**: 3+ `keyCounted` messages within 1 second → `checkKeySpam()` pauses
   listening, toast + "Resume listening" banner. Entirely client-side — do NOT touch the
   native hook/poll timer for this (must stay minimal, see gotcha above).
+- **Rarity bars** (2026-08-27, collapsed by default behind a "Show rarity estimate" toggle,
+  `#fish-rarity-panel`/`renderFishRarityPanel()`) — an EMPIRICAL guess from this app's own
+  logged data, not the wiki's Common/Uncommon/Rare/Very Rare label (may switch to that
+  instead later per the user — this was the first cut). `Get-FishRarity` in
+  MnMFieldNotes.ps1 reads the WHOLE `AllTimeLog.jsonl` (all sessions, all time, not just the
+  current one), sums `attempts` and counts catches per fish, grouped by `zone` — sent once
+  as `fishRarity` on `ready`, alongside `wikiData`. Client combines that snapshot with the
+  CURRENT session's own entries + not-yet-flushed `liveAttempts` in `computeZoneRarity()`
+  (the snapshot predates anything caught this session, so this avoids double-counting
+  without a host round trip per catch). Horizontal bars, not vertical — this app's layout is
+  tuned for a narrow portrait 2nd monitor, side-by-side vertical bars run out of width fast.
+  Bar width is normalized to the zone's own highest rate, not an absolute percentage scale.
+  `MIN_RARITY_ATTEMPTS = 20` gates the whole zone (not per-fish) — below it, shows a
+  "not enough data yet, logged N so far" message instead of bars, since a tiny sample makes
+  every fish's ratio equally meaningless, not just a specific one's.
 
 ### Gathering — own tab, node→material(s) two-tier pick (redesigned 2026-08-26)
 
@@ -194,14 +219,22 @@ fishing spots), junk detection (no wiki concept of "junk" for gathering material
   `trivialSkill` (no more skill gain), Red = at/near `minSkill` (hardest, freshest skill
   gain) — opposite direction from Combat's Con scale, don't mix the two up. Re-renders live
   on every skill change (`bindGatherSkillEvents` calls `renderGatherNodeGrid()` on all three
-  skill inputs) since the guess is skill-relative. `data-tip` on the button spells out the
-  guess is an estimate, not measured.
+  skill inputs) since the guess is skill-relative.
   - Freed up a channel to do this: `.expected` ("expected in this zone") used to be
     text/border color, now a `box-shadow` ring (`--accent-craft`) so it doesn't compete with
     the difficulty color on the same button. Shared CSS with Fishing's fish-pick grid, so
     this changed Fishing's "expected" styling too (ring instead of gold text) — deliberate,
     not a Gathering-only tweak.
   - `Get-WikiData` forwards `minSkill`/`trivialSkill` per node (added alongside `results`).
+  - **Tooltip** (`data-tip`, one combined string, only when there's something to say):
+    difficulty guess text + the wiki's own `note` if the node has one (2026-08-27) + the
+    sub-area location detail (below) if that's what made this node "expected". The `note`
+    turned out more load-bearing than expected here — a lot of them are caveats specifically
+    about how sure `minSkill`/`trivialSkill` actually are (e.g. "Trivial skill is at least
+    225, exact value unknown"), which should soften trust in the color above it.
+  - **Location matching is lenient, not exact** — same `locationMatchesZone()`/
+    `extractLocationDetail()` fix as Fishing's fish-pick grid above; wiki `locations` aren't
+    always the bare zone name, and a straight `.includes(zone)` silently missed those.
 - **Tapping a node type** opens `#gather-material-modal` (`openGatherMaterialModal`) — a
   second `.fish-pick-grid` scoped to that one node's materials: wiki `results` (flattened by
   `Get-WikiData`, which mixes plain strings and `{family,label}` objects — display label

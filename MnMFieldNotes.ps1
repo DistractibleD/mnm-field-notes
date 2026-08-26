@@ -300,6 +300,36 @@ function Get-SessionEntries {
     }
 }
 
+# Aggregates every Fishing entry ever logged (all sessions, all time) into
+# per-zone totals - attempts vs. catches per fish - so the client can show an
+# empirical "how rare is this fish here" guess (Fishing tab rarity bars,
+# 2026-08-27). Read-only, recomputed fresh on 'ready' rather than cached:
+# AllTimeLog.jsonl is small at this app's scale, staying correct beats
+# staying fast here. Each logged entry's `attempts` is casts leading up to
+# that entry (a catch or a flushed no-catch batch - see logFishCatch/
+# flushPendingFishAttempts in app.js), so summing it across a zone gives
+# total casts there; `success`+`resultItem` gives which fish, if any.
+function Get-FishRarity {
+    $result = @{}
+    if (-not (Test-Path $AllTimeLogPath)) { return $result }
+    Get-Content -Path $AllTimeLogPath -Encoding UTF8 | ForEach-Object {
+        if (-not $_.Trim()) { return }
+        try { $o = $_ | ConvertFrom-Json } catch { return }
+        if ($o.tradeskill -ne 'Fishing' -or -not $o.zone) { return }
+        if (-not $result.ContainsKey($o.zone)) {
+            $result[$o.zone] = @{ totalAttempts = 0; fish = @{} }
+        }
+        $attempts = if ($null -ne $o.attempts) { [int]$o.attempts } else { 0 }
+        $result[$o.zone].totalAttempts += $attempts
+        if ($o.success -and $o.resultItem) {
+            $fishName = $o.resultItem
+            if (-not $result[$o.zone].fish.ContainsKey($fishName)) { $result[$o.zone].fish[$fishName] = 0 }
+            $result[$o.zone].fish[$fishName]++
+        }
+    }
+    return $result
+}
+
 # Rewrites the one matching line in place (by the entry's client-generated
 # id) rather than appending a correction - the all-time log stays append-only
 # for new entries, this is the one deliberate exception, scoped to fixing a
@@ -533,6 +563,7 @@ $wv.add_CoreWebView2InitializationCompleted({
                 Send-ToUI @{ type = 'profiles'; profiles = $profileData.profiles; lastUsed = $profileData.lastUsed }
                 $update = Get-UpdateInfo
                 Send-ToUI @{ type = 'updateInfo'; currentVersion = $update.currentVersion; buildDate = $update.buildDate; latestVersion = $update.latestVersion; url = $update.url; available = $update.available; error = $update.error }
+                Send-ToUI @{ type = 'fishRarity'; data = (Get-FishRarity) }
             }
             'checkForUpdates' {
                 $update = Get-UpdateInfo

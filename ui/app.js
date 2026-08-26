@@ -39,10 +39,10 @@ function mockHostRespond(msg) {
         nodes: [
           { name: 'Lionleaf', tradeskill: 'Herbalism', locations: ['Vale of Zintar', 'Evershade Weald'], results: ['Lionleaf Bloom', 'Plant Fiber'] },
           { name: 'Ghost Poppy', tradeskill: 'Herbalism', locations: ['Evershade Weald'], results: ['Ghost Poppy Petal'] },
-          { name: 'Copper Vein', tradeskill: 'Mining', locations: ['Shaded Dunes', 'Sungreet Strand'], results: ['Copper Ore', 'Rough Stone'], minSkill: 1, trivialSkill: 50 },
+          { name: 'Copper Vein', tradeskill: 'Mining', locations: ['Shaded Dunes (West Ridge, East Ridge)', 'Sungreet Strand'], results: ['Copper Ore', 'Rough Stone'], minSkill: 1, trivialSkill: 50, note: 'Trivial skill might be lower - needs testing to confirm.' },
           { name: 'Limestone Deposit', tradeskill: 'Mining', locations: ['Shaded Dunes'], results: ['Limestone', 'Rough Stone'], minSkill: 40, trivialSkill: 75 },
           { name: 'Old Oak', tradeskill: 'Lumberjacking', locations: ['Evershade Weald', 'Vale of Zintar'], results: ['Oak Log', 'Tree Sap'], minSkill: 1, trivialSkill: 40 },
-          { name: 'Whitefish', tradeskill: 'Fishing', locations: ['Night Harbor', 'Shaded Dunes'] },
+          { name: 'Whitefish', tradeskill: 'Fishing', locations: ['Night Harbor, near the docks', 'Shaded Dunes'] },
           { name: 'Grouper', tradeskill: 'Fishing', locations: ['Night Harbor', 'Sungreet Strand'] },
           { name: 'Basa', tradeskill: 'Fishing', locations: ['Shaded Dunes'] },
           { name: 'Old Boot', tradeskill: 'Fishing', locations: ['Night Harbor'], note: 'A junk drop.' },
@@ -56,6 +56,13 @@ function mockHostRespond(msg) {
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
       deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null });
+      deliverFromHost({
+        type: 'fishRarity',
+        data: {
+          'Night Harbor': { totalAttempts: 87, fish: { 'Whitefish': 40, 'Grouper': 25, 'Old Boot': 8 } },
+          'Shaded Dunes': { totalAttempts: 6, fish: { 'Basa': 2 } }, // deliberately below MIN_RARITY_ATTEMPTS
+        },
+      });
     } else if (msg.type === 'checkForUpdates') {
       deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null, manual: true });
     } else if (msg.type === 'openUrl') {
@@ -537,6 +544,7 @@ onHostMessage((msg) => {
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
     refreshDishList();
     renderFishPickGrid();
+    if (fishingSession.active) renderFishRarityPanel();
     if (gatheringSession.active) renderGatherNodeGrid();
     if (msg.error) showToast('Wiki data unavailable — autocomplete limited (' + msg.error + ')');
   } else if (msg.type === 'profiles') {
@@ -558,6 +566,13 @@ onHostMessage((msg) => {
     } else if (msg.manual) {
       showToast('You\'re on the latest version.');
     }
+  } else if (msg.type === 'fishRarity') {
+    // A one-time snapshot of every Fishing attempt ever logged (all
+    // sessions), keyed by zone - see computeZoneRarity() for how this gets
+    // combined with the CURRENT session's own catches/attempts, which
+    // aren't in this snapshot since it's taken once at 'ready'.
+    fishRarityBaseline = msg.data || {};
+    if (fishingSession.active) renderFishRarityPanel();
   } else if (msg.type === 'error') {
     showToast('Error: ' + msg.message);
     // Safety net: if a session is still genuinely running (host-side export
@@ -570,6 +585,35 @@ onHostMessage((msg) => {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Wiki location strings aren't always the bare zone name - e.g.
+// "Night Harbor (West Gate, North Gate)" or "Shaded Dunes, on the way to
+// Tel'Ekir" - so an exact-match against wikiData.zones (which IS just the
+// bare name) silently misses those, and the node/fish never gets flagged
+// "expected" in the right zone. Matches on the zone name being a genuine
+// prefix (not just any substring another zone's name happens to contain)
+// followed by a word boundary, so "Vale" can't accidentally match inside a
+// longer unrelated location.
+function locationMatchesZone(location, zone) {
+  if (!location || !zone) return false;
+  if (location === zone) return true;
+  if (!location.startsWith(zone)) return false;
+  const rest = location.slice(zone.length);
+  return rest === '' || /^[\s,(\-]/.test(rest);
+}
+
+// Pulls the "(West Gate, North Gate)" / ", on the way to Tel'Ekir" part back
+// out for display - the sub-area detail is genuinely useful (tells you WHERE
+// in the zone, not just that it's somewhere in it), so worth surfacing
+// rather than just silently discarding it once the lenient match above
+// no longer needs an exact string.
+function extractLocationDetail(location, zone) {
+  if (!locationMatchesZone(location, zone) || location === zone) return '';
+  let rest = location.slice(zone.length).trim();
+  rest = rest.replace(/^[,\-]\s*/, '');
+  const parenMatch = rest.match(/^\(([^)]*)\)$/);
+  return parenMatch ? parenMatch[1] : rest;
 }
 
 // A stable per-entry id, generated client-side at logging time so a single
@@ -1004,7 +1048,7 @@ function renderGatherNodeGrid() {
 
   const selectedZone = gatherZoneCtrl ? gatherZoneCtrl.getValue() : gatheringSession.zone;
   const wikiExpected = wikiData.nodes
-    .filter(n => n.tradeskill === gatheringSession.tradeskill && selectedZone && (n.locations || []).includes(selectedZone))
+    .filter(n => n.tradeskill === gatheringSession.tradeskill && selectedZone && (n.locations || []).some(loc => locationMatchesZone(loc, selectedZone)))
     .map(n => n.name);
   const sessionGatheredHere = gatheringSession.entries.filter(e => e.success && e.zone === selectedZone).map(e => e.target);
   const expectedNames = new Set([...wikiExpected, ...sessionGatheredHere]);
@@ -1023,9 +1067,22 @@ function renderGatherNodeGrid() {
     if (tier) classes.push('tier-' + tier);
     const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
     const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
-    const tip = tier
-      ? ` data-tip="Guessed difficulty at skill ${gatheringSession.skill}, from this node's ${nodeData.minSkill}-${nodeData.trivialSkill} skill range in the wiki - not measured."`
-      : '';
+
+    // One combined tooltip - difficulty guess, the wiki's own testing/caveat
+    // note if it has one (often directly about how sure minSkill/trivialSkill
+    // actually are, which should inform trust in the color above it), and
+    // the sub-area detail from whichever matched location pulled this node
+    // into "expected" (e.g. "West Gate, North Gate" inside Night Harbor).
+    const tipParts = [];
+    if (tier) tipParts.push(`Guessed difficulty at skill ${gatheringSession.skill}, from this node's ${nodeData.minSkill}-${nodeData.trivialSkill} skill range in the wiki - not measured.`);
+    if (nodeData && nodeData.note) tipParts.push(`Wiki note: ${nodeData.note}`);
+    if (nodeData && selectedZone) {
+      const matchedLoc = (nodeData.locations || []).find(loc => locationMatchesZone(loc, selectedZone));
+      const detail = matchedLoc ? extractLocationDetail(matchedLoc, selectedZone) : '';
+      if (detail) tipParts.push(`Specifically: ${detail}`);
+    }
+    const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' '))}"` : '';
+
     return `<button class="${classes.join(' ')}"${tip} data-node="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
   }
 
@@ -1487,6 +1544,13 @@ function updateCookingStats() {
 // deliberately just two buttons; once "Start fishing!" is pressed, logging a
 // result is a single tap on a fish name (or "No catch") - no form to fill.
 // ---------------------------------------------------------------------------
+// All-time Fishing attempts/catches by zone, snapshotted once from the host
+// at 'ready' (see the 'fishRarity' message handler) - {zone: {totalAttempts,
+// fish: {name: catches}}}. Feeds the rarity bars panel; combined with the
+// current session's own entries in computeZoneRarity() since this snapshot
+// predates anything caught this session.
+let fishRarityBaseline = {};
+
 const fishingSession = {
   active: false,        // has "Start fishing!" been pressed
   zone: '',
@@ -1561,13 +1625,14 @@ function renderFishingPanel() {
         <input id="fish-new-name" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
         <button class="mini-btn" id="fish-add-btn" style="padding:0 14px;">+ Add</button>
       </div>
+      <div id="fish-rarity-panel"></div>
       <div class="log" style="margin-top:18px;">
         <div class="log-title">Logged this session</div>
         <div id="fish-log"></div>
       </div>
     </div>
   `;
-  fishZoneCtrl = setupChecklistDropdown('fish-zone', { multi: false, onChange: () => { fishingSession.zone = fishZoneCtrl.getValue(); renderFishPickGrid(); } });
+  fishZoneCtrl = setupChecklistDropdown('fish-zone', { multi: false, onChange: () => { fishingSession.zone = fishZoneCtrl.getValue(); renderFishPickGrid(); renderFishRarityPanel(); } });
   document.getElementById('fish-area').addEventListener('input', e => { fishingSession.area = e.target.value; renderFishPickGrid(); });
   document.getElementById('fish-change-key-link').addEventListener('click', e => { e.preventDefault(); openFishKeyModal(); });
   const resumeLink = document.getElementById('fish-resume-listening-link');
@@ -1578,6 +1643,7 @@ function renderFishingPanel() {
   document.getElementById('fish-add-btn').addEventListener('click', addCustomFish);
   document.getElementById('fish-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') addCustomFish(); });
   renderFishLog();
+  renderFishRarityPanel();
 }
 
 function openFishSkillModal() {
@@ -1691,6 +1757,7 @@ function adjustAttempts(delta) {
   fishingSession.liveAttempts = Math.max(0, fishingSession.liveAttempts + delta);
   updateCounterBox();
   updateFishStats();
+  renderFishRarityPanel();
 }
 
 function bindSkillEvents() {
@@ -1790,7 +1857,7 @@ function renderFishPickGrid() {
   const selectedZone = fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone;
   const areaInput = document.getElementById('fish-area');
   const selectedArea = areaInput ? areaInput.value.trim() : (fishingSession.area || '');
-  const wikiExpected = fishNodes.filter(n => selectedZone && (n.locations || []).includes(selectedZone)).map(n => n.name);
+  const wikiExpected = fishNodes.filter(n => selectedZone && (n.locations || []).some(loc => locationMatchesZone(loc, selectedZone))).map(n => n.name);
   // Anything actually caught here this session counts as "expected" too, even
   // if the wiki doesn't have this zone in that fish's locations yet. Scoped
   // to area too when one's been entered - different bodies of water in the
@@ -1807,13 +1874,27 @@ function renderFishPickGrid() {
   });
 
   function renderBtn(f) {
+    const nodeData = fishNodes.find(n => n.name === f);
     const classes = ['fish-pick-btn'];
     if (!known.includes(f)) classes.push('new');
     if (expectedNames.has(f)) classes.push('expected');
     if (junkNames.has(f)) classes.push('junk');
     const count = catchCounts[f] ? `<span class="fish-pick-count">&times;${catchCounts[f]}</span>` : '';
     const newBadge = !known.includes(f) ? '<span class="fish-pick-new-badge">new</span>' : '';
-    return `<button class="${classes.join(' ')}" data-fish="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
+
+    // Wiki note (e.g. a skill-threshold caveat) + the sub-area detail from
+    // whichever matched location pulled this fish into "expected" - same
+    // combined-tooltip approach as Gathering's node grid.
+    const tipParts = [];
+    if (nodeData && nodeData.note) tipParts.push(`Wiki note: ${nodeData.note}`);
+    if (nodeData && selectedZone) {
+      const matchedLoc = (nodeData.locations || []).find(loc => locationMatchesZone(loc, selectedZone));
+      const detail = matchedLoc ? extractLocationDetail(matchedLoc, selectedZone) : '';
+      if (detail) tipParts.push(`Specifically: ${detail}`);
+    }
+    const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' '))}"` : '';
+
+    return `<button class="${classes.join(' ')}"${tip} data-fish="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
   }
 
   const expected = all.filter(f => expectedNames.has(f)).sort();
@@ -1835,6 +1916,83 @@ function addCustomFish() {
   if (!fishingSession.customFish.includes(name)) fishingSession.customFish.push(name);
   input.value = '';
   renderFishPickGrid();
+}
+
+// ---------------------------------------------------------------------------
+// Rarity bars (2026-08-27) - an empirical guess at how rare each fish is in
+// the current zone, from the app's own logged attempts/catches rather than
+// the wiki's Common/Uncommon/Rare label (may switch to that instead later,
+// this is the first cut). Collapsed by default - useful, but not part of
+// the fast tap-and-log loop, so it shouldn't compete for space with it.
+// ---------------------------------------------------------------------------
+const MIN_RARITY_ATTEMPTS = 20; // below this the ratio is too noisy to show with a straight face
+let fishRarityPanelExpanded = false;
+
+// Combines the all-time baseline (frozen at 'ready', so it excludes anything
+// caught THIS session) with fishingSession's own entries plus any attempts
+// not yet flushed into a logged entry, so the numbers stay live while
+// actively fishing without a host round trip on every cast.
+function computeZoneRarity(zone) {
+  const base = fishRarityBaseline[zone] || { totalAttempts: 0, fish: {} };
+  let totalAttempts = base.totalAttempts || 0;
+  const fish = Object.assign({}, base.fish);
+  fishingSession.entries.forEach(e => {
+    if (e.zone !== zone) return;
+    totalAttempts += (e.attempts || 0);
+    if (e.success && e.resultItem) fish[e.resultItem] = (fish[e.resultItem] || 0) + 1;
+  });
+  if (fishingSession.zone === zone) totalAttempts += fishingSession.liveAttempts;
+  return { totalAttempts, fish };
+}
+
+function renderFishRarityPanel() {
+  const el = document.getElementById('fish-rarity-panel');
+  if (!el) return;
+  const zone = fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone;
+
+  if (!zone) {
+    el.innerHTML = `<button class="mini-btn" id="fish-rarity-toggle" disabled style="margin-top:10px;">Pick a zone to see rarity</button>`;
+    return;
+  }
+
+  const toggleLabel = fishRarityPanelExpanded ? 'Hide rarity estimate ▲' : 'Show rarity estimate ▼';
+  let body = '';
+  if (fishRarityPanelExpanded) {
+    const { totalAttempts, fish } = computeZoneRarity(zone);
+    if (totalAttempts < MIN_RARITY_ATTEMPTS) {
+      body = `<div class="rarity-panel"><p class="rarity-empty">Not enough data yet in ${escapeHtml(zone)} to guess rarity &mdash; ${totalAttempts} attempt${totalAttempts === 1 ? '' : 's'} logged here so far, want at least ${MIN_RARITY_ATTEMPTS}.</p></div>`;
+    } else {
+      const fishNodes = wikiData.nodes.filter(n => n.tradeskill === 'Fishing');
+      const expectedHere = fishNodes.filter(n => (n.locations || []).some(loc => locationMatchesZone(loc, zone))).map(n => n.name);
+      const names = [...new Set([...expectedHere, ...Object.keys(fish)])];
+      if (names.length === 0) {
+        body = `<div class="rarity-panel"><p class="rarity-empty">No fish data for ${escapeHtml(zone)} yet.</p></div>`;
+      } else {
+        const rows = names
+          .map(name => ({ name, catches: fish[name] || 0, rate: totalAttempts > 0 ? (fish[name] || 0) / totalAttempts : 0 }))
+          .sort((a, b) => b.rate - a.rate);
+        const maxRate = Math.max(...rows.map(r => r.rate), 0.0001);
+        body = `
+          <div class="rarity-panel">
+            <p class="rarity-caption">From ${totalAttempts} logged attempts in ${escapeHtml(zone)} &mdash; an estimate from this app's own data, not the wiki's rarity label.</p>
+            ${rows.map(r => `
+              <div class="rarity-row">
+                <span class="rarity-name">${escapeHtml(r.name)}</span>
+                <span class="rarity-bar-track"><span class="rarity-bar-fill" style="width:${Math.max(4, (r.rate / maxRate) * 100)}%;"></span></span>
+                <span class="rarity-pct">${(r.rate * 100).toFixed(1)}% (${r.catches})</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+  }
+
+  el.innerHTML = `<button class="mini-btn" id="fish-rarity-toggle" style="margin-top:10px;">${toggleLabel}</button>${body}`;
+  document.getElementById('fish-rarity-toggle').addEventListener('click', () => {
+    fishRarityPanelExpanded = !fishRarityPanelExpanded;
+    renderFishRarityPanel();
+  });
 }
 
 function renderFishLog() {
@@ -1893,6 +2051,7 @@ function logFishCatch(fishName) {
   renderFishPickGrid(); // catch just fed back into this zone's "expected" set - reflect it now
   refreshFishAreaDatalist();
   updateFishStats();
+  renderFishRarityPanel();
 }
 
 function refreshFishAreaDatalist() {
@@ -1960,6 +2119,7 @@ document.getElementById('fish-edit-save').addEventListener('click', () => {
   renderFishPickGrid();
   refreshFishAreaDatalist();
   updateFishStats();
+  renderFishRarityPanel();
 });
 
 // Called right before the fishing UI resets for a new/ended session - if

@@ -308,6 +308,22 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-btn.tier-orange { background: #6b3f1f; color: #ffcfa8; border-color: #6b3f1f; }
 .fish-pick-btn.tier-red { background: #6b1f1f; color: #ffb3b3; border-color: #6b1f1f; }
 
+/* ---------- Fishing rarity bars - collapsed by default (toggle button,
+   .rarity-panel only rendered while expanded), horizontal bars since this
+   app's layout is tuned for a narrow portrait 2nd monitor where side-by-side
+   vertical bars would run out of width fast. ---------- */
+.rarity-panel {
+  margin-top: 8px; padding: 10px 12px; background: var(--bg-raised);
+  border: 1px solid var(--border-strong); border-radius: 8px;
+}
+.rarity-caption { font-size: 11.5px; color: var(--text-secondary); margin: 0 0 8px; }
+.rarity-empty { font-size: 12.5px; color: var(--text-secondary); margin: 0; text-align: center; }
+.rarity-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 12px; }
+.rarity-name { flex: 0 0 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.rarity-bar-track { flex: 1 1 auto; height: 10px; background: var(--bg-page); border-radius: 5px; overflow: hidden; }
+.rarity-bar-fill { display: block; height: 100%; background: var(--accent-craft); border-radius: 5px; }
+.rarity-pct { flex: 0 0 auto; font-size: 11px; color: var(--text-secondary); min-width: 68px; text-align: right; }
+
 /* ---------- Responsive: optimized for a tall/narrow (portrait) second
    monitor, still comfortable on a wide landscape one. ---------- */
 @media (max-width: 900px) {
