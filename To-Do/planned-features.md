@@ -240,3 +240,107 @@ Depends on #14 existing first. User-contributed pins placed on the map:
   the wiki side (percentage-of-image coordinates survive a resize; they don't survive a
   re-crop or a swap to a differently-composed image). Decide the coordinate system with this
   in mind, don't bolt it on after the fact.
+
+## 16. Normal-theme text readability (2026-08-27)
+
+User's own words: "The gray font in the normal app skin is a bit hard to read, messages
+might get lost to users not familiar with the app. Please make the text around the app more
+visible, or in a easier-to-read color." Scoped to the DEFAULT (dark) skin, not the Win98
+easter-egg theme — likely means raising contrast on `--text-secondary`/`--text-muted`
+against `--bg-page`/`--bg-surface` in `style.css`'s base `:root` block, but check which
+specific text (labels, captions, tooltips, empty-states) actually reads as the offender
+before changing the shared variables wholesale, since those colors are reused everywhere.
+
+## 17. Desktop/taskbar-pinnable icon (2026-08-27)
+
+User asked whether the app can be pinned to the Windows taskbar today — confirmed it can't,
+for three compounding reasons, all currently true:
+- `Start.vbs` launches the app (see file layout in `CLAUDE.md`) but is itself a script, and
+  Windows doesn't offer "Pin to taskbar" on `.vbs` files directly.
+- `Start.vbs` launches `powershell.exe` hidden (`objShell.Run "powershell.exe ..." , 0, False`)
+  to host the WinForms window, so Windows would identify/group any pin under PowerShell's own
+  taskbar identity, not a distinct app one.
+- The WinForms `$form` never sets `.Icon` (`MnMFieldNotes.ps1` only sets `$form.Text`, see
+  around line 559) and nothing calls `SetCurrentProcessExplicitAppUserModelID` — so even a
+  working pin would show a generic PowerShell icon, not something recognizable as this app.
+
+Real fix needs, together, not piecemeal: an actual `.ico` file, `$form.Icon` set to it,
+`SetCurrentProcessExplicitAppUserModelID` called early (so Windows treats the running window
+as its own distinct app identity rather than grouping under `powershell.exe`), and a proper
+`.lnk` shortcut (pointing at the same AppID) as the thing that actually gets pinned — pinning
+`Start.vbs` itself won't work even after the above. Where the shortcut/icon file should live
+(shipped inside the release zip vs. generated on first run) isn't decided yet.
+
+## 18. Fishing: clarify "click the fish you caught" wording (2026-08-27)
+
+User wants the label at `app.js` around line 1928 (`<label>Click the fish you caught</label>`)
+changed to add "as you catch them" — making explicit that this is a click-every-time action,
+not a one-time setup step, for users unfamiliar with the app's flow.
+
+## 19. Fishing: the catch-logged toast blocks the fish grid (2026-08-27)
+
+User's own words: "The popup box that pops whenever you click a fish blocks the fish window
+in a somewhat annoying way." That's the shared `.toast` (`showToast()` in `app.js`, styled in
+`style.css` around line 201) — positioned dead center of the screen
+(`position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);`), which sits right on
+top of the fish-pick grid it was just triggered from. `.toast` is shared app-wide (not
+Fishing-specific), so check other callers before just moving/repositioning it — may need a
+Fishing-specific placement (e.g. anchored near the grid or a corner) rather than changing the
+shared toast for everyone.
+
+## 20. Fishing: sort caught fish ahead of merely-expected fish (2026-08-27)
+
+User's own words: "Expected fish should always sort behind currently caught fish." Today,
+`renderFishPickGrid()` in `app.js` (around line 2205) puts a fish in the "Expected in this
+zone" box if it's either wiki-expected OR already caught this session (`expectedNames` merges
+both), then sorts that whole box alphabetically — so a fish the user has actually caught can
+still land behind a never-caught-but-wiki-expected fish just because of alphabetical order.
+Wants caught fish (`catchCounts[f] > 0`) to always sort ahead of expected-but-not-yet-caught
+ones, likely as a third tier within (or above) the existing expected box, not just an
+alphabetical re-sort.
+
+## 21. Shared/pooled data across guild members (2026-08-27)
+
+User's own words, after asking whether other users' fishing data already feeds the rarity
+bars (it doesn't — confirmed, see below): "I want as much data as possible. Any data we can
+use to predict rarity or use as statistics in our app and on the wiki. Shared datasets sounds
+wonderful to me." So this is explicitly NOT scoped to just Fishing rarity — the ask covers
+any statistic this app could compute from pooled data (drop rates, gathering yields, rarity,
+etc.), for both in-app display and the wiki.
+
+**Confirmed current state, so this isn't built from a wrong assumption**: rarity bars
+(`Get-FishRarity` in `MnMFieldNotes.ps1`) only ever read the local, gitignored
+`Data\AllTimeLog.jsonl` on that one machine — each install is an island. Session export
+submission (#1, built) is one-directional, app → wiki, as a human-reviewed PR; nothing reads
+data back down from the wiki into any install's rarity bars or stats today.
+
+**Partially addressed (2026-08-27)**: the export itself now carries computed Fishing rarity
+stats alongside the raw entries (`Write-FishRarityBlock`, see "Session export submission" in
+`CLAUDE.md`) — this session's own catch-rate plus the submitter's all-time-on-this-install
+rate, so whoever reviews a submission (wiki-side Claude) doesn't have to hand-tally raw
+lines. This only closes the "does a single submission carry its full statistical picture"
+gap — it's still one submitter's local numbers per file, not pooled across submitters. The
+cross-user aggregation below is still fully open.
+
+Natural building block already in place: once a session-export PR (#1) is merged, its file
+already sits in the wiki repo's `session-exports/` folder — that merged set IS the shared
+pool, just not aggregated or fed back to anyone yet. Rough shape, not yet scoped/confirmed:
+- Something (a script, a GitHub Action, or a manual Claude-assisted pass) needs to
+  periodically aggregate all merged `session-exports/*.txt` files into a computed stats file
+  (e.g. rarity per zone/fish, drop rates per monster, gathering yield rates) — this means
+  WRITING to the wiki repo, which is out of scope for this project's own read-only rule (see
+  "Wiki data" in `CLAUDE.md`) — needs its own design pass scoped IN the wiki repo, not here.
+- The app side is the easy half, same pattern already used for `items.json`/`monsters.json`
+  etc: fetch a new published JSON file (e.g. `fishing-rarity.json`) from the wiki's GitHub
+  Pages site at `ready`, same as `wikiData`/`fishRarity` already work — `computeZoneRarity()`
+  would need to combine this new SHARED baseline with the existing LOCAL one rather than
+  replacing it, so a user's own not-yet-submitted session data still counts too.
+- Overlaps with #3 (contributor scoring) — same underlying "submitted exports become real,
+  reusable data" pipeline; worth designing together rather than twice, but keep them
+  separately scoped since scoring is about attribution/leaderboards and this is about the
+  raw pooled numbers themselves.
+- Trust/staleness questions to resolve when this is actually scoped: how often the aggregate
+  refreshes (every merge? a periodic batch?), whether a single guild member's outlier session
+  (very few attempts, unusual luck) should be weighted down vs. a large sample, and whether
+  the "Guild data trust model" section in `CLAUDE.md` (trusted by default, flag conflicts)
+  extends cleanly to an aggregate stat or needs its own rule.

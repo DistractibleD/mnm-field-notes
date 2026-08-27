@@ -449,6 +449,62 @@ function Write-CraftingBlock {
     }
 }
 
+# Computed rarity stats for the export - the wiki-side reviewer only ever
+# sees ONE submission's raw entries otherwise, not the fuller statistical
+# picture this app already builds for its own rarity bars (see
+# computeZoneRarity()/renderFishRarityPanel() in app.js). Reuses Get-FishRarity
+# (the same function powering the live in-app bars) for the all-time half, so
+# there's one source of truth for "how is rarity computed" rather than two.
+# Same honest framing as the in-app bars: this app's own logged data, not the
+# wiki's Common/Uncommon/Rare label.
+function Write-FishRarityBlock {
+    param($sb, $entries)
+    $fishEntries = @($entries | Where-Object { $_.tradeskill -eq 'Fishing' })
+    if ($fishEntries.Count -eq 0) { return }
+
+    $allTimeRarity = Get-FishRarity
+    [void]$sb.AppendLine("--- Fishing rarity data (this app's own logged data, not the wiki's rarity label) ---")
+    [void]$sb.AppendLine('')
+
+    $byZone = $fishEntries | Group-Object -Property zone
+    foreach ($zg in $byZone) {
+        $zone = $zg.Name
+        if (-not $zone) { continue }
+        $sessionAttempts = ($zg.Group | Measure-Object -Property attempts -Sum).Sum
+        if (-not $sessionAttempts) { $sessionAttempts = 0 }
+        $sessionCatches = [ordered]@{}
+        foreach ($e in $zg.Group) {
+            if ($e.success -and $e.resultItem) {
+                if (-not $sessionCatches.Contains($e.resultItem)) { $sessionCatches[$e.resultItem] = 0 }
+                $sessionCatches[$e.resultItem]++
+            }
+        }
+
+        [void]$sb.AppendLine("== $zone ==")
+        [void]$sb.AppendLine("This session - $sessionAttempts attempt$(if ($sessionAttempts -ne 1) { 's' }):")
+        if ($sessionCatches.Count -eq 0) {
+            [void]$sb.AppendLine('  (no catches this session)')
+        } else {
+            foreach ($fishName in ($sessionCatches.Keys | Sort-Object)) {
+                $count = $sessionCatches[$fishName]
+                $pct = if ($sessionAttempts -gt 0) { [math]::Round(($count / $sessionAttempts) * 100, 1) } else { 0 }
+                [void]$sb.AppendLine("  - $fishName`: $count / $sessionAttempts ($pct%)")
+            }
+        }
+
+        if ($allTimeRarity.ContainsKey($zone)) {
+            $allTime = $allTimeRarity[$zone]
+            [void]$sb.AppendLine("All-time on this install, includes this session - $($allTime.totalAttempts) attempts:")
+            foreach ($fishName in ($allTime.fish.Keys | Sort-Object)) {
+                $count = $allTime.fish[$fishName]
+                $pct = if ($allTime.totalAttempts -gt 0) { [math]::Round(($count / $allTime.totalAttempts) * 100, 1) } else { 0 }
+                [void]$sb.AppendLine("  - $fishName`: $count / $($allTime.totalAttempts) ($pct%)")
+            }
+        }
+        [void]$sb.AppendLine('')
+    }
+}
+
 function Write-SessionExport {
     param([string]$sessionId, [hashtable]$sessionInfo)
 
@@ -483,6 +539,8 @@ function Write-SessionExport {
             default { Write-CombatBlock -sb $sb -entries $typeGroup.Group }
         }
     }
+
+    Write-FishRarityBlock -sb $sb -entries $entries
 
     $fileName = "$($sessionInfo.startedAt -replace '[: ]','-')_$($sessionInfo.loggedBy)_$($sessionInfo.type).txt"
     $fileName = $fileName -replace '[\\/:*?"<>|]', '_'

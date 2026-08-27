@@ -570,3 +570,18 @@ before any code existed: reuse-vs-new-infrastructure, and this hard-rule update 
 - PS 5.1 has no `-Form` parameter on `Invoke-WebRequest`/`Invoke-RestMethod` (that's PS 6+
   only) — the multipart/form-data body is built by hand. See `Submit-SessionExport` in
   `MnMFieldNotes.ps1`.
+- **The export includes computed Fishing rarity stats, not just raw entries** (2026-08-27,
+  `Write-FishRarityBlock`) — explicit user ask: whoever reviews a submitted export (wiki-side
+  Claude, most likely) should see this app's own rarity math already done, not have to
+  re-derive it from a list of raw catch/no-catch lines. Prints two tiers per zone fished this
+  session: **this session's own** catch-rate (from the entries in this one export) and **the
+  submitter's all-time-on-this-install** rate (via `Get-FishRarity` — the exact same function
+  that powers the live in-app rarity bars, one source of truth for the math, not two). The
+  all-time figure is read at export time, which is AFTER this session's own entries were
+  already appended to `AllTimeLog.jsonl` in real time (`logEntry` writes immediately, not just
+  at session end) — so it already includes this session, labeled as such rather than awkwardly
+  subtracted back out. Only fires for Fishing entries (`tradeskill -eq 'Fishing'`) — Gathering
+  has no rarity concept at all (see "Gathering" above: attempts/rarity was deliberately not
+  ported there). This is still just ONE submitter's local numbers, not a cross-user pooled
+  stat — see planned-features.md #21 for the still-open "aggregate across everyone's merged
+  submissions" piece, which needs its own design pass on the wiki repo's side.
