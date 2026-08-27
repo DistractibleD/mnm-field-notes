@@ -330,6 +330,19 @@ taps. 2 states in `renderFishingPanel()`:
   `MIN_RARITY_ATTEMPTS = 20` gates the whole zone (not per-fish) — below it, shows a
   "not enough data yet, logged N so far" message instead of bars, since a tiny sample makes
   every fish's ratio equally meaningless, not just a specific one's.
+  - **Pooled across the guild** (2026-08-27, closes backlog #20/#21) — `Get-SharedFishRarity`
+    in `MnMFieldNotes.ps1` fetches the wiki's own published `fishing-rarity.json` (built there
+    by a GitHub Action, every time a session-export PR merges to `main` — see that repo's
+    `CLAUDE.md` "Session exports & pooled Fishing rarity"), sent as `sharedFishRarity`
+    alongside `fishRarity` at `ready`. Same shape as `Get-FishRarity` by design, so
+    `computeZoneRarity()` just sums local + shared + this session's own live entries, no
+    translation needed. The rarity caption calls out the pooled count when present ("pooled
+    with N attempts from the guild's submitted sessions"), falling back to the original
+    wording when a zone has no shared data yet. **Known accepted double-count**: a session
+    this install both logged locally AND already had submitted/merged shows up in both the
+    local and shared totals — there's no cheap way from here to know which of an install's
+    own past sessions were ever submitted, and this is already framed as an estimate, not the
+    wiki's own figure, so the imprecision is tolerated rather than solved.
 
 ### Gathering — own tab, node→material(s) two-tier pick (redesigned 2026-08-26)
 

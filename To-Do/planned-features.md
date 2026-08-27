@@ -307,52 +307,26 @@ box, alphabetical within each tier. Scoped to Fishing only, matching the user's 
 Gathering's node grid has the identical pattern but wasn't touched, since it wasn't what was
 asked about.
 
-## 20. Shared/pooled data across guild members (2026-08-27)
+## 20. ~~Shared/pooled data across guild members~~ — done for Fishing (2026-08-27)
 
-User's own words, after asking whether other users' fishing data already feeds the rarity
-bars (it doesn't — confirmed, see below): "I want as much data as possible. Any data we can
-use to predict rarity or use as statistics in our app and on the wiki. Shared datasets sounds
-wonderful to me." So this is explicitly NOT scoped to just Fishing rarity — the ask covers
-any statistic this app could compute from pooled data (drop rates, gathering yields, rarity,
-etc.), for both in-app display and the wiki.
+User's own words: "I want as much data as possible. Any data we can use to predict rarity or
+use as statistics in our app and on the wiki. Shared datasets sounds wonderful to me."
 
-**Confirmed current state, so this isn't built from a wrong assumption**: rarity bars
-(`Get-FishRarity` in `MnMFieldNotes.ps1`) only ever read the local, gitignored
-`Data\AllTimeLog.jsonl` on that one machine — each install is an island. Session export
-submission (#1, built) is one-directional, app → wiki, as a human-reviewed PR; nothing reads
-data back down from the wiki into any install's rarity bars or stats today.
+Built as a two-repo pipeline: the wiki-side half (a separate Claude session working in the
+wiki repo) added a GitHub Action that aggregates every merged `session-exports/*.txt` file
+into a published `fishing-rarity.json` on every merge (plus manual dispatch) — see that
+repo's `CLAUDE.md` "Session exports & pooled Fishing rarity". The app-side half
+(`Get-SharedFishRarity` in `MnMFieldNotes.ps1`) fetches that file and `computeZoneRarity()`
+sums it in alongside the local baseline — see "Rarity bars" in this repo's `CLAUDE.md` for
+the full mechanism, including the one accepted double-count caveat (a locally-logged session
+that's ALSO been submitted/merged counts in both totals).
 
-**Partially addressed (2026-08-27)**: the export itself now carries computed Fishing rarity
-stats alongside the raw entries (`Write-FishRarityBlock`, see "Session export submission" in
-`CLAUDE.md`) — this session's own catch-rate plus the submitter's all-time-on-this-install
-rate, so whoever reviews a submission (wiki-side Claude) doesn't have to hand-tally raw
-lines. This only closes the "does a single submission carry its full statistical picture"
-gap — it's still one submitter's local numbers per file, not pooled across submitters. The
-cross-user aggregation below is still fully open. A briefing for the wiki-side half of this
-was already handed to a separate Claude session working in the wiki repo (2026-08-27).
+Verified against the real live endpoint (already serving real merged data by the time this
+was built — confirmed via `curl`, then through the actual PS function + JSON encoding, then
+the full `SV_AUTOTEST` harness).
 
-**Wiki-side status (2026-08-27): that session has reported back that it's finished the task
-it was briefed on.** It has NOT yet reported the actual specifics back through the user
-(the published file's URL/path, its exact JSON shape, the refresh mechanism it landed on) —
-those are needed before the app-side fetch/merge below can actually be built. Ask the user
-for those details (or to relay them from the wiki-side session) before starting the app-side
-work, rather than guessing at a shape that might not match what was actually built.
-
-Natural building block already in place: once a session-export PR (#1) is merged, its file
-already sits in the wiki repo's `session-exports/` folder — that merged set IS the shared
-pool, just not aggregated or fed back to anyone yet. Rough shape, not yet scoped/confirmed:
-- Something (a script, a GitHub Action, or a manual Claude-assisted pass) needs to
-  periodically aggregate all merged `session-exports/*.txt` files into a computed stats file
-  (e.g. rarity per zone/fish, drop rates per monster, gathering yield rates) — this means
-  WRITING to the wiki repo, which is out of scope for this project's own read-only rule (see
-  "Wiki data" in `CLAUDE.md`) — needs its own design pass scoped IN the wiki repo, not here.
-- The app side is the easy half, same pattern already used for `items.json`/`monsters.json`
-  etc: fetch a new published JSON file (e.g. `fishing-rarity.json`) from the wiki's GitHub
-  Pages site at `ready`, same as `wikiData`/`fishRarity` already work — `computeZoneRarity()`
-  would need to combine this new SHARED baseline with the existing LOCAL one rather than
-  replacing it, so a user's own not-yet-submitted session data still counts too.
-- Trust/staleness questions to resolve when this is actually scoped: how often the aggregate
-  refreshes (every merge? a periodic batch?), whether a single guild member's outlier session
-  (very few attempts, unusual luck) should be weighted down vs. a large sample, and whether
-  the "Guild data trust model" section in `CLAUDE.md` (trusted by default, flag conflicts)
-  extends cleanly to an aggregate stat or needs its own rule.
+**Still open**: this was explicitly scoped to Fishing rarity only, since that's the only stat
+the app currently computes — the user's original ask covers "any statistic," so drop rates,
+gathering yields, etc. would need the same treatment if/when the app computes those itself.
+The wiki-side script's line-parser was written generically enough to be reused for a future
+stat without a rewrite, per the wiki-side session's own report.
