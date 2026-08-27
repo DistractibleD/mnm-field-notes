@@ -70,7 +70,7 @@ function Write-DebugLog {
 }
 
 $WikiBaseUrl = 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/'
-$script:AppVersion = '0.4'
+$script:AppVersion = '0.5'
 $script:AppBuildDate = '2026-08-27'
 $UpdateCheckUrl = 'https://raw.githubusercontent.com/DistractibleD/mnm-field-notes/main/latest.json'
 # Same Worker URL as SUBMIT_WORKER_URL in the wiki's own script.js - the
