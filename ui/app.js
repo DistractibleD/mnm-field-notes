@@ -597,6 +597,11 @@ function updateStatsBarVisibility() {
   if (isGathering) updateGatherStats();
 }
 
+// Tabs that actually put data-tip on things worth hovering - a plain hint
+// on every tab (including still-empty Crafting/Multi/Lookup) would just be
+// noise where there's nothing to discover yet.
+const TABS_WITH_TOOLTIPS = new Set(['combat', 'gathering', 'fishing', 'cooking']);
+
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.panel-body').forEach(x => x.classList.remove('active'));
@@ -605,6 +610,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   if (TAB_SESSION_TYPE[t.dataset.tab]) {
     session.type = TAB_SESSION_TYPE[t.dataset.tab];
   }
+  document.getElementById('tooltip-hint').style.display = TABS_WITH_TOOLTIPS.has(t.dataset.tab) ? 'block' : 'none';
   updateStatsBarVisibility();
   updateCombatSessionVisibility();
 }));

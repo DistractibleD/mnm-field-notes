@@ -80,6 +80,10 @@ html, body {
 .update-banner.submit-ask.flash { animation: submit-ask-flash 0.5s ease-in-out 2; }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+
+.tooltip-hint {
+  font-size: 12px; color: var(--accent); margin: -0.75rem 0 1rem; text-align: center;
+}
 .tab {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
