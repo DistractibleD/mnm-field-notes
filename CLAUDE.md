@@ -100,6 +100,62 @@ Filtering hides non-matching `.checklist-option` (`filtered-out` class), doesn't
 checked state lives on the `<input>` DOM nodes, removing would lose it. Verify: check while
 filtered, clear search, check survives.
 
+### Landing info — every tab usable without a session (2026-08-27)
+
+Explicit standing goal, the user's own words: "i want every tab to display valuable
+information even if there is no session running - This will inspire users to open the app
+even if they don't want to start a session." Combat/Fishing/Gathering each have a
+zone-scoped "browse" area that works with zero session/profile/anything else required —
+picking a zone is the only input. Empty-zone state is always the same one-liner:
+`<p class="landing-info-empty">Select a zone to see more.</p>` (or a zone+tradeskill variant
+for Gathering) — keep this wording consistent if more tabs get a landing section.
+
+- **Fishing**: the pre-start screen's zone picker (`fish-landing-zone`) writes straight into
+  `fishingSession.zone` — the SAME field the active screen and start-flow modals already
+  read/pre-fill from, so picking a zone while browsing carries into the real session with no
+  extra plumbing. Below it, `renderFishRarityPanel()` — already built for the active
+  screen — is called as-is; it doesn't care whether a session exists, just needs the zone.
+- **Gathering**: same pattern, `gather-landing-zone` writes to `gatheringSession.zone`, plus
+  a 3-button tradeskill row (`data-landing-tradeskill`, styled via `.mini-btn.active`) writing
+  to `gatheringSession.tradeskill` — both carry into the real start-flow modals the same way.
+  Below: `renderGatherLandingInfo()`, a DELIBERATELY separate, simpler function from
+  `renderGatherNodeGrid()` — read-only (no click-to-log handlers, nothing to log against
+  yet), and no difficulty-tier color (skill isn't known pre-session, so guessing would just
+  paint everything the hardest color, which is actively misleading, not just unavailable).
+- **Combat**: has no pre-start screen at all (roster's always live regardless of session
+  state), so this is new UI, not a repurposed existing one — `combat-landing-zone` is its own
+  state (`combatLandingZone`, unrelated to the per-kill zone field in the roster detail form).
+  Shows "N named monsters known here" (`wikiData.monsters` filtered `named && locations`
+  matches) collapsed by default, expands to a compact list with `data-tip` showing wiki
+  `areas`/`drops` per monster — same tooltip pattern used everywhere else, not a new one.
+  `Get-WikiData` forwards `named`/`locations` (was `maps`)/`areas`/`drops` per monster now —
+  used to only send `name`. **No monster in the wiki has a numeric `level` field (checked:
+  0/660)** — Combat already logs `playerLevel`+`con` per kill (this app's own data, not the
+  wiki's), which could feed an empirical level-range guess the same way Fishing's rarity bars
+  work, but that's NOT built yet — deliberately deferred, not an oversight, see
+  `To-Do/planned-features.md`.
+- **Gotcha, hit once already**: `renderFishingPanel()`/`renderGatheringPanel()`'s landing
+  branches build their zone picker's options from `wikiData.zones` inline, at whatever point
+  they're called — including the very first render, in Init, which happens BEFORE the
+  `wikiData` message has arrived (`wikiData.zones` is still `[]` then). The `wikiData`
+  message handler has to fully re-render the whole panel (not just call the narrower
+  rarity/info sub-functions) when no session is active, or the zone picker stays stuck empty
+  until something else happens to trigger a full re-render. Combat's own landing zone picker
+  never had this bug — `renderCombatLandingInfo()` was written to always rebuild the picker's
+  HTML from `wikiData.zones` fresh on every call, not just render it once as part of a bigger
+  template.
+- Leave `fishZoneCtrl`/`gatherZoneCtrl` reset to `null` at the top of each render function's
+  landing branch — they're set by the ACTIVE screen's own zone dropdown, and left stale
+  they'd make `renderFishRarityPanel()`'s "`fishZoneCtrl` ? ... : `fishingSession.zone`"
+  fallback read a detached DOM node's frozen `.checked` state instead of the landing picker's
+  real live selection.
+
+**Deliberately out of scope for this pass** (see `To-Do/planned-features.md` for the fuller
+version): a whole "add info" contribution tab (dropdown-driven named-monster/camp/item
+authoring, camp+named sharing one form), zone-level min/max/avg level tracking. Both are
+real, separate features the user wants, not forgotten — they need their own design pass, not
+a bolt-on to this one.
+
 ### Starting a session — one button, state-dependent (2026-08-27)
 
 `#btn-session-action` (`btnSession` in app.js) is the ONLY session start/end control — used to

@@ -34,7 +34,12 @@ function mockHostRespond(msg) {
     if (msg.type === 'ready') {
       deliverFromHost({
         type: 'wikiData',
-        monsters: [{ name: 'a corrupted outrider' }, { name: 'a smuggler' }, { name: 'Onis the Elder' }],
+        monsters: [
+          { name: 'a corrupted outrider', named: false, locations: ['Night Harbor'], areas: [], drops: [] },
+          { name: 'a smuggler', named: false, locations: ['Night Harbor'], areas: [], drops: [] },
+          { name: 'Onis the Elder', named: true, locations: ['Shaded Dunes'], areas: ['Sunken Ruins'], drops: ["Onis's Signet", 'Elder Ashira Hide'] },
+          { name: 'Night Terror', named: true, locations: ['Night Harbor'], areas: ['Necropolis'], drops: ["Night Terror's Wing"] },
+        ],
         items: [{ name: 'Ashira War Tooth' }, { name: 'Corroded Bronze Chain Boots' }],
         nodes: [
           { name: 'Lionleaf', tradeskill: 'Herbalism', locations: ['Vale of Zintar', 'Evershade Weald'], results: ['Lionleaf Bloom', 'Plant Fiber'] },
@@ -102,6 +107,61 @@ const session = {
 // roster: Map of target name -> { entries: [ {con, playerLevel, coin, items, named, factionChanges, loggedAt} ] }
 const roster = new Map();
 let activeTarget = null;
+
+// ---------------------------------------------------------------------------
+// Combat landing info (2026-08-27) - browsable without a session: pick a
+// zone, see how many named monsters the wiki knows about there, expand for
+// a compact list with their drops/sub-area (data-tip, same pattern used
+// elsewhere). Own state, not tied to roster/session - this is browsing, not
+// logging (Combat's roster has no zone concept of its own; zone is only
+// ever entered per-kill in the detail form).
+// ---------------------------------------------------------------------------
+let combatLandingZone = '';
+let combatNamedListExpanded = false;
+
+function renderCombatLandingInfo() {
+  const pickerEl = document.getElementById('combat-landing-zone-picker');
+  if (!pickerEl) return;
+  pickerEl.innerHTML = checklistDropdownHTML('combat-landing-zone', combatLandingZone ? combatLandingZone : 'Select zone', wikiData.zones, { multi: false, selected: combatLandingZone ? [combatLandingZone] : [] });
+  const landingZoneCtrl = setupChecklistDropdown('combat-landing-zone', { multi: false, onChange: () => {
+    combatLandingZone = landingZoneCtrl.getValue();
+    combatNamedListExpanded = false;
+    renderCombatNamedInfo();
+  } });
+  renderCombatNamedInfo();
+}
+
+function renderCombatNamedInfo() {
+  const el = document.getElementById('combat-landing-named');
+  if (!el) return;
+  if (!combatLandingZone) {
+    el.innerHTML = `<p class="landing-info-empty">Select a zone to see more.</p>`;
+    return;
+  }
+  const named = wikiData.monsters.filter(m => m.named && (m.locations || []).some(loc => locationMatchesZone(loc, combatLandingZone)));
+  if (named.length === 0) {
+    el.innerHTML = `<p class="landing-info-empty">No named monsters known in ${escapeHtml(combatLandingZone)} yet, per the wiki.</p>`;
+    return;
+  }
+  const toggleLabel = combatNamedListExpanded
+    ? 'Hide the list ▲'
+    : `${named.length} named monster${named.length === 1 ? '' : 's'} known here ▼`;
+  let body = '';
+  if (combatNamedListExpanded) {
+    body = '<div class="landing-info-box">' + named.map(m => {
+      const tipParts = [];
+      if (m.areas && m.areas.length) tipParts.push(`Found in: ${m.areas.join(', ')}`);
+      if (m.drops && m.drops.length) tipParts.push(`Drops: ${m.drops.join(', ')}`);
+      const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' — '))}"` : '';
+      return `<span class="fish-pick-btn" style="cursor:default; display:inline-block; margin:3px;"${tip}>${escapeHtml(m.name)}</span>`;
+    }).join('') + '</div>';
+  }
+  el.innerHTML = `<button class="mini-btn" id="combat-named-toggle" style="margin-top:10px;">${toggleLabel}</button>${body}`;
+  document.getElementById('combat-named-toggle').addEventListener('click', () => {
+    combatNamedListExpanded = !combatNamedListExpanded;
+    renderCombatNamedInfo();
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Utilities
@@ -580,9 +640,16 @@ onHostMessage((msg) => {
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
     refreshDishList();
-    renderFishPickGrid();
-    if (fishingSession.active) renderFishRarityPanel();
-    if (gatheringSession.active) renderGatherNodeGrid();
+    // Fishing/Gathering's landing screens build their zone picker's options
+    // from wikiData.zones inline in a bigger template rendered once at init
+    // (before this message has arrived, so wikiData.zones was still empty
+    // then) - re-rendering the whole panel is what actually rebuilds the
+    // picker with real options, not just the narrower info sub-functions.
+    // Combat's own landing zone picker doesn't have this problem since
+    // renderCombatLandingInfo() always rebuilds it fresh from wikiData.zones.
+    if (fishingSession.active) { renderFishPickGrid(); renderFishRarityPanel(); } else { renderFishingPanel(); }
+    if (gatheringSession.active) { renderGatherNodeGrid(); } else { renderGatheringPanel(); }
+    renderCombatLandingInfo();
     if (msg.error) showToast('Wiki data unavailable — autocomplete limited (' + msg.error + ')');
   } else if (msg.type === 'profiles') {
     profileState.profiles = msg.profiles || [];
@@ -906,16 +973,36 @@ function renderGatheringPanel() {
   const el = document.getElementById('panel-gathering');
 
   if (!gatheringSession.active) {
+    // Stale from a previous active-screen render - same reasoning as
+    // Fishing's equivalent reset in renderFishingPanel().
+    gatherZoneCtrl = null;
     el.innerHTML = `
-      <div class="detail" style="text-align:center; padding: 48px 20px;">
+      <div class="detail" style="text-align:center; padding: 48px 20px 24px;">
         <p style="font-size:13px; color:var(--text-secondary); max-width:38ch; margin:0 auto 20px;">
           Pick what you're gathering and where &mdash; the app will show you what's expected
           to find there, from the wiki's own data.
         </p>
         <button class="primary-btn" id="gather-start-btn" style="max-width:260px; margin:0 auto;">Let's start gathering!</button>
       </div>
+      <div class="detail" style="text-align:left; max-width:440px; margin:24px auto 0; border-top:1px solid var(--border); padding-top:22px;">
+        <label>Browse a zone <span style="color:var(--text-muted); font-weight:400;">(no session needed)</span></label>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          ${GATHER_TRADESKILLS.map(ts => `<button class="mini-btn${gatheringSession.tradeskill === ts ? ' active' : ''}" data-landing-tradeskill="${escapeHtml(ts)}">${escapeHtml(ts)}</button>`).join('')}
+        </div>
+        ${checklistDropdownHTML('gather-landing-zone', gatheringSession.zone ? gatheringSession.zone : 'Select zone', wikiData.zones, { multi: false, selected: gatheringSession.zone ? [gatheringSession.zone] : [] })}
+        <div id="gather-landing-info" style="margin-top:10px;"></div>
+      </div>
     `;
     document.getElementById('gather-start-btn').addEventListener('click', openGatherZoneModal);
+    el.querySelectorAll('[data-landing-tradeskill]').forEach(btn => btn.addEventListener('click', () => {
+      gatheringSession.tradeskill = btn.dataset.landingTradeskill;
+      renderGatheringPanel();
+    }));
+    const landingZoneCtrl = setupChecklistDropdown('gather-landing-zone', { multi: false, onChange: () => {
+      gatheringSession.zone = landingZoneCtrl.getValue();
+      renderGatherLandingInfo();
+    } });
+    renderGatherLandingInfo();
     return;
   }
 
@@ -1071,6 +1158,40 @@ function gatherDifficultyTier(node, skill) {
   if (pct >= 2 / 7) return 'yellow';
   if (pct >= 1 / 7) return 'orange';
   return 'red';
+}
+
+// Landing-screen preview (2026-08-27) - read-only, no session needed: just
+// which node types are expected in the picked zone+tradeskill. No difficulty
+// tier here (skill isn't known yet pre-session, so a guess would just show
+// everything as the hardest color) and no tap-to-log click handlers (there's
+// nothing to log yet). Once gathering starts, renderGatherNodeGrid() below
+// takes over with the full interactive version.
+function renderGatherLandingInfo() {
+  const el = document.getElementById('gather-landing-info');
+  if (!el) return;
+  const zone = gatheringSession.zone;
+  const tradeskill = gatheringSession.tradeskill;
+  if (!zone || !tradeskill) {
+    el.innerHTML = `<p class="landing-info-empty">Select a zone and a tradeskill to see more.</p>`;
+    return;
+  }
+  const known = wikiData.nodes.filter(n => n.tradeskill === tradeskill).map(n => n.name);
+  const expected = wikiData.nodes
+    .filter(n => n.tradeskill === tradeskill && (n.locations || []).some(loc => locationMatchesZone(loc, zone)))
+    .map(n => n.name)
+    .sort();
+  if (known.length === 0) {
+    el.innerHTML = `<p class="landing-info-empty">No ${escapeHtml(tradeskill)} data in the wiki yet.</p>`;
+  } else if (expected.length === 0) {
+    el.innerHTML = `<p class="landing-info-empty">Nothing expected for ${escapeHtml(tradeskill)} in ${escapeHtml(zone)} yet, per the wiki.</p>`;
+  } else {
+    el.innerHTML = `
+      <div class="fish-pick-expected-box">
+        <div class="fish-pick-expected-label">Expected in this zone</div>
+        ${expected.map(name => `<span class="fish-pick-btn" style="cursor:default;">${escapeHtml(name)}</span>`).join('')}
+      </div>
+    `;
+  }
 }
 
 // Sorts/highlights the same way Fishing's fish-pick-grid does: known node
@@ -1610,8 +1731,12 @@ function renderFishingPanel() {
   const el = document.getElementById('panel-fishing');
 
   if (!fishingSession.active) {
+    // Stale from a previous active-screen render - if left set, renderFishRarityPanel()'s
+    // "fishZoneCtrl ? ... : fishingSession.zone" would read a detached DOM node's frozen
+    // .checked state instead of the landing zone picker's actual live selection below.
+    fishZoneCtrl = null;
     el.innerHTML = `
-      <div class="detail" style="text-align:center; padding: 48px 20px;">
+      <div class="detail" style="text-align:center; padding: 48px 20px 24px;">
         <p style="font-size:13px; color:var(--text-secondary); max-width:38ch; margin:0 auto 20px;">
           This lets the app count your casts automatically: pick one key you use to fish, and
           from then on every press of that key bumps the attempts counter below &mdash; the
@@ -1624,9 +1749,19 @@ function renderFishingPanel() {
           <button class="primary-btn" id="fish-start-btn" style="max-width:240px; margin:0 auto;">Start fishing!</button>
         </div>
       </div>
+      <div class="detail" style="text-align:left; max-width:440px; margin:24px auto 0; border-top:1px solid var(--border); padding-top:22px;">
+        <label>Browse a zone <span style="color:var(--text-muted); font-weight:400;">(no session needed)</span></label>
+        ${checklistDropdownHTML('fish-landing-zone', fishingSession.zone ? fishingSession.zone : 'Select zone', wikiData.zones, { multi: false, selected: fishingSession.zone ? [fishingSession.zone] : [] })}
+        <div id="fish-rarity-panel" style="margin-top:10px;"></div>
+      </div>
     `;
     document.getElementById('fish-listen-btn').addEventListener('click', openFishKeyModal);
     document.getElementById('fish-start-btn').addEventListener('click', openFishSkillModal);
+    const landingZoneCtrl = setupChecklistDropdown('fish-landing-zone', { multi: false, onChange: () => {
+      fishingSession.zone = landingZoneCtrl.getValue();
+      renderFishRarityPanel();
+    } });
+    renderFishRarityPanel();
     return;
   }
 
@@ -1986,7 +2121,7 @@ function renderFishRarityPanel() {
   const zone = fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone;
 
   if (!zone) {
-    el.innerHTML = `<button class="mini-btn" id="fish-rarity-toggle" disabled style="margin-top:10px;">Pick a zone to see rarity</button>`;
+    el.innerHTML = `<p class="landing-info-empty">Select a zone to see more.</p>`;
     return;
   }
 
@@ -2242,6 +2377,7 @@ document.getElementById('lookup-input').addEventListener('input', e => renderLoo
 // ---------------------------------------------------------------------------
 renderRoster();
 renderDetail();
+renderCombatLandingInfo();
 renderFishingPanel();
 renderGatheringPanel();
 updateStats();

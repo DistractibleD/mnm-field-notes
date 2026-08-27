@@ -97,3 +97,31 @@ Still open:
   A traditional installer would add real downsides (unsigned `.exe` triggers SmartScreen)
   for no real benefit at guild scale. Still needs an `INSTALL.txt` in the distributed zip
   explaining what's inside and why, for guild members who aren't the project owner.
+
+## 6. "Add info" contribution tab (2026-08-27)
+
+User's own framing: unlike the wiki (screenshots only), let users add STRUCTURED data
+straight from the app — dropdowns, not free text, so it's consistent/parseable. Explicitly
+scoped OUT of the 2026-08-27 "landing info" pass (see `CLAUDE.md` "Landing info") since it's
+a genuinely separate, much bigger feature — needs its own design session, not a bolt-on.
+
+Rough shape from the user's own description, not yet scoped/confirmed:
+- A "What do you want to add?" entry dropdown — Named Monster, Camp, (Item?) as the first
+  choices.
+- **Named Monster**: level, a free-text comment on where in the zone it's found, drops (item
+  name autocompletes against wiki data if it matches; if not found, a separate "add item"
+  flow captures full item-card fields via dropdowns rather than free text).
+- **Camp**: level range, general area, which regular + named monsters live there.
+- User's own suggestion: **try to build Camp and Named off the same underlying
+  form/function** — significant field overlap (level, area, monsters-present), worth
+  checking during design rather than assuming they're separate before scoping it.
+- **Zone-level min/max/avg level** — could go either of two very different ways: (a) a wiki
+  schema addition (new fields on `maps.json`, would need the wiki owner's OK — this project's
+  wiki repo is read-only, see "Wiki data" in `CLAUDE.md`), or (b) an app-computed empirical
+  estimate from Combat's own logged `playerLevel`+`con` per zone, same pattern as Fishing's
+  rarity bars (`Get-FishRarity`) — no wiki changes needed for (b). Worth deciding which
+  before building, not assuming (a).
+- Whatever a user submits here still needs the same human-review trust model as everything
+  else this app produces (see "Guild data trust model" in `CLAUDE.md`) before it's real wiki
+  data — this tab produces submittable data, it doesn't write to the wiki directly, matching
+  how session exports already work.

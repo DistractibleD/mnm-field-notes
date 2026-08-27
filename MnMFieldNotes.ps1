@@ -112,7 +112,12 @@ function Get-WikiData {
         $nodes = Invoke-RestMethod -Uri ($WikiBaseUrl + 'gathering-nodes.json') -TimeoutSec 10
         $crafting = Invoke-RestMethod -Uri ($WikiBaseUrl + 'crafting.json') -TimeoutSec 10
         $maps = Invoke-RestMethod -Uri ($WikiBaseUrl + 'maps.json') -TimeoutSec 10
-        $result.monsters = @($monsters | ForEach-Object { @{ name = $_.name } })
+        $result.monsters = @($monsters | ForEach-Object {
+            # drops is [{item:"Name"}, ...] in the wiki - flatten to plain
+            # strings, same reasoning as gathering nodes' `results` below.
+            $flatDrops = @($_.drops | ForEach-Object { $_.item })
+            @{ name = $_.name; named = [bool]$_.named; locations = @($_.maps); areas = @($_.areas); drops = $flatDrops }
+        })
         $result.items = @($items | ForEach-Object { @{ name = $_.name } })
         $result.nodes = @($nodes | ForEach-Object {
             # results can mix plain strings ("Copper Ore") and family objects
