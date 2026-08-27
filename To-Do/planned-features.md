@@ -146,10 +146,11 @@ first step toward #5).
 
 ## 9. Tooltip discoverability + coverage (2026-08-27)
 
-- A small, easy-to-spot hint in each tab noting hovering things shows more info — the
-  `data-tip` system (see `CLAUDE.md` "Tooltips") is used app-wide already but nothing
-  currently tells a first-time user it exists.
-- Expand tooltip coverage so every node in Gathering and Fishing has SOMETHING to show, not
+- ~~A small, easy-to-spot hint in each tab noting hovering things shows more info~~ — done
+  (2026-08-27), `#tooltip-hint` in `index.html`, shown only on Combat/Gathering/Fishing/
+  Cooking (the tabs with real `data-tip` content), toggled from the tab-click handler in
+  `app.js` against a `TABS_WITH_TOOLTIPS` set.
+- Still open: expand tooltip coverage so every node in Gathering and Fishing has SOMETHING to show, not
   just the ones that happen to have a wiki `note`/location-detail/difficulty-tier already.
   Needs scoping first: what should a node with genuinely nothing to say show — nothing (an
   absent tooltip, current behavior) vs. some kind of "no data yet" placeholder?
