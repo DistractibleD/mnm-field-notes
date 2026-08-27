@@ -58,6 +58,7 @@ function mockHostRespond(msg) {
         ],
         factions: ['Bends Garrison', 'Citizens of Night Harbor', 'Orcs', 'Pyrmos Mercenaries', 'Steel Talons', 'Ten Hooks', 'Vermahn\'s Brood'],
         zones: ['Night Harbor', 'Shaded Dunes', 'Sungreet Strand', 'Vale of Zintar', 'Evershade Weald'],
+        pageUrl: 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/',
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
       deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null });
@@ -88,6 +89,9 @@ function mockHostRespond(msg) {
       setTimeout(() => deliverFromHost({ type: 'keyCounted' }), 400);
     } else if (msg.type === 'stopKeyCounting') {
       console.log('[mock host] would stop counting key');
+    } else if (msg.type === 'submitExport') {
+      console.log('[mock host] would POST export to the wiki Worker:', msg.fileName);
+      deliverFromHost({ type: 'submitExportResult', ok: true, error: null, fileName: msg.fileName });
     }
   }, 50);
 }
@@ -95,7 +99,7 @@ function mockHostRespond(msg) {
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [] };
+const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [], pageUrl: '' };
 
 const session = {
   id: null,
@@ -118,6 +122,16 @@ let activeTarget = null;
 // ---------------------------------------------------------------------------
 let combatLandingZone = '';
 let combatNamedListExpanded = false;
+
+// Combat has no pre-start/active split of its own (unlike Fishing/Gathering)
+// - this is the equivalent for it: the roster+detail ".layout" only shows
+// once a session actually exists, so the tab is just the landing info until
+// then. Called from the tab-click handler and sessionStarted/sessionEnded.
+function updateCombatSessionVisibility() {
+  const running = !!session.id;
+  document.getElementById('combat-no-session-msg').style.display = running ? 'none' : '';
+  document.getElementById('combat-session-layout').style.display = running ? '' : 'none';
+}
 
 function renderCombatLandingInfo() {
   const pickerEl = document.getElementById('combat-landing-zone-picker');
@@ -148,19 +162,55 @@ function renderCombatNamedInfo() {
     : `${named.length} named monster${named.length === 1 ? '' : 's'} known here ▼`;
   let body = '';
   if (combatNamedListExpanded) {
-    body = '<div class="landing-info-box">' + named.map(m => {
+    // Search filters existing buttons via the same .filtered-out class the
+    // checklist dropdown uses, not a full re-render on every keystroke -
+    // rebuilding innerHTML on 'input' would steal focus out of the search
+    // box after every character typed.
+    const itemsHtml = named.map(m => {
       const tipParts = [];
       if (m.areas && m.areas.length) tipParts.push(`Found in: ${m.areas.join(', ')}`);
       if (m.drops && m.drops.length) tipParts.push(`Drops: ${m.drops.join(', ')}`);
       const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' — '))}"` : '';
-      return `<span class="fish-pick-btn" style="cursor:default; display:inline-block; margin:3px;"${tip}>${escapeHtml(m.name)}</span>`;
-    }).join('') + '</div>';
+      return `<span class="fish-pick-btn" style="cursor:default; display:inline-block; margin:3px;" data-search="${escapeHtml(m.name.toLowerCase())}"${tip}>${escapeHtml(m.name)}</span>`;
+    }).join('');
+    const wikiLink = wikiData.pageUrl
+      ? `<a href="#" id="combat-named-wiki-link" style="font-size:11px; color:var(--accent); white-space:nowrap; flex-shrink:0;">View on wiki ↗</a>`
+      : '';
+    body = `
+      <div class="landing-info-box">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <input type="text" id="combat-named-search" class="checklist-search" placeholder="Search…" autocomplete="off" style="flex:1; margin:0;" />
+          ${wikiLink}
+        </div>
+        <div id="combat-named-list">${itemsHtml}</div>
+      </div>
+    `;
   }
   el.innerHTML = `<button class="mini-btn" id="combat-named-toggle" style="margin-top:10px;">${toggleLabel}</button>${body}`;
   document.getElementById('combat-named-toggle').addEventListener('click', () => {
     combatNamedListExpanded = !combatNamedListExpanded;
     renderCombatNamedInfo();
+    if (combatNamedListExpanded) {
+      const searchInput = document.getElementById('combat-named-search');
+      if (searchInput) searchInput.focus();
+    }
   });
+  const searchInput = document.getElementById('combat-named-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      document.querySelectorAll('#combat-named-list [data-search]').forEach(item => {
+        item.classList.toggle('filtered-out', !(!q || item.dataset.search.includes(q)));
+      });
+    });
+  }
+  const wikiLinkEl = document.getElementById('combat-named-wiki-link');
+  if (wikiLinkEl) {
+    wikiLinkEl.addEventListener('click', e => {
+      e.preventDefault();
+      sendToHost({ type: 'openUrl', url: wikiData.pageUrl + '#monsters-named/' + encodeURIComponent(combatLandingZone) });
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -389,6 +439,30 @@ function showUpdateBanner(version, url) {
   });
 }
 
+// Submit-for-review banner (2026-08-27) - dismissible, never blocking, same
+// visual/interaction pattern as the update banner above (deliberately reused,
+// not a new design). Offered once per export, right after "sessionEnded" -
+// the file is already safely on disk either way, submitting is purely
+// additive. Posts the export text to the wiki's own submission Worker
+// (extended with a session-export path - see CLAUDE.md "Session export
+// submission"), which opens a PR; nothing is live until the wiki owner
+// merges it - that PR review IS the "i check each submission" the user
+// asked for, not a separate gate this app needs to add on top.
+function showSubmitExportBanner(fileName) {
+  const el = document.getElementById('submit-export-banner');
+  el.innerHTML = `<span>Submit this session to the wiki for review?</span><span><a href="#" id="submit-export-go">Submit</a><a href="#" id="submit-export-dismiss">Dismiss</a></span>`;
+  el.style.display = 'flex';
+  document.getElementById('submit-export-go').addEventListener('click', e => {
+    e.preventDefault();
+    el.innerHTML = `<span>Submitting…</span>`;
+    sendToHost({ type: 'submitExport', fileName });
+  });
+  document.getElementById('submit-export-dismiss').addEventListener('click', e => {
+    e.preventDefault();
+    el.style.display = 'none';
+  });
+}
+
 document.getElementById('check-updates-link').addEventListener('click', e => {
   e.preventDefault();
   sendToHost({ type: 'checkForUpdates' });
@@ -465,6 +539,26 @@ profileModalCancel.addEventListener('click', closeProfileModal);
 // 'harvesting', matching Write-HarvestingBlock's grouping in MnMFieldNotes.ps1).
 const TAB_SESSION_TYPE = { combat: 'combat', gathering: 'gathering', fishing: 'fishing', craft: 'crafting', cooking: 'cooking', multi: 'multi' };
 
+// Stats (and Combat's roster) are all-zero noise before a session exists -
+// gated on session.id, not just which tab is active, so a tab shows ONLY
+// its landing/browse info until something's actually being logged. Called
+// from the tab-click handler below and from sessionStarted/sessionEnded.
+function updateStatsBarVisibility() {
+  const activeTab = document.querySelector('.tab.active');
+  if (!activeTab) return;
+  const running = !!session.id;
+  const isFishing = activeTab.dataset.tab === 'fishing';
+  const isCooking = activeTab.dataset.tab === 'cooking';
+  const isGathering = activeTab.dataset.tab === 'gathering';
+  document.getElementById('stats-combat').style.display = (running && !isFishing && !isCooking && !isGathering) ? '' : 'none';
+  document.getElementById('stats-fishing').style.display = (running && isFishing) ? '' : 'none';
+  document.getElementById('stats-cooking').style.display = (running && isCooking) ? '' : 'none';
+  document.getElementById('stats-gathering').style.display = (running && isGathering) ? '' : 'none';
+  if (isFishing) updateFishStats();
+  if (isCooking) updateCookingStats();
+  if (isGathering) updateGatherStats();
+}
+
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.panel-body').forEach(x => x.classList.remove('active'));
@@ -473,18 +567,8 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   if (TAB_SESSION_TYPE[t.dataset.tab]) {
     session.type = TAB_SESSION_TYPE[t.dataset.tab];
   }
-  // Kills/coin are meaningless on Fishing/Cooking/Gathering, so each gets its
-  // own stats bar rather than showing Combat numbers that don't apply.
-  const isFishing = t.dataset.tab === 'fishing';
-  const isCooking = t.dataset.tab === 'cooking';
-  const isGathering = t.dataset.tab === 'gathering';
-  document.getElementById('stats-combat').style.display = (isFishing || isCooking || isGathering) ? 'none' : '';
-  document.getElementById('stats-fishing').style.display = isFishing ? '' : 'none';
-  document.getElementById('stats-cooking').style.display = isCooking ? '' : 'none';
-  document.getElementById('stats-gathering').style.display = isGathering ? '' : 'none';
-  if (isFishing) updateFishStats();
-  if (isCooking) updateCookingStats();
-  if (isGathering) updateGatherStats();
+  updateStatsBarVisibility();
+  updateCombatSessionVisibility();
 }));
 
 // ---------------------------------------------------------------------------
@@ -581,6 +665,8 @@ onHostMessage((msg) => {
   if (msg.type === 'sessionStarted') {
     session.id = msg.sessionId;
     setSessionButtonState(true);
+    updateStatsBarVisibility();
+    updateCombatSessionVisibility();
     profileSelect.disabled = true;
     document.getElementById('session-sub').textContent = 'Session running · logged by ' + session.loggedBy;
     if (pendingFishingStart) {
@@ -593,9 +679,12 @@ onHostMessage((msg) => {
     }
   } else if (msg.type === 'sessionEnded') {
     showToast('Exported ' + msg.entryCount + ' entries to ' + msg.exportFileName);
+    showSubmitExportBanner(msg.exportFileName);
     session.id = null;
     session.startedAt = null;
     setSessionButtonState(false);
+    updateStatsBarVisibility();
+    updateCombatSessionVisibility();
     profileSelect.disabled = false;
     document.getElementById('session-sub').textContent = 'No session running';
     roster.clear();
@@ -637,6 +726,7 @@ onHostMessage((msg) => {
     wikiData.recipes = msg.recipes || [];
     wikiData.factions = msg.factions || [];
     wikiData.zones = msg.zones || [];
+    wikiData.pageUrl = msg.pageUrl || '';
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
     refreshDishList();
@@ -677,6 +767,16 @@ onHostMessage((msg) => {
     // aren't in this snapshot since it's taken once at 'ready'.
     fishRarityBaseline = msg.data || {};
     if (fishingSession.active) renderFishRarityPanel();
+  } else if (msg.type === 'submitExportResult') {
+    const el = document.getElementById('submit-export-banner');
+    if (msg.ok) {
+      el.innerHTML = `<span>Submitted — thanks! It's waiting for review on the wiki now.</span><span><a href="#" id="submit-export-dismiss">Dismiss</a></span>`;
+    } else {
+      el.innerHTML = `<span>Couldn't submit: ${escapeHtml(msg.error || 'unknown error')}</span><span><a href="#" id="submit-export-retry">Retry</a><a href="#" id="submit-export-dismiss">Dismiss</a></span>`;
+      const retry = document.getElementById('submit-export-retry');
+      if (retry) retry.addEventListener('click', e => { e.preventDefault(); showSubmitExportBanner(msg.fileName); document.getElementById('submit-export-go').click(); });
+    }
+    document.getElementById('submit-export-dismiss').addEventListener('click', e => { e.preventDefault(); el.style.display = 'none'; });
   } else if (msg.type === 'error') {
     showToast('Error: ' + msg.message);
     // Safety net: if a session is still genuinely running (host-side export
@@ -969,6 +1069,15 @@ let pendingGatheringNode = null; // which node type the material modal is curren
 let pendingGatheringStart = false; // session was just requested for gathering - start it once 'sessionStarted' confirms
 let editingGatherEntryId = null;
 
+// Landing-only, deliberately separate from gatheringSession.tradeskill - a
+// real gathering session is always exactly one tradeskill, but browsing
+// isn't a session, so it can show several at once (toggle any number on/off,
+// e.g. Lumberjacking + Herbalism together). Doesn't feed into the real
+// start-flow's own single-select tradeskill modal - there's no sensible
+// single value to carry over from a multi-select browse into a
+// single-tradeskill session anyway.
+let gatherLandingTradeskills = [];
+
 function renderGatheringPanel() {
   const el = document.getElementById('panel-gathering');
 
@@ -987,7 +1096,7 @@ function renderGatheringPanel() {
       <div class="detail" style="text-align:left; max-width:440px; margin:24px auto 0; border-top:1px solid var(--border); padding-top:22px;">
         <label>Browse a zone <span style="color:var(--text-muted); font-weight:400;">(no session needed)</span></label>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
-          ${GATHER_TRADESKILLS.map(ts => `<button class="mini-btn${gatheringSession.tradeskill === ts ? ' active' : ''}" data-landing-tradeskill="${escapeHtml(ts)}">${escapeHtml(ts)}</button>`).join('')}
+          ${GATHER_TRADESKILLS.map(ts => `<button class="mini-btn${gatherLandingTradeskills.includes(ts) ? ' active' : ''}" data-landing-tradeskill="${escapeHtml(ts)}">${escapeHtml(ts)}</button>`).join('')}
         </div>
         ${checklistDropdownHTML('gather-landing-zone', gatheringSession.zone ? gatheringSession.zone : 'Select zone', wikiData.zones, { multi: false, selected: gatheringSession.zone ? [gatheringSession.zone] : [] })}
         <div id="gather-landing-info" style="margin-top:10px;"></div>
@@ -995,7 +1104,9 @@ function renderGatheringPanel() {
     `;
     document.getElementById('gather-start-btn').addEventListener('click', openGatherZoneModal);
     el.querySelectorAll('[data-landing-tradeskill]').forEach(btn => btn.addEventListener('click', () => {
-      gatheringSession.tradeskill = btn.dataset.landingTradeskill;
+      const ts = btn.dataset.landingTradeskill;
+      const idx = gatherLandingTradeskills.indexOf(ts);
+      if (idx === -1) { gatherLandingTradeskills.push(ts); } else { gatherLandingTradeskills.splice(idx, 1); }
       renderGatheringPanel();
     }));
     const landingZoneCtrl = setupChecklistDropdown('gather-landing-zone', { multi: false, onChange: () => {
@@ -1170,25 +1281,26 @@ function renderGatherLandingInfo() {
   const el = document.getElementById('gather-landing-info');
   if (!el) return;
   const zone = gatheringSession.zone;
-  const tradeskill = gatheringSession.tradeskill;
-  if (!zone || !tradeskill) {
-    el.innerHTML = `<p class="landing-info-empty">Select a zone and a tradeskill to see more.</p>`;
+  const tradeskills = gatherLandingTradeskills;
+  if (!zone || tradeskills.length === 0) {
+    el.innerHTML = `<p class="landing-info-empty">Select a zone and at least one tradeskill to see more.</p>`;
     return;
   }
-  const known = wikiData.nodes.filter(n => n.tradeskill === tradeskill).map(n => n.name);
-  const expected = wikiData.nodes
-    .filter(n => n.tradeskill === tradeskill && (n.locations || []).some(loc => locationMatchesZone(loc, zone)))
-    .map(n => n.name)
-    .sort();
+  const known = wikiData.nodes.filter(n => tradeskills.includes(n.tradeskill));
+  const expected = known
+    .filter(n => (n.locations || []).some(loc => locationMatchesZone(loc, zone)))
+    .sort((a, b) => a.name.localeCompare(b.name));
   if (known.length === 0) {
-    el.innerHTML = `<p class="landing-info-empty">No ${escapeHtml(tradeskill)} data in the wiki yet.</p>`;
+    el.innerHTML = `<p class="landing-info-empty">No data in the wiki yet for ${tradeskills.map(escapeHtml).join(', ')}.</p>`;
   } else if (expected.length === 0) {
-    el.innerHTML = `<p class="landing-info-empty">Nothing expected for ${escapeHtml(tradeskill)} in ${escapeHtml(zone)} yet, per the wiki.</p>`;
+    el.innerHTML = `<p class="landing-info-empty">Nothing expected in ${escapeHtml(zone)} yet, per the wiki.</p>`;
   } else {
+    // Tagged with its tradeskill via tooltip - harmless when only one
+    // tradeskill is picked, disambiguates when several are shown at once.
     el.innerHTML = `
       <div class="fish-pick-expected-box">
         <div class="fish-pick-expected-label">Expected in this zone</div>
-        ${expected.map(name => `<span class="fish-pick-btn" style="cursor:default;">${escapeHtml(name)}</span>`).join('')}
+        ${expected.map(n => `<span class="fish-pick-btn" style="cursor:default;" data-tip="${escapeHtml(n.tradeskill)}">${escapeHtml(n.name)}</span>`).join('')}
       </div>
     `;
   }
@@ -1987,7 +2099,7 @@ onHostMessage((msg) => {
 });
 
 // Guards against a held-down or physically stuck key skewing the attempt
-// count: 3+ counted presses within 1 second isn't 3 real casts, so pause
+// count: 3+ counted presses within 5 seconds isn't 3 real casts, so pause
 // listening rather than silently recording bad data. Deliberately handled
 // entirely here, not in the native hook or its poll timer in
 // MnMFieldNotes.ps1 - those have to stay minimal/trivial (see
@@ -1997,7 +2109,7 @@ const keyPressTimestamps = [];
 function checkKeySpam() {
   const now = Date.now();
   keyPressTimestamps.push(now);
-  while (keyPressTimestamps.length && now - keyPressTimestamps[0] > 1000) keyPressTimestamps.shift();
+  while (keyPressTimestamps.length && now - keyPressTimestamps[0] > 5000) keyPressTimestamps.shift();
   if (keyPressTimestamps.length >= 3 && keyState.listening) {
     keyPressTimestamps.length = 0;
     keyState.spamPaused = true;
@@ -2382,4 +2494,6 @@ renderFishingPanel();
 renderGatheringPanel();
 updateStats();
 setSessionButtonState(false);
+updateStatsBarVisibility();
+updateCombatSessionVisibility();
 sendToHost({ type: 'ready' });

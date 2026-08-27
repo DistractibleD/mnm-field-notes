@@ -23,6 +23,14 @@ game's EULA. See CLAUDE-HISTORY "EULA discovery." Door closed, not deprioritized
    need this rather than finding a narrower workaround. Never soften this rule regardless of
    how anything else in this file evolves — tampering risks a real account ban.
 2. **Writes stay inside the project folder only** (see File layout).
+3. **Outbound network writes only via the wiki's own reviewed submission Worker.** The only
+   data this app ever sends anywhere is a session export POSTed to the wiki's existing
+   Cloudflare Worker (see "Session export submission"), which commits to a NEW branch and
+   opens a PR — never `main`, never auto-merged, a human always decides. No other outbound
+   write path exists or should be added without the same explicit confirm-first treatment
+   this one got (checked the Worker's actual mechanism, confirmed reuse vs. new
+   infrastructure, confirmed the hard-rule update itself — all with the user, all before any
+   code existed).
 
 ## Naming
 
@@ -115,13 +123,19 @@ for Gathering) — keep this wording consistent if more tabs get a landing secti
   read/pre-fill from, so picking a zone while browsing carries into the real session with no
   extra plumbing. Below it, `renderFishRarityPanel()` — already built for the active
   screen — is called as-is; it doesn't care whether a session exists, just needs the zone.
-- **Gathering**: same pattern, `gather-landing-zone` writes to `gatheringSession.zone`, plus
-  a 3-button tradeskill row (`data-landing-tradeskill`, styled via `.mini-btn.active`) writing
-  to `gatheringSession.tradeskill` — both carry into the real start-flow modals the same way.
-  Below: `renderGatherLandingInfo()`, a DELIBERATELY separate, simpler function from
-  `renderGatherNodeGrid()` — read-only (no click-to-log handlers, nothing to log against
-  yet), and no difficulty-tier color (skill isn't known pre-session, so guessing would just
-  paint everything the hardest color, which is actively misleading, not just unavailable).
+- **Gathering**: `gather-landing-zone` writes to `gatheringSession.zone`, same carry-over
+  as Fishing. Tradeskill is a 3-button row (`data-landing-tradeskill`, styled via
+  `.mini-btn.active`) but writes to its OWN `gatherLandingTradeskills` array, NOT
+  `gatheringSession.tradeskill` — deliberately separate, and **multi-select** (click again to
+  untoggle, any number can be on at once, e.g. Lumberjacking + Herbalism together) since
+  browsing isn't a session and a real session is always exactly one tradeskill, so there's no
+  sensible single value to carry into the start-flow's own single-select tradeskill modal
+  anyway (that modal stays un-prefilled). Below: `renderGatherLandingInfo()`, a DELIBERATELY
+  separate, simpler function from `renderGatherNodeGrid()` — read-only (no click-to-log
+  handlers, nothing to log against yet), no difficulty-tier color (skill isn't known
+  pre-session, so guessing would just paint everything the hardest color, actively
+  misleading, not just unavailable), and each node tagged with its own tradeskill via
+  `data-tip` since several can show at once now.
 - **Combat**: has no pre-start screen at all (roster's always live regardless of session
   state), so this is new UI, not a repurposed existing one — `combat-landing-zone` is its own
   state (`combatLandingZone`, unrelated to the per-kill zone field in the roster detail form).
@@ -134,6 +148,19 @@ for Gathering) — keep this wording consistent if more tabs get a landing secti
   wiki's), which could feed an empirical level-range guess the same way Fishing's rarity bars
   work, but that's NOT built yet — deliberately deferred, not an oversight, see
   `To-Do/planned-features.md`.
+  - **Search + wiki link** (2026-08-27, expanded state only, keeps the collapsed toggle
+    compact): search filters the already-rendered `.fish-pick-btn` items by toggling the
+    SAME `.filtered-out` class the checklist dropdown uses (generalized from
+    `.checklist-option.filtered-out` to a bare `.filtered-out` rule so both can share it) —
+    NOT a full re-render on every keystroke, which would steal focus out of the search box
+    after each character (same reasoning as the checklist dropdown's own filtering).
+    "View on wiki ↗" opens `wikiData.pageUrl + '#monsters-named/' + encodeURIComponent(zone)`
+    via the existing `openUrl` round trip — deep-links straight to that zone's named-monster
+    list on the live wiki (confirmed against the wiki's own `goToMonster()` hash scheme in
+    `script.js`; there's no single-monster URL, the wiki itself only deep-links to a
+    zone-scoped list + a JS-only highlight). `Get-WikiData`/`wikiData` message now carry
+    `pageUrl` (`= $WikiBaseUrl`) so the client has this without a second hardcoded copy of
+    the wiki's base URL.
 - **Gotcha, hit once already**: `renderFishingPanel()`/`renderGatheringPanel()`'s landing
   branches build their zone picker's options from `wikiData.zones` inline, at whatever point
   they're called — including the very first render, in Init, which happens BEFORE the
@@ -149,6 +176,18 @@ for Gathering) — keep this wording consistent if more tabs get a landing secti
   they'd make `renderFishRarityPanel()`'s "`fishZoneCtrl` ? ... : `fishingSession.zone`"
   fallback read a detached DOM node's frozen `.checked` state instead of the landing picker's
   real live selection.
+- **"This session" UI only shows once a session exists** (2026-08-27, explicit follow-up
+  ask): all-zero stats before anything's logged is noise competing with the landing info
+  for space. `updateStatsBarVisibility()` gates all 4 stats bars on `session.id` (not just
+  which tab is active, the pre-existing check) — called from the tab-click handler AND
+  `sessionStarted`/`sessionEnded` (switching tabs isn't the only way this needs to update).
+  Combat has the same problem in a different shape — no active/inactive split of its own, so
+  `updateCombatSessionVisibility()` toggles `#combat-session-layout` (the roster+detail,
+  `display:none` until `session.id`) against a plain `#combat-no-session-msg` placeholder,
+  called from the same 3 places. Fishing/Gathering didn't need equivalent new code — their
+  existing pre-start/active split already only renders roster/log-type elements once
+  `fishingSession.active`/`gatheringSession.active`, which was already gated on a session
+  existing.
 
 **Deliberately out of scope for this pass** (see `To-Do/planned-features.md` for the fuller
 version): a whole "add info" contribution tab (dropdown-driven named-monster/camp/item
@@ -246,7 +285,7 @@ taps. 2 states in `renderFishingPanel()`:
 - **Skill recorded at session start** (`fishingStarted`, once, guarded by `startSkillSent`)
   **and end** (`fishingEnded`, same guard) — both fire before `endSession`. Catches
   skill-ups with no catch following.
-- **Key-spam guard**: 3+ `keyCounted` messages within 1 second → `checkKeySpam()` pauses
+- **Key-spam guard**: 3+ `keyCounted` messages within 5 seconds → `checkKeySpam()` pauses
   listening, toast + "Resume listening" banner. Entirely client-side — do NOT touch the
   native hook/poll timer for this (must stay minimal, see gotcha above).
 - **Rarity bars** (2026-08-27, expanded by default — collapsible via a "Hide rarity estimate"
@@ -474,6 +513,42 @@ spells/tradeskills/gemstones `.json`. Two channels, don't conflate:
    identical across machines. Tradeoff: unpushed wiki edits are invisible until deployed —
    accepted, no local fallback.
 
-**Read-only, both channels, always** — never create/edit/delete in the wiki repo, never let
-this project's git history touch it or its remote. Published site = `GET` only, never
-written to. One-directional: this project reads wiki data, never the reverse.
+**Read-only for DATA, both channels, always** — never create/edit/delete a file in the wiki
+repo, never let this project's git history touch it or its remote (see "Session export
+submission" below for the one narrow exception — a network POST to a Worker the wiki repo
+already hosts source-for, not a git write, and this project's own copy of that Worker's code
+lives here, not there — the wiki repo's copy stays untouched). Published site = `GET` only,
+never written to.
+
+## Session export submission (2026-08-27) — the one outbound-write exception
+
+Until now this app only ever READ the wiki (JSON fetch) or opened it in a browser (`openUrl`)
+— this is the first capability where the running app sends data OUT. Confirmed with the user
+before any code existed: reuse-vs-new-infrastructure, and this hard-rule update itself.
+
+- **What it does**: POSTs a session export to the wiki's OWN existing Cloudflare Worker
+  (`SUBMIT_WORKER_URL` in the wiki's `script.js`) — the same one behind the wiki's "Submit a
+  Screenshot" form. The Worker commits the export as a new file on a NEW branch and opens a
+  pull request; it never commits to `main` directly. **A human (the wiki owner) merges to
+  accept or closes to deny — the app never merges its own PRs, and has no credentials that
+  could.** This PR-review step IS the check the user asked for ("for now i have to check
+  each submission"), not a separate approval gate bolted on top of it.
+- **Extended, not replaced**: the deployed Worker already handles the wiki's own
+  screenshot/notes submissions (commits to `images/Inbox/`/`community-notes/`). Session
+  exports get their own code path — a `sessionExport` field, its own `session-exports/`
+  folder, no length cap (the existing `notes` field is capped at 2200 chars server-side,
+  fine for a short note, not for a whole session's worth of entries) — the existing
+  screenshot/notes path is untouched, still works exactly as before.
+- **This project's own copy of the Worker lives in `lib/cloudflare-worker/submit-worker.js`**
+  — NOT the wiki repo's own copy (`cloudflare-worker/submit-worker.js` there), which stays
+  untouched per the read-only rule above. Cloudflare Workers aren't deployable from a git
+  push — the user pastes this file's contents into the Worker's editor in the Cloudflare
+  dashboard and clicks Deploy by hand, the same manual process the wiki repo's own copy
+  already documents for itself in its own header comment. If the two copies drift, that's
+  expected until the user chooses to sync the wiki repo's reference copy themselves — Claude
+  does not do that sync (would mean editing the wiki repo, see the rule above).
+- **No new secrets in this project** — the Worker's `GITHUB_TOKEN` lives only in Cloudflare's
+  own secret storage, never in this repo, never sent to or through this app.
+- PS 5.1 has no `-Form` parameter on `Invoke-WebRequest`/`Invoke-RestMethod` (that's PS 6+
+  only) — the multipart/form-data body is built by hand. See `Submit-SessionExport` in
+  `MnMFieldNotes.ps1`.

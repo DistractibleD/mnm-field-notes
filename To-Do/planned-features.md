@@ -6,28 +6,33 @@ something a session should treat as a current spec. Claude picks the order when 
 says "keep building" without naming something specific; when the user names a specific
 idea from here, that's the one to build.
 
-## 1. Push session exports to GitHub (2026-08-24)
+## 1. ~~Push session exports to GitHub~~ — built (2026-08-27), needs deployment to actually work
 
-Instead of (or alongside) the current "hand the export .txt to Claude manually" flow, have
-the app submit it directly — same spirit as the wiki's own "Submit a Screenshot" form.
+Built exactly as scoped below: reused the wiki's own Worker (extended, not replaced), one
+new hard rule, human-review-by-PR as the trust model. Full mechanism documented in
+`CLAUDE.md` "Session export submission" — not duplicated here.
 
-- **Reuse, don't rebuild, if possible**: the wiki already has a deployed Cloudflare Worker
-  (`SUBMIT_WORKER_URL` in the wiki's `script.js`) that accepts `FormData` (notes text and/or
-  a screenshot), creates a branch, commits into `community-notes/` or `images/Inbox/`, and
-  opens a PR — a human still has to merge it, nothing reaches the live wiki automatically.
-  Worth checking whether this app could POST to that *same* endpoint with a session export
-  as the "notes" text, rather than standing up separate infrastructure. Confirm with the
-  user before assuming reuse is fine — it's the wiki owner's own Worker/token, shared
-  infrancture between two projects is a real decision, not just a technical shortcut.
-- **This is a real scope change, not a small addition**: the project's current hard rule is
-  network calls only ever reach the *published wiki site* (read-only fetch). Actually
-  submitting data outward is a new capability and needs the same care/confirmation the
-  read-only fetch decision got — update `CLAUDE.md`'s hard rules deliberately when this is
-  actually built, don't just bolt it on.
-- Every submission still needs a human merge/review step before it's real wiki data — same
-  trust model already established for guild-submitted exports (see "Guild data trust
-  model" in `CLAUDE.md`), just moving the hand-off mechanism from "paste to Claude" to
-  "auto-opens a PR Claude/the user reviews."
+**One remaining step before this does anything real: the user has to paste
+`lib/cloudflare-worker/submit-worker.js` into the Cloudflare dashboard and redeploy.**
+Until that happens, the "Submit" banner will always come back with an error (verified —
+the currently-live Worker doesn't recognize the `sessionExport` field yet, and correctly,
+safely rejects it with its own existing "Please attach a screenshot or write a note." error
+rather than doing anything unexpected).
+
+Verified before deployment: the Worker's routing/honeypot/oversized-export/backward-compat
+logic (browser-based unit tests against the actual file), the PS-built multipart body
+(round-tripped through a real `Request.formData()` parse), and the real network path itself
+(a live POST to the actual deployed Worker, which correctly parsed it and rejected it for
+the expected reason — confirms the wire format and connectivity both work, with zero side
+effects since no PR was possible without a recognized field).
+
+Original scoping notes, all resolved as above:
+- ~~Reuse, don't rebuild, if possible~~ — confirmed with the user, reused.
+- ~~This is a real scope change, not a small addition~~ — confirmed with the user, `CLAUDE.md`
+  hard rules updated before any code was written (new hard rule #3 + "Session export
+  submission" section).
+- ~~Every submission still needs a human merge/review step~~ — this is exactly what merging
+  the Worker's PR already requires; no separate gate was added on top.
 
 ## 2. Photo attachments (2026-08-24)
 
@@ -125,3 +130,113 @@ Rough shape from the user's own description, not yet scoped/confirmed:
   else this app produces (see "Guild data trust model" in `CLAUDE.md`) before it's real wiki
   data — this tab produces submittable data, it doesn't write to the wiki directly, matching
   how session exports already work.
+
+## 7. Combat landing info: regular monsters + zone level range (2026-08-27)
+
+Two additions to Combat's existing "browse a zone" landing section (see `CLAUDE.md`
+"Landing info"), alongside the named-monster list already built:
+- Regular (non-named) monsters found in the picked zone, same `wikiData.monsters`
+  filter/list pattern as the named-monster one, just `named: false` instead.
+- The zone's level range (lowest to highest player level it's meant for) — same open
+  question as #6's zone-level note above: wiki schema addition vs. an app-computed estimate
+  from Combat's own logged `playerLevel`+`con` (empirical, same pattern as `Get-FishRarity`).
+  Decide which before building, don't default to assuming a wiki addition.
+
+## 8. Combat: camp selector + dedicated "add camp/named" entry point (2026-08-27)
+
+- Let the user narrow Combat's landing browse from "whole zone" down to one camp within it.
+  **Blocked on real camp data existing** — checked `monsters.json`/`maps.json`, there is NO
+  structured "camp" concept anywhere in the wiki today (camp names only ever show up as
+  free-text inside a monster's `areas`, e.g. "Corrupted Ashira Camp"). This can't be built
+  until #6's "add camp" authoring flow (or a wiki addition) produces real, structured camp
+  data to select from — check that exists first, don't build a selector with nothing to
+  select from.
+- A dedicated "add camp or named" entry point reachable from the Combat tab specifically —
+  this is #6 above, not a new feature (user's own words: "we already talked about this new
+  feature"), just confirms Combat should be one of its entry points once #6 is built.
+
+## 9. Gathering: user comment on "where to find this" (2026-08-27)
+
+A lighter-weight cousin of #6's full contribution tab: let a user attach a quick free-text
+"where can you find this" comment to a node, surfaced via the SAME `data-tip` tooltip
+pattern already used everywhere else (see the combined-tooltip work in `CLAUDE.md`
+"Gathering"). Related to #6 but smaller in scope — worth deciding which gets built first
+when either is picked up, since #6 might make this redundant (or this might be a good small
+first step toward #6).
+
+## 10. Tooltip discoverability + coverage (2026-08-27)
+
+- A small, easy-to-spot hint in each tab noting hovering things shows more info — the
+  `data-tip` system (see `CLAUDE.md` "Tooltips") is used app-wide already but nothing
+  currently tells a first-time user it exists.
+- Expand tooltip coverage so every node in Gathering and Fishing has SOMETHING to show, not
+  just the ones that happen to have a wiki `note`/location-detail/difficulty-tier already.
+  Needs scoping first: what should a node with genuinely nothing to say show — nothing (an
+  absent tooltip, current behavior) vs. some kind of "no data yet" placeholder?
+
+## 11. Fishing: "average time between attempts" (2026-08-27)
+
+A new session-only stat — explicit user caveat: do NOT persist/aggregate this across
+sessions or use it for anything beyond that one session's own display, since breaks between
+casts (stepping away, alt-tabbing) would silently skew it. Still genuinely useful for a user
+who wants a rough feel for how fast they're actually casting during one sitting.
+
+## 12. Landing info: explain WHY to pick a zone, per tab (2026-08-27)
+
+Replace the generic "Select a zone to see more." wording (Combat/Fishing/Gathering's landing
+sections, see `CLAUDE.md` "Landing info") with tab-specific, benefit-oriented copy — e.g.
+"Pick a zone to see how rare each fish is" / "Pick a zone to see which named monsters live
+there". Wording is Claude's call when built, but same standing rule as everywhere else in
+this app: written for the player reading it, not describing the feature back to the project
+owner.
+
+## 13. Tab polish: under-construction marker + hide Lookup (2026-08-27)
+
+- Crafting and Multi currently just show a plain `.stub` message — user wants a prominent
+  (their words: "big orange") under-construction treatment instead, so an empty tab reads as
+  "not built yet" rather than "broken/empty".
+- Hide the Lookup tab from the visible tab bar — keep the feature/code, just stop surfacing
+  it in navigation for now. No reason given yet; worth asking why when this is picked up
+  (redundant with the new landing info elsewhere? Superseded by the Maps tab below?).
+
+## 14. Maps tab — pan/zoom map viewer (2026-08-27)
+
+A new top-level tab. Existing precedent worth reusing rather than building pan/zoom from
+scratch: the wiki already has its own full-screen pan/zoom map lightbox
+(`#map-viewer`/`#map-viewer-img` in the wiki's `style.css`/`script.js`) — check whether that
+implementation (or its approach) can be mirrored/adapted here before inventing a new one.
+
+The wiki's 29 map images vary wildly in resolution (400×631 up to 9702×5821, 20x+
+difference), aspect ratio, and per-zone variant count (several zones have 2-4 map images —
+isometric/mob-levels/numbered/schematic — not one canonical map). **User's own call,
+2026-08-27, after checking the actual assets: this is NOT a blocker for the viewer itself**
+— pan/zoom just adapts to whatever image it's given, same as it already does on the wiki
+today. Only relevant once pins (#15) exist — see that item for why. One unrelated loose end:
+`aethoril.webp` couldn't be read by a standard .NET image check while inspecting these —
+likely fine in WebView2's own Chromium engine, but worth confirming rather than assuming.
+
+## 15. Maps tab — user pin annotations (2026-08-27)
+
+Depends on #14 existing first. User-contributed pins placed on the map:
+- Small icon + tooltip (reuses the app's own `data-tip` system) — the tooltip is the user's
+  own free-text comment about what's found there or why the spot's worth noting.
+- Two pin-ownership tiers: the user's OWN pins (local, immediate, no review needed), and
+  OTHER users' shared pins — explicitly deferred, user's own words: "we will build this
+  later." Sharing pins raises the same submission/review-pipeline questions as #1 (Push
+  session exports to GitHub) and the same trust-model questions as "Guild data trust model"
+  in `CLAUDE.md` — don't assume that mechanism, decide it fresh when this is picked up.
+- Pin categories + filtering — Gathering pins, Camp pins, Fishing pins, etc. (taxonomy not
+  yet decided — check whether it should mirror the app's own tab set 1:1 or be its own list).
+- Real open questions for whenever this is picked up, not yet answered: pin coordinate
+  system relative to the map image (percentage-of-image vs. pixel-based, and how that
+  survives the image being re-exported/resized), where a user's own pins are stored
+  (`Data\`, presumably, matching everything else this app persists locally), and the
+  category taxonomy itself.
+- **This is where #14's map-inconsistency findings actually matter** (they don't block the
+  viewer itself — see #14): a pin has to anchor to ONE specific image. A zone with 2-4 map
+  variants (isometric/mob-levels/numbered/schematic, see #14) means deciding which variant a
+  pin belongs to, whether it's pinned to just one variant or needs to appear on all of them,
+  and what happens to existing pins if a map image later gets replaced/re-cropped/resized on
+  the wiki side (percentage-of-image coordinates survive a resize; they don't survive a
+  re-crop or a swap to a differently-composed image). Decide the coordinate system with this
+  in mind, don't bolt it on after the fact.

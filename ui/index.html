@@ -20,6 +20,7 @@
   </div>
 
   <div class="update-banner" id="update-banner" style="display:none;"></div>
+  <div class="update-banner" id="submit-export-banner" style="display:none;"></div>
 
   <div class="session-bar">
     <div class="status" id="session-status">
@@ -76,7 +77,8 @@
       <div id="combat-landing-zone-picker"></div>
       <div id="combat-landing-named"></div>
     </div>
-    <div class="layout">
+    <p class="landing-info-empty" id="combat-no-session-msg">Start a session (top bar) to begin logging kills.</p>
+    <div class="layout" id="combat-session-layout" style="display:none;">
       <div class="roster">
         <div class="roster-title">This session</div>
         <div class="roster-add">

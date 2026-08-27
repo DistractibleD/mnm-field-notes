@@ -73,6 +73,10 @@ $WikiBaseUrl = 'https://distractibled.github.io/DistractibleD-MonstersAndMemorie
 $script:AppVersion = '0.3'
 $script:AppBuildDate = '2026-08-26'
 $UpdateCheckUrl = 'https://raw.githubusercontent.com/DistractibleD/mnm-field-notes/main/latest.json'
+# Same Worker URL as SUBMIT_WORKER_URL in the wiki's own script.js - the
+# "sessionExport" code path is this project's own addition, see CLAUDE.md
+# "Session export submission" and lib/cloudflare-worker/submit-worker.js.
+$SubmitWorkerUrl = 'https://muddy-bar-88a7.mnm-wiki.workers.dev'
 $AllTimeLogPath = Join-Path $dataDir 'AllTimeLog.jsonl'
 $ProfilesPath = Join-Path $dataDir 'Profiles.json'
 
@@ -105,7 +109,7 @@ function Add-OrSetLastProfile {
 # see CLAUDE.md "Wiki data as a read-only reference")
 # ---------------------------------------------------------------------------
 function Get-WikiData {
-    $result = @{ monsters = @(); items = @(); nodes = @(); recipes = @(); factions = @(); zones = @(); error = $null }
+    $result = @{ monsters = @(); items = @(); nodes = @(); recipes = @(); factions = @(); zones = @(); pageUrl = $WikiBaseUrl; error = $null }
     try {
         $monsters = Invoke-RestMethod -Uri ($WikiBaseUrl + 'monsters.json') -TimeoutSec 10
         $items = Invoke-RestMethod -Uri ($WikiBaseUrl + 'items.json') -TimeoutSec 10
@@ -488,6 +492,65 @@ function Write-SessionExport {
 }
 
 # ---------------------------------------------------------------------------
+# Session export submission - the one exception to "never write outward",
+# see CLAUDE.md "Session export submission". POSTs to the wiki's own
+# Cloudflare Worker (extended with a session-export path, this project's own
+# copy at lib\cloudflare-worker\submit-worker.js) - it commits the export to
+# a new branch and opens a PR; nothing is live until the wiki owner merges
+# it. PS 5.1 has no `-Form` parameter on Invoke-RestMethod (PS 6+ only), so
+# the multipart/form-data body is built by hand.
+# ---------------------------------------------------------------------------
+function Submit-SessionExport {
+    param([string]$SessionText, [string]$Title)
+    $boundary = [guid]::NewGuid().ToString('N')
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append("--$boundary`r`n")
+    [void]$sb.Append("Content-Disposition: form-data; name=`"sessionExport`"`r`n`r`n")
+    [void]$sb.Append("$SessionText`r`n")
+    [void]$sb.Append("--$boundary`r`n")
+    [void]$sb.Append("Content-Disposition: form-data; name=`"title`"`r`n`r`n")
+    [void]$sb.Append("$Title`r`n")
+    # Honeypot field the Worker checks on every submission (real callers
+    # never fill it) - MnM Field Notes always sends it empty, matching the
+    # wiki's own form, even though this isn't a public-facing form.
+    [void]$sb.Append("--$boundary`r`n")
+    [void]$sb.Append("Content-Disposition: form-data; name=`"website`"`r`n`r`n`r`n")
+    [void]$sb.Append("--$boundary--`r`n")
+    $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($sb.ToString())
+
+    try {
+        $response = Invoke-RestMethod -Uri $SubmitWorkerUrl -Method Post `
+            -ContentType "multipart/form-data; boundary=$boundary" -Body $bodyBytes -TimeoutSec 25
+        if ($response.error) { return @{ ok = $false; error = $response.error } }
+        return @{ ok = $true; error = $null }
+    } catch {
+        $msg = $_.Exception.Message
+        try {
+            $errBody = $_.ErrorDetails.Message | ConvertFrom-Json
+            if ($errBody.error) { $msg = $errBody.error }
+        } catch {}
+        return @{ ok = $false; error = $msg }
+    }
+}
+
+# Pulls "Session export - fishing" / "Logged by: X" / "Entries: N" back out
+# of the export text itself for a friendlier PR title, rather than the
+# client passing separate metadata that could drift from the file's own
+# header - single source of truth.
+function Get-SessionExportTitle {
+    param([string]$Text, [string]$FileName)
+    $typeMatch = [regex]::Match($Text, 'Session export - (.+)')
+    $byMatch = [regex]::Match($Text, 'Logged by: (.+)')
+    $countMatch = [regex]::Match($Text, 'Entries: (\d+)')
+    if ($typeMatch.Success -and $byMatch.Success) {
+        $title = "$($typeMatch.Groups[1].Value.Trim()) session by $($byMatch.Groups[1].Value.Trim())"
+        if ($countMatch.Success) { $title += " ($($countMatch.Groups[1].Value) entries)" }
+        return $title
+    }
+    return "Session export ($FileName)"
+}
+
+# ---------------------------------------------------------------------------
 # WinForms + WebView2 host
 # ---------------------------------------------------------------------------
 $script:Sessions = @{}  # sessionId -> @{ type; loggedBy; startedAt }
@@ -563,7 +626,7 @@ $wv.add_CoreWebView2InitializationCompleted({
         switch ($msg.type) {
             'ready' {
                 $script:wikiData = Get-WikiData
-                Send-ToUI @{ type = 'wikiData'; monsters = $script:wikiData.monsters; items = $script:wikiData.items; nodes = $script:wikiData.nodes; recipes = $script:wikiData.recipes; factions = $script:wikiData.factions; zones = $script:wikiData.zones; error = $script:wikiData.error }
+                Send-ToUI @{ type = 'wikiData'; monsters = $script:wikiData.monsters; items = $script:wikiData.items; nodes = $script:wikiData.nodes; recipes = $script:wikiData.recipes; factions = $script:wikiData.factions; zones = $script:wikiData.zones; pageUrl = $script:wikiData.pageUrl; error = $script:wikiData.error }
                 $profileData = Get-Profiles
                 Send-ToUI @{ type = 'profiles'; profiles = $profileData.profiles; lastUsed = $profileData.lastUsed }
                 $update = Get-UpdateInfo
@@ -662,6 +725,17 @@ $wv.add_CoreWebView2InitializationCompleted({
                 if ($script:Sessions.ContainsKey($msg.sessionId)) {
                     Edit-AllTimeLogEntry -entryId $msg.entryId -patch $msg.patch
                 }
+            }
+            'submitExport' {
+                $exportPath = Join-Path $sessionsDir $msg.fileName
+                if (-not (Test-Path $exportPath)) {
+                    Send-ToUI @{ type = 'submitExportResult'; ok = $false; error = 'Export file not found - was it moved or deleted?'; fileName = $msg.fileName }
+                    return
+                }
+                $text = Get-Content -Path $exportPath -Raw -Encoding UTF8
+                $title = Get-SessionExportTitle -Text $text -FileName $msg.fileName
+                $result = Submit-SessionExport -SessionText $text -Title $title
+                Send-ToUI @{ type = 'submitExportResult'; ok = $result.ok; error = $result.error; fileName = $msg.fileName }
             }
             'startKeyCapture' {
                 Start-KeyHook -mode 'capture' -target $null
