@@ -350,7 +350,6 @@ function ensureChecklistDropdownGlobalClose() {
   function apply(isWin98) {
     document.documentElement.setAttribute('data-theme', isWin98 ? 'win98' : 'default');
     btn.classList.toggle('active', isWin98);
-    btn.setAttribute('data-tip', isWin98 ? 'I am young again! Click again to go back.' : 'I am old. Click again to go back.');
   }
   let stored = false;
   try { stored = localStorage.getItem('mnmTheme') === 'win98'; } catch {}
