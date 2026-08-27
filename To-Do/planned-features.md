@@ -157,14 +157,22 @@ first step toward #5).
   Needs scoping first: what should a node with genuinely nothing to say show — nothing (an
   absent tooltip, current behavior) vs. some kind of "no data yet" placeholder?
 
-## 10. Fishing: "average time between attempts" (2026-08-27)
+## 10. ~~Fishing: "average time between attempts"~~ — done (2026-08-27)
 
 A new session-only stat — explicit user caveat: do NOT persist/aggregate this across
 sessions or use it for anything beyond that one session's own display, since breaks between
 casts (stepping away, alt-tabbing) would silently skew it. Still genuinely useful for a user
 who wants a rough feel for how fast they're actually casting during one sitting.
 
-## 11. Landing info: explain WHY to pick a zone, per tab (2026-08-27)
+Built as `fishingSession.attemptTimestamps` (in-memory only, never exported/persisted) - one
+`Date.now()` pushed per real attempt (a manual `+` or an auto-counted keypress; the `-`
+correction button does NOT push one). `formatAvgCastTime()` averages first-to-last gap across
+those timestamps, shown as a new "Avg. time between casts" stat tile (`#fs-avgtime`) with the
+session-only caveat repeated in its own tooltip. Verified with synthetic timestamps (exact
+10s gaps -> "10s", a 125s two-point gap -> "2m 5s", one timestamp -> "—") and with the real
+click/key-count paths.
+
+## 11. ~~Landing info: explain WHY to pick a zone, per tab~~ — done (2026-08-27)
 
 Replace the generic "Select a zone to see more." wording (Combat/Fishing/Gathering's landing
 sections, see `CLAUDE.md` "Landing info") with tab-specific, benefit-oriented copy — e.g.
@@ -260,33 +268,38 @@ as its own distinct app identity rather than grouping under `powershell.exe`), a
 `Start.vbs` itself won't work even after the above. Where the shortcut/icon file should live
 (shipped inside the release zip vs. generated on first run) isn't decided yet.
 
-## 17. Fishing: clarify "click the fish you caught" wording (2026-08-27)
+## 17. ~~Fishing: clarify "click the fish you caught" wording~~ — done (2026-08-27)
 
 User wants the label at `app.js` around line 1928 (`<label>Click the fish you caught</label>`)
 changed to add "as you catch them" — making explicit that this is a click-every-time action,
 not a one-time setup step, for users unfamiliar with the app's flow.
 
-## 18. Fishing: the catch-logged toast blocks the fish grid (2026-08-27)
+## 18. ~~Fishing: the catch-logged toast blocks the fish grid~~ — done (2026-08-27)
 
 User's own words: "The popup box that pops whenever you click a fish blocks the fish window
 in a somewhat annoying way." That's the shared `.toast` (`showToast()` in `app.js`, styled in
 `style.css` around line 201) — positioned dead center of the screen
 (`position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);`), which sits right on
-top of the fish-pick grid it was just triggered from. `.toast` is shared app-wide (not
-Fishing-specific), so check other callers before just moving/repositioning it — may need a
-Fishing-specific placement (e.g. anchored near the grid or a corner) rather than changing the
-shared toast for everyone.
+top of the fish-pick grid it was just triggered from.
 
-## 19. Fishing: sort caught fish ahead of merely-expected fish (2026-08-27)
+Fixed via an opt-in `.toast-corner` modifier (`showToast(text, corner)`, second arg defaults
+false) rather than changing the shared toast for everyone — plain center placement stays the
+default for errors/guards ("start a session first", etc.). Applied to both the fish-catch
+confirmation and Gathering's material-log confirmation, since that has the identical "toast
+lands on the grid you just tapped" problem.
+
+## 19. ~~Fishing: sort caught fish ahead of merely-expected fish~~ — done (2026-08-27)
 
 User's own words: "Expected fish should always sort behind currently caught fish." Today,
 `renderFishPickGrid()` in `app.js` (around line 2205) puts a fish in the "Expected in this
 zone" box if it's either wiki-expected OR already caught this session (`expectedNames` merges
 both), then sorts that whole box alphabetically — so a fish the user has actually caught can
 still land behind a never-caught-but-wiki-expected fish just because of alphabetical order.
-Wants caught fish (`catchCounts[f] > 0`) to always sort ahead of expected-but-not-yet-caught
-ones, likely as a third tier within (or above) the existing expected box, not just an
-alphabetical re-sort.
+
+Fixed by sorting caught fish (`catchCounts[f] > 0`) ahead of merely-expected ones within the
+box, alphabetical within each tier. Scoped to Fishing only, matching the user's report —
+Gathering's node grid has the identical pattern but wasn't touched, since it wasn't what was
+asked about.
 
 ## 20. Shared/pooled data across guild members (2026-08-27)
 
