@@ -139,14 +139,20 @@ Two additions were scoped to Combat's existing "browse a zone" landing section (
   this is #5 above, not a new feature (user's own words: "we already talked about this new
   feature"), just confirms Combat should be one of its entry points once #5 is built.
 
-## 8. Gathering: user comment on "where to find this" (2026-08-27)
+## 8. ~~Gathering: user comment on "where to find this"~~ — done (2026-08-27)
 
 A lighter-weight cousin of #5's full contribution tab: let a user attach a quick free-text
 "where can you find this" comment to a node, surfaced via the SAME `data-tip` tooltip
 pattern already used everywhere else (see the combined-tooltip work in `CLAUDE.md`
-"Gathering"). Related to #5 but smaller in scope — worth deciding which gets built first
-when either is picked up, since #5 might make this redundant (or this might be a good small
-first step toward #5).
+"Gathering").
+
+Built as a purely local note (never submitted/shared, unlike #5's eventual contribution
+data) — `Get-GatherNotes`/`Save-GatherNote` persist `Data\GatherNotes.json`, same pattern as
+`Profiles.json`. Entry point is a collapsed-by-default toggle in the gather-material modal
+(collapsed since that modal opens on every gather — an always-visible field would clutter a
+fast, repetitive action), auto-saving on blur. See "Gathering" in `CLAUDE.md` for the full
+mechanism. Doesn't make #5 redundant — #5's contribution tab is still the bigger, shared/
+submittable version of structured data; this is just a quick personal reminder.
 
 ## 9. Tooltip discoverability + coverage (2026-08-27)
 

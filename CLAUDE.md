@@ -416,6 +416,16 @@ fishing spots), junk detection (no wiki concept of "junk" for gathering material
   zone-staleness-style lesson as Fishing's zone edit). The edit modal's Result field can
   still be blanked to mark a correction as no-result — that's a correction tool for an
   already-logged entry, unrelated to the material modal no longer offering it going forward.
+- **Per-node "where can you find this" note** (2026-08-27, backlog #8) — purely local,
+  never submitted/shared anywhere (unlike session exports). `Get-GatherNotes`/
+  `Save-GatherNote` in `MnMFieldNotes.ps1` persist a small flat `Data\GatherNotes.json`
+  keyed by node name, same pattern as `Profiles.json`. Surfaced in the material modal via a
+  toggle collapsed by default — that modal opens on every single gather (a fast, repetitive
+  action), so an always-visible note field would clutter the common case. Auto-saves on
+  blur, no separate save button. The saved note gets appended to the node grid's existing
+  combined tooltip (alongside the wiki note/difficulty guess/location detail), and
+  `gatherNotesData` is updated optimistically the moment it's saved so the tooltip reflects
+  an edit immediately, without waiting on a host round trip.
 - **Skill recorded at session start** (`gatheringStarted`, guarded by `startSkillSent`) **and
   end** (`gatheringEnded`, same guard) — mirrors Fishing exactly, both fire before
   `endSession`.
@@ -499,8 +509,8 @@ pass when picked up.
 - `INSTALL.txt` — setup/uninstall/update guide for someone who just received a copy. Written
   entirely as "you" addressed to that recipient, never to the project owner — no "it's fine
   to share this" framing, that's not their concern to read about.
-- `Data\` (gitignored): `AllTimeLog.jsonl`, `Profiles.json`, `WebView2UserData\`,
-  `error.log` (ThreadException handler).
+- `Data\` (gitignored): `AllTimeLog.jsonl`, `Profiles.json`, `GatherNotes.json`,
+  `WebView2UserData\`, `error.log` (ThreadException handler).
 - `Sessions\` (gitignored): per-session export txts.
 
 ## Update checking
