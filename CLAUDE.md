@@ -163,9 +163,16 @@ for Gathering) — keep this wording consistent if more tabs get a landing secti
   `Get-WikiData` forwards `named`/`locations` (was `maps`)/`areas`/`drops` per monster now —
   used to only send `name`. **No monster in the wiki has a numeric `level` field (checked:
   0/660)** — Combat already logs `playerLevel`+`con` per kill (this app's own data, not the
-  wiki's), which could feed an empirical level-range guess the same way Fishing's rarity bars
-  work, but that's NOT built yet — deliberately deferred, not an oversight, see
-  `To-Do/planned-features.md`.
+  wiki's), which feeds an empirical level-range guess the same way Fishing's rarity bars work
+  (2026-08-27, `Get-CombatZoneLevelRange` in `MnMFieldNotes.ps1`, sent as `combatLevelRange`
+  alongside `fishRarity` at `ready`) — `MIN_LEVEL_RANGE_KILLS = 5` gates it per zone, same
+  reasoning as Fishing's `MIN_RARITY_ATTEMPTS`. Entries with no `playerLevel` (the field is
+  optional per-kill) are skipped rather than counted as 0, which would silently drag every
+  zone's minimum down.
+  - **Regular (non-named) monsters** (2026-08-27, `renderCombatRegularInfo()`) — same
+    collapsible/searchable/wiki-linked pattern as the named-monster list below, just
+    `named: false` and the wiki's parallel `#monsters-regular/<zone>` hash instead of
+    `#monsters-named/<zone>` (confirmed against the wiki's real routing, not assumed).
   - **Search + wiki link** (2026-08-27, expanded state only, keeps the collapsed toggle
     compact): search filters the already-rendered `.fish-pick-btn` items by toggling the
     SAME `.filtered-out` class the checklist dropdown uses (generalized from
