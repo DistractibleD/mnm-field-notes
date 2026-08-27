@@ -476,8 +476,16 @@ function showSubmitExportBanner(fileName) {
   const el = document.getElementById('submit-export-banner');
   el.innerHTML = `<span>Submit this session to the wiki for review?</span><span><a href="#" id="submit-export-go">Submit</a><a href="#" id="submit-export-dismiss">Dismiss</a></span>`;
   el.style.display = 'flex';
+  // Re-trigger the flash even if this banner was already showing (e.g. a
+  // second session ended before the first was dismissed) - just re-adding a
+  // class that's already present doesn't restart a CSS animation, so drop it,
+  // force a reflow, then re-add.
+  el.classList.remove('submit-ask', 'flash');
+  void el.offsetWidth;
+  el.classList.add('submit-ask', 'flash');
   document.getElementById('submit-export-go').addEventListener('click', e => {
     e.preventDefault();
+    el.classList.remove('submit-ask', 'flash');
     el.innerHTML = `<span>Submitting…</span>`;
     sendToHost({ type: 'submitExport', fileName });
   });

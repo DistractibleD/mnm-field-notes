@@ -64,6 +64,21 @@ html, body {
 }
 .update-banner a { color: var(--accent-strong); font-weight: 600; margin-left: 10px; }
 
+/* ---------- Submit-export banner's "ask" state (2026-08-27) - more
+   prominent than the plain .update-banner it's otherwise styled like, since
+   this is the one banner asking the user to actually decide something
+   (submit or dismiss) rather than just announcing a fact. Only applied while
+   asking - the follow-up "submitted"/"failed" states revert to the plain
+   .update-banner look, see the 'submitExportResult' handler in app.js. ---------- */
+.update-banner.submit-ask {
+  border-width: 2px; font-size: 14px; font-weight: 600;
+}
+@keyframes submit-ask-flash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 6px var(--accent-soft); }
+}
+.update-banner.submit-ask.flash { animation: submit-ask-flash 0.5s ease-in-out 2; }
+
 .tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; flex-wrap: wrap; }
 .tab {
   font-family: 'Inter', sans-serif;
