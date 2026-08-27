@@ -339,6 +339,24 @@ function Get-FishRarity {
     return $result
 }
 
+# Pooled Fishing rarity across every guild member's MERGED session exports
+# (backlog #20/#21) - fetched from the wiki repo's own published
+# fishing-rarity.json (built there by a GitHub Action on every merge to
+# session-exports/, see that repo's CLAUDE.md "Session exports & pooled
+# Fishing rarity"). Same shape as Get-FishRarity by design, so the client can
+# merge the two without any translation. Soft-fails to an empty object on any
+# error (network, 404 before the file exists, malformed JSON) - same
+# reasoning as Get-WikiData's own error handling, never blocks the app.
+function Get-SharedFishRarity {
+    try {
+        $data = Invoke-RestMethod -Uri ($WikiBaseUrl + 'fishing-rarity.json') -TimeoutSec 10
+        if ($null -eq $data) { return @{} }
+        return $data
+    } catch {
+        return @{}
+    }
+}
+
 # Empirical zone level range (2026-08-27, backlog #6) - min/max of every
 # playerLevel logged against a Combat kill in that zone, across all-time
 # local history. Same reasoning as Get-FishRarity: the wiki has no numeric
@@ -717,6 +735,7 @@ $wv.add_CoreWebView2InitializationCompleted({
                 $update = Get-UpdateInfo
                 Send-ToUI @{ type = 'updateInfo'; currentVersion = $update.currentVersion; buildDate = $update.buildDate; latestVersion = $update.latestVersion; url = $update.url; available = $update.available; error = $update.error }
                 Send-ToUI @{ type = 'fishRarity'; data = (Get-FishRarity) }
+                Send-ToUI @{ type = 'sharedFishRarity'; data = (Get-SharedFishRarity) }
                 Send-ToUI @{ type = 'combatLevelRange'; data = (Get-CombatZoneLevelRange) }
             }
             'checkForUpdates' {

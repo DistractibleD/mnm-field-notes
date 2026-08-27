@@ -70,6 +70,12 @@ function mockHostRespond(msg) {
         },
       });
       deliverFromHost({
+        type: 'sharedFishRarity',
+        data: {
+          'Night Harbor': { totalAttempts: 30, fish: { 'Whitefish': 12, 'Grouper': 6 } },
+        },
+      });
+      deliverFromHost({
         type: 'combatLevelRange',
         data: {
           'Night Harbor': { min: 3, max: 9, count: 14 },
@@ -907,6 +913,9 @@ onHostMessage((msg) => {
     // combined with the CURRENT session's own catches/attempts, which
     // aren't in this snapshot since it's taken once at 'ready'.
     fishRarityBaseline = msg.data || {};
+    if (fishingSession.active) renderFishRarityPanel();
+  } else if (msg.type === 'sharedFishRarity') {
+    sharedFishRarityBaseline = msg.data || {};
     if (fishingSession.active) renderFishRarityPanel();
   } else if (msg.type === 'combatLevelRange') {
     combatLevelRangeBaseline = msg.data || {};
@@ -1963,6 +1972,19 @@ function updateCookingStats() {
 // predates anything caught this session.
 let fishRarityBaseline = {};
 
+// Pooled Fishing rarity across every guild member's MERGED session exports
+// (backlog #20/#21) - same shape as fishRarityBaseline, fetched by the host
+// from the wiki's own published fishing-rarity.json (see Get-SharedFishRarity
+// in MnMFieldNotes.ps1). computeZoneRarity() sums this in alongside the
+// local baseline and the current session's own entries. This can double-count
+// a small slice of THIS install's own data if a session it logged has since
+// been submitted and merged (the shared total already includes it, and the
+// local log still has it too) - accepted, since this is already an
+// "estimate" caption, not the wiki's own figure, and there's no cheap way to
+// know from here which of this install's own past sessions were ever
+// submitted.
+let sharedFishRarityBaseline = {};
+
 // Empirical Combat zone level range (2026-08-27, backlog #6) - {zone: {min,
 // max, count}}, snapshotted once at 'ready' from Get-CombatZoneLevelRange -
 // same pattern as fishRarityBaseline above. This app's own data, since the
@@ -2378,16 +2400,21 @@ let fishRarityPanelExpanded = true;
 // not yet flushed into a logged entry, so the numbers stay live while
 // actively fishing without a host round trip on every cast.
 function computeZoneRarity(zone) {
-  const base = fishRarityBaseline[zone] || { totalAttempts: 0, fish: {} };
-  let totalAttempts = base.totalAttempts || 0;
-  const fish = Object.assign({}, base.fish);
+  const local = fishRarityBaseline[zone] || { totalAttempts: 0, fish: {} };
+  const shared = sharedFishRarityBaseline[zone] || { totalAttempts: 0, fish: {} };
+  const sharedAttempts = shared.totalAttempts || 0;
+  let totalAttempts = (local.totalAttempts || 0) + sharedAttempts;
+  const fish = Object.assign({}, local.fish);
+  Object.keys(shared.fish || {}).forEach(name => {
+    fish[name] = (fish[name] || 0) + shared.fish[name];
+  });
   fishingSession.entries.forEach(e => {
     if (e.zone !== zone) return;
     totalAttempts += (e.attempts || 0);
     if (e.success && e.resultItem) fish[e.resultItem] = (fish[e.resultItem] || 0) + 1;
   });
   if (fishingSession.zone === zone) totalAttempts += fishingSession.liveAttempts;
-  return { totalAttempts, fish };
+  return { totalAttempts, fish, sharedAttempts };
 }
 
 function renderFishRarityPanel() {
@@ -2403,7 +2430,7 @@ function renderFishRarityPanel() {
   const toggleLabel = fishRarityPanelExpanded ? 'Hide rarity estimate ▲' : 'Show rarity estimate ▼';
   let body = '';
   if (fishRarityPanelExpanded) {
-    const { totalAttempts, fish } = computeZoneRarity(zone);
+    const { totalAttempts, fish, sharedAttempts } = computeZoneRarity(zone);
     if (totalAttempts < MIN_RARITY_ATTEMPTS) {
       body = `<div class="rarity-panel"><p class="rarity-empty">Not enough data yet in ${escapeHtml(zone)} to guess rarity &mdash; ${totalAttempts} attempt${totalAttempts === 1 ? '' : 's'} logged here so far, want at least ${MIN_RARITY_ATTEMPTS}.</p></div>`;
     } else {
@@ -2417,9 +2444,12 @@ function renderFishRarityPanel() {
           .map(name => ({ name, catches: fish[name] || 0, rate: totalAttempts > 0 ? (fish[name] || 0) / totalAttempts : 0 }))
           .sort((a, b) => b.rate - a.rate);
         const maxRate = Math.max(...rows.map(r => r.rate), 0.0001);
+        const captionTail = sharedAttempts > 0
+          ? `pooled with ${sharedAttempts} attempt${sharedAttempts === 1 ? '' : 's'} from the guild's submitted sessions &mdash; still an estimate, not the wiki's rarity label`
+          : `an estimate from this app's own data, not the wiki's rarity label`;
         body = `
           <div class="rarity-panel">
-            <p class="rarity-caption">From ${totalAttempts} logged attempts in ${escapeHtml(zone)} &mdash; an estimate from this app's own data, not the wiki's rarity label.</p>
+            <p class="rarity-caption">From ${totalAttempts} logged attempts in ${escapeHtml(zone)} &mdash; ${captionTail}.</p>
             ${rows.map(r => `
               <div class="rarity-row">
                 <span class="rarity-name">${escapeHtml(r.name)}</span>
