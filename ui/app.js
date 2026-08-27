@@ -337,6 +337,31 @@ function ensureChecklistDropdownGlobalClose() {
   document.addEventListener('focusout', e => { const t = e.target.closest('[data-tip]'); if (t) hide(); });
 })();
 
+// ---------------------------------------------------------------------------
+// "I am old" theme toggle (2026-08-27) - a fun easter egg, not a real theme
+// system: one alternate look (Windows 98), on/off, remembered per browser
+// profile via localStorage (WebView2 gives this app its own private storage
+// under the appassets.local origin - no host round trip needed, purely
+// client-side). The wiki may get its own matching version of this later,
+// built separately there - this app never touches that repo, see CLAUDE.md.
+// ---------------------------------------------------------------------------
+(function setupThemeToggle() {
+  const btn = document.getElementById('theme-toggle-btn');
+  function apply(isWin98) {
+    document.documentElement.setAttribute('data-theme', isWin98 ? 'win98' : 'default');
+    btn.classList.toggle('active', isWin98);
+    btn.setAttribute('data-tip', isWin98 ? 'I am young again! Click again to go back.' : 'I am old. Click again to go back.');
+  }
+  let stored = false;
+  try { stored = localStorage.getItem('mnmTheme') === 'win98'; } catch {}
+  apply(stored);
+  btn.addEventListener('click', () => {
+    const isWin98 = document.documentElement.getAttribute('data-theme') === 'win98';
+    apply(!isWin98);
+    try { localStorage.setItem('mnmTheme', !isWin98 ? 'win98' : 'default'); } catch {}
+  });
+})();
+
 function setupChecklistDropdown(idPrefix, config) {
   config = config || {};
   const multi = config.multi !== false;

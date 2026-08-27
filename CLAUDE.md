@@ -108,6 +108,24 @@ Filtering hides non-matching `.checklist-option` (`filtered-out` class), doesn't
 checked state lives on the `<input>` DOM nodes, removing would lose it. Verify: check while
 filtered, clear search, check survives.
 
+### "I am old" Win98 theme toggle (2026-08-27) — easter egg, not a real theme system
+
+Small flag icon in the masthead's `version-row` (next to "Check for updates"), not a
+labeled button — deliberately tucked in rather than prominent, per the user
+("not too obvious but fairly easy to find"). Click toggles `data-theme="win98"` on
+`<html>` (`setupThemeToggle()` in `app.js`), persisted via `localStorage` (WebView2's own
+private store under `appassets.local`, no host round trip). `style.css` redefines the same
+CSS custom properties the rest of the app already uses under `:root[data-theme="win98"]`,
+plus flattens radius/shadows and adds beveled 3D borders on the main surfaces — doesn't
+chase down every hardcoded-hex element (tier/badge colors etc.), this is a joke button, not
+a full port. One real bug hit building this: a code comment containing the literal substring
+`*/` (mid-word, e.g. "tier-*/badge") silently closes a CSS comment early — everything after
+it parses as garbage until the next recoverable boundary, which silently ate the actual
+`:root[data-theme="win98"] { ... }` variable-definition rule (visible via
+`document.styleSheets[n].cssRules` inspection: the rule was just missing, no console error).
+**Never put `*/` inside a CSS comment's text, even mid-word.** Wiki may get its own matching
+version later, built separately there — this project never touches that repo either way.
+
 ### Landing info — every tab usable without a session (2026-08-27)
 
 Explicit standing goal, the user's own words: "i want every tab to display valuable

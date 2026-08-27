@@ -48,6 +48,14 @@ html, body {
 .version-row { display: flex; align-items: center; gap: 10px; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
 .version-row a { color: var(--text-muted); text-decoration: underline; }
 .version-row a:hover { color: var(--accent); }
+.theme-toggle-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; margin: 0;
+  background: none; border: none; border-radius: 4px;
+  opacity: 0.45; cursor: pointer;
+}
+.theme-toggle-icon:hover, .theme-toggle-icon.active { opacity: 1; }
+.theme-toggle-icon svg { display: block; }
 
 .update-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -355,4 +363,87 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .masthead h1 { font-size: 20px; }
   .tab { padding: 7px 11px; font-size: 12.5px; }
   .detail { padding: 14px 14px; }
+}
+
+/* ---------- "I am old" theme (2026-08-27) - a fun easter egg toggle, not a
+   second real design system: re-skins the app as Windows 98 by redefining
+   the same CSS variables everything else already uses, plus flattening
+   radius/shadows and adding classic beveled 3D borders on the main
+   interactive surfaces. Deliberately doesn't chase down every last
+   hardcoded-hex element (tier- and badge- colors etc. stay as they are) - this
+   is a joke button, not a full port. Toggled via [data-theme] on <html>,
+   see setupThemeToggle() in app.js. ---------- */
+:root[data-theme="win98"] {
+  --bg-page: #008080;
+  --bg-surface: #c0c0c0;
+  --bg-raised: #c0c0c0;
+  --bg-raised-hover: #d4d0c8;
+  --border: #808080;
+  --border-strong: #000000;
+  --text-primary: #000000;
+  --text-secondary: #202020;
+  --text-muted: #454545;
+  --accent: #000080;
+  --accent-strong: #0000a0;
+  --accent-soft: #d4d0c8;
+  --accent-craft: #008080;
+  --accent-craft-dim: #005f5f;
+  --success: #008000;
+  --danger: #800000;
+  --danger-soft: #ffd4d4;
+}
+:root[data-theme="win98"] * {
+  font-family: Tahoma, 'MS Sans Serif', sans-serif !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+:root[data-theme="win98"] .wrap { background: var(--bg-page); }
+:root[data-theme="win98"] .masthead {
+  background: linear-gradient(90deg, #000080, #1084d0);
+  border: 2px solid; border-color: #dfdfdf #000 #000 #dfdfdf;
+  padding: 6px 10px; margin-bottom: 1rem;
+}
+:root[data-theme="win98"] .masthead h1,
+:root[data-theme="win98"] .masthead .sub,
+:root[data-theme="win98"] .masthead .clock,
+:root[data-theme="win98"] .version-row,
+:root[data-theme="win98"] .version-row a { color: #fff; }
+:root[data-theme="win98"] .primary-btn,
+:root[data-theme="win98"] .secondary-btn,
+:root[data-theme="win98"] .mini-btn,
+:root[data-theme="win98"] .tab,
+:root[data-theme="win98"] button {
+  background: #c0c0c0; color: #000;
+  border: 2px solid; border-color: #fff #000 #000 #fff;
+}
+:root[data-theme="win98"] .primary-btn:hover,
+:root[data-theme="win98"] .secondary-btn:hover,
+:root[data-theme="win98"] .mini-btn:hover,
+:root[data-theme="win98"] .tab:hover,
+:root[data-theme="win98"] button:hover { background: #d4d0c8; }
+:root[data-theme="win98"] .primary-btn:active,
+:root[data-theme="win98"] .secondary-btn:active,
+:root[data-theme="win98"] .mini-btn:active,
+:root[data-theme="win98"] button:active {
+  border-color: #000 #fff #fff #000;
+}
+:root[data-theme="win98"] .tab.active { background: #dfdfdf; border-color: #000 #fff #fff #000; }
+:root[data-theme="win98"] .theme-toggle-icon { background: none !important; border: none !important; }
+:root[data-theme="win98"] input,
+:root[data-theme="win98"] select,
+:root[data-theme="win98"] textarea {
+  background: #fff; color: #000;
+  border: 2px solid; border-color: #000 #fff #fff #000;
+}
+:root[data-theme="win98"] .detail,
+:root[data-theme="win98"] .modal-box,
+:root[data-theme="win98"] .stat,
+:root[data-theme="win98"] .roster,
+:root[data-theme="win98"] .rarity-panel,
+:root[data-theme="win98"] .landing-info-box,
+:root[data-theme="win98"] .fish-pick-expected-box,
+:root[data-theme="win98"] .checklist-panel {
+  background: #c0c0c0;
+  border: 2px solid; border-color: #fff #000 #000 #fff;
 }
