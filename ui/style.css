@@ -215,6 +215,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .stub { color: var(--text-secondary); font-size: 14px; line-height: 1.7; max-width: 60ch; padding: 2rem 0; }
 .stub b { color: var(--text-primary); font-weight: 600; }
 
+.under-construction {
+  display: inline-block; background: #ff8c00; color: #1a1200; font-weight: 700;
+  font-size: 13px; letter-spacing: 0.02em; padding: 8px 16px; border-radius: 8px;
+  margin: 1.5rem 0 0;
+}
+
 .err { font-size: 13px; color: var(--danger); display: none; margin-bottom: 8px; }
 
 .toast {
