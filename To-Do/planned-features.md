@@ -111,18 +111,20 @@ Rough shape from the user's own description, not yet scoped/confirmed:
   data — this tab produces submittable data, it doesn't write to the wiki directly, matching
   how session exports already work.
 
-## 6. Combat landing info: zone level range (2026-08-27)
+## 6. ~~Combat landing info: regular monsters + zone level range~~ — done (2026-08-27)
 
 Two additions were scoped to Combat's existing "browse a zone" landing section (see
 `CLAUDE.md` "Landing info"), alongside the named-monster list already built:
-- ~~Regular (non-named) monsters found in the picked zone~~ — done (2026-08-27),
-  `renderCombatRegularInfo()` in `app.js`, mirrors the named-monster list (collapsible,
-  searchable, "View on wiki" link to the wiki's own parallel `#monsters-regular/<zone>`
-  route, confirmed against the wiki's real hash scheme rather than assumed).
-- Still open: the zone's level range (lowest to highest player level it's meant for) — same
-  open question as #5's zone-level note above: wiki schema addition vs. an app-computed
-  estimate from Combat's own logged `playerLevel`+`con` (empirical, same pattern as
-  `Get-FishRarity`). Decide which before building, don't default to assuming a wiki addition.
+- ~~Regular (non-named) monsters found in the picked zone~~ — done, `renderCombatRegularInfo()`
+  in `app.js`, mirrors the named-monster list (collapsible, searchable, "View on wiki" link to
+  the wiki's own parallel `#monsters-regular/<zone>` route, confirmed against the wiki's real
+  hash scheme rather than assumed).
+- ~~The zone's level range~~ — done, went with the app-computed estimate (wiki schema addition
+  was effectively ruled out anyway — this project's wiki repo is read-only, needing the wiki
+  owner's OK to add a field there wasn't a call to make unilaterally). `Get-CombatZoneLevelRange`
+  in `MnMFieldNotes.ps1` mirrors `Get-FishRarity`'s pattern exactly (min/max `playerLevel` per
+  zone, all-time local history, `MIN_LEVEL_RANGE_KILLS = 5` gating the estimate the same way
+  `MIN_RARITY_ATTEMPTS` does).
 
 ## 7. Combat: camp selector + dedicated "add camp/named" entry point (2026-08-27)
 
