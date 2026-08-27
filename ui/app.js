@@ -438,9 +438,15 @@ function setupChecklistDropdown(idPrefix, config) {
     getValue: () => { const c = inputs.find(cb => cb.checked); return c ? c.value : ''; },
   };
 }
-function showToast(text) {
+// corner=true anchors bottom-right instead of dead-center - for confirmations
+// triggered by clicking something in a grid (fish/gather-material picks),
+// where a centered toast sits right on top of the grid the user's about to
+// tap again. Plain center placement stays the default for everything else
+// (errors, "start a session first" guards, etc.).
+function showToast(text, corner) {
   const t = document.getElementById('toast');
   t.textContent = text;
+  t.classList.toggle('toast-corner', !!corner);
   t.style.display = 'block';
   clearTimeout(showToast._h);
   showToast._h = setTimeout(() => { t.style.display = 'none'; }, 4500);
@@ -1488,7 +1494,7 @@ document.getElementById('gather-material-log').addEventListener('click', () => {
       logGatherAttempt(nodeType, material);
     }
   });
-  showToast(`Logged ${totalUnits} item${totalUnits === 1 ? '' : 's'} from ${nodeType}`);
+  showToast(`Logged ${totalUnits} item${totalUnits === 1 ? '' : 's'} from ${nodeType}`, true);
   closeGatherMaterialModal();
 });
 
@@ -1933,7 +1939,7 @@ function renderFishingPanel() {
       </div>
       ${renderAttemptsCounterHTML(fishingSession)}
       ${renderSkillCounterHTML(fishingSession)}
-      <label>Click the fish you caught</label>
+      <label>Click the fish you caught, as you catch them</label>
       <div class="fish-pick-grid" id="fish-pick-grid"></div>
       <div style="display:flex; gap:8px; margin-top:10px;">
         <input id="fish-new-name" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
@@ -2210,7 +2216,13 @@ function renderFishPickGrid() {
     return `<button class="${classes.join(' ')}"${tip} data-fish="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
   }
 
-  const expected = all.filter(f => expectedNames.has(f)).sort();
+  // Caught-this-session fish sort ahead of merely-expected (never-caught) ones
+  // within the expected box, so a fish already found doesn't get buried behind
+  // alphabetically-earlier ones the user hasn't caught yet.
+  const expected = all.filter(f => expectedNames.has(f)).sort((a, b) => {
+    const caughtDiff = (catchCounts[b] ? 1 : 0) - (catchCounts[a] ? 1 : 0);
+    return caughtDiff !== 0 ? caughtDiff : a.localeCompare(b);
+  });
   const rest = all.filter(f => !expectedNames.has(f)).sort();
   let html = '';
   if (expected.length > 0) {
@@ -2360,7 +2372,7 @@ function logFishCatch(fishName) {
     entry: Object.assign({ target: fishingSession.zone || 'Fishing', tradeskill: 'Fishing' }, entry),
   });
 
-  showToast('Logged ' + fishName + ' (skill ' + fishingSession.skill + ', ' + entry.attempts + ' attempts)');
+  showToast('Logged ' + fishName + ' (skill ' + fishingSession.skill + ', ' + entry.attempts + ' attempts)', true);
   renderFishLog();
   renderFishPickGrid(); // catch just fed back into this zone's "expected" set - reflect it now
   refreshFishAreaDatalist();

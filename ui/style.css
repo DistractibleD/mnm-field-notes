@@ -218,6 +218,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   background: var(--bg-raised); border: 1px solid var(--accent);
   color: var(--text-primary); padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none;
 }
+/* For confirmations from clicking a grid button (fish/gather-material picks) -
+   dead-center sits right on top of the grid the user's about to tap again. */
+.toast.toast-corner {
+  top: auto; left: auto; bottom: 24px; right: 24px; transform: none;
+}
 
 /* ---------- App-wide tooltips - any element with data-tip="..." gets one of
    these on hover/focus, see setupTooltips() in app.js. ---------- */
