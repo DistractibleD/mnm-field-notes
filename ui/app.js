@@ -122,6 +122,7 @@ let activeTarget = null;
 // ---------------------------------------------------------------------------
 let combatLandingZone = '';
 let combatNamedListExpanded = false;
+let combatRegularListExpanded = false;
 
 // Combat has no pre-start/active split of its own (unlike Fishing/Gathering)
 // - this is the equivalent for it: the roster+detail ".layout" only shows
@@ -140,9 +141,12 @@ function renderCombatLandingInfo() {
   const landingZoneCtrl = setupChecklistDropdown('combat-landing-zone', { multi: false, onChange: () => {
     combatLandingZone = landingZoneCtrl.getValue();
     combatNamedListExpanded = false;
+    combatRegularListExpanded = false;
     renderCombatNamedInfo();
+    renderCombatRegularInfo();
   } });
   renderCombatNamedInfo();
+  renderCombatRegularInfo();
 }
 
 function renderCombatNamedInfo() {
@@ -209,6 +213,71 @@ function renderCombatNamedInfo() {
     wikiLinkEl.addEventListener('click', e => {
       e.preventDefault();
       sendToHost({ type: 'openUrl', url: wikiData.pageUrl + '#monsters-named/' + encodeURIComponent(combatLandingZone) });
+    });
+  }
+}
+
+// Regular (non-named) monsters - same collapsible list/search/wiki-link
+// pattern as renderCombatNamedInfo() above, just named:false and the wiki's
+// parallel "monsters-regular" hash (confirmed against the wiki's own
+// goToMonster()/renderMonstersPage() routing, same as the named one).
+function renderCombatRegularInfo() {
+  const el = document.getElementById('combat-landing-regular');
+  if (!el) return;
+  if (!combatLandingZone) { el.innerHTML = ''; return; }
+  const regular = wikiData.monsters.filter(m => !m.named && (m.locations || []).some(loc => locationMatchesZone(loc, combatLandingZone)));
+  if (regular.length === 0) {
+    el.innerHTML = `<p class="landing-info-empty">No regular monsters known in ${escapeHtml(combatLandingZone)} yet, per the wiki.</p>`;
+    return;
+  }
+  const toggleLabel = combatRegularListExpanded
+    ? 'Hide the list ▲'
+    : `${regular.length} regular monster${regular.length === 1 ? '' : 's'} known here ▼`;
+  let body = '';
+  if (combatRegularListExpanded) {
+    const itemsHtml = regular.map(m => {
+      const tipParts = [];
+      if (m.areas && m.areas.length) tipParts.push(`Found in: ${m.areas.join(', ')}`);
+      if (m.drops && m.drops.length) tipParts.push(`Drops: ${m.drops.join(', ')}`);
+      const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' — '))}"` : '';
+      return `<span class="fish-pick-btn" style="cursor:default; display:inline-block; margin:3px;" data-search="${escapeHtml(m.name.toLowerCase())}"${tip}>${escapeHtml(m.name)}</span>`;
+    }).join('');
+    const wikiLink = wikiData.pageUrl
+      ? `<a href="#" id="combat-regular-wiki-link" style="font-size:11px; color:var(--accent); white-space:nowrap; flex-shrink:0;">View on wiki ↗</a>`
+      : '';
+    body = `
+      <div class="landing-info-box">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <input type="text" id="combat-regular-search" class="checklist-search" placeholder="Search…" autocomplete="off" style="flex:1; margin:0;" />
+          ${wikiLink}
+        </div>
+        <div id="combat-regular-list">${itemsHtml}</div>
+      </div>
+    `;
+  }
+  el.innerHTML = `<button class="mini-btn" id="combat-regular-toggle" style="margin-top:10px;">${toggleLabel}</button>${body}`;
+  document.getElementById('combat-regular-toggle').addEventListener('click', () => {
+    combatRegularListExpanded = !combatRegularListExpanded;
+    renderCombatRegularInfo();
+    if (combatRegularListExpanded) {
+      const searchInput = document.getElementById('combat-regular-search');
+      if (searchInput) searchInput.focus();
+    }
+  });
+  const searchInput = document.getElementById('combat-regular-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      document.querySelectorAll('#combat-regular-list [data-search]').forEach(item => {
+        item.classList.toggle('filtered-out', !(!q || item.dataset.search.includes(q)));
+      });
+    });
+  }
+  const wikiLinkEl = document.getElementById('combat-regular-wiki-link');
+  if (wikiLinkEl) {
+    wikiLinkEl.addEventListener('click', e => {
+      e.preventDefault();
+      sendToHost({ type: 'openUrl', url: wikiData.pageUrl + '#monsters-regular/' + encodeURIComponent(combatLandingZone) });
     });
   }
 }
