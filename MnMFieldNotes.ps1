@@ -79,6 +79,7 @@ $UpdateCheckUrl = 'https://raw.githubusercontent.com/DistractibleD/mnm-field-not
 $SubmitWorkerUrl = 'https://muddy-bar-88a7.mnm-wiki.workers.dev'
 $AllTimeLogPath = Join-Path $dataDir 'AllTimeLog.jsonl'
 $ProfilesPath = Join-Path $dataDir 'Profiles.json'
+$GatherNotesPath = Join-Path $dataDir 'GatherNotes.json'
 
 # ---------------------------------------------------------------------------
 # Profiles - who's logging. A small persisted file so the name doesn't need
@@ -102,6 +103,31 @@ function Add-OrSetLastProfile {
     if (-not $profiles.Contains($name)) { $profiles.Add($name) }
     $out = @{ profiles = @($profiles); lastUsed = $name }
     ($out | ConvertTo-Json -Depth 5) | Set-Content -Path $ProfilesPath -Encoding UTF8
+}
+
+# ---------------------------------------------------------------------------
+# Gathering node notes (backlog #8) - a purely local, per-node-type "where can
+# you find this" comment, keyed by node name. Same small-flat-JSON pattern as
+# Profiles above (not sensitive, no need for anything heavier). Never
+# submitted/shared anywhere - this is a personal note, not wiki-bound data.
+# ---------------------------------------------------------------------------
+function Get-GatherNotes {
+    if (-not (Test-Path $GatherNotesPath)) { return @{} }
+    try {
+        $raw = Get-Content -Path $GatherNotesPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $out = @{}
+        $raw.PSObject.Properties | ForEach-Object { $out[$_.Name] = $_.Value }
+        return $out
+    } catch {
+        return @{}
+    }
+}
+
+function Save-GatherNote {
+    param([string]$node, [string]$note)
+    $data = Get-GatherNotes
+    if ([string]::IsNullOrWhiteSpace($note)) { $data.Remove($node) | Out-Null } else { $data[$node] = $note }
+    ($data | ConvertTo-Json -Depth 5) | Set-Content -Path $GatherNotesPath -Encoding UTF8
 }
 
 # ---------------------------------------------------------------------------
@@ -737,6 +763,7 @@ $wv.add_CoreWebView2InitializationCompleted({
                 Send-ToUI @{ type = 'fishRarity'; data = (Get-FishRarity) }
                 Send-ToUI @{ type = 'sharedFishRarity'; data = (Get-SharedFishRarity) }
                 Send-ToUI @{ type = 'combatLevelRange'; data = (Get-CombatZoneLevelRange) }
+                Send-ToUI @{ type = 'gatherNotes'; data = (Get-GatherNotes) }
             }
             'checkForUpdates' {
                 $update = Get-UpdateInfo
@@ -749,6 +776,9 @@ $wv.add_CoreWebView2InitializationCompleted({
             }
             'setProfile' {
                 Add-OrSetLastProfile -name $msg.name
+            }
+            'saveGatherNote' {
+                Save-GatherNote -node $msg.node -note $msg.note
             }
             'startSession' {
                 $sessionId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + ([guid]::NewGuid().ToString('N').Substring(0,6))

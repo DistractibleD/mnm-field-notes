@@ -76,6 +76,10 @@ function mockHostRespond(msg) {
         },
       });
       deliverFromHost({
+        type: 'gatherNotes',
+        data: { 'Copper Vein': 'Near the west wall, behind the crates' },
+      });
+      deliverFromHost({
         type: 'combatLevelRange',
         data: {
           'Night Harbor': { min: 3, max: 9, count: 14 },
@@ -89,6 +93,8 @@ function mockHostRespond(msg) {
       if (!mockProfiles.profiles.includes(msg.name)) mockProfiles.profiles.push(msg.name);
       mockProfiles.lastUsed = msg.name;
       console.log('[mock host] profile set to', msg.name);
+    } else if (msg.type === 'saveGatherNote') {
+      console.log('[mock host] would save gather note', msg.node, msg.note);
     } else if (msg.type === 'startSession') {
       mockSessionCounter++;
       deliverFromHost({ type: 'sessionStarted', sessionId: 'mock-' + mockSessionCounter });
@@ -920,6 +926,9 @@ onHostMessage((msg) => {
   } else if (msg.type === 'combatLevelRange') {
     combatLevelRangeBaseline = msg.data || {};
     if (combatLandingZone) renderCombatLandingInfo();
+  } else if (msg.type === 'gatherNotes') {
+    gatherNotesData = msg.data || {};
+    if (gatheringSession.active) renderGatherNodeGrid();
   } else if (msg.type === 'submitExportResult') {
     const el = document.getElementById('submit-export-banner');
     if (msg.ok) {
@@ -1503,6 +1512,7 @@ function renderGatherNodeGrid() {
       const detail = matchedLoc ? extractLocationDetail(matchedLoc, selectedZone) : '';
       if (detail) tipParts.push(`Specifically: ${detail}`);
     }
+    if (gatherNotesData[f]) tipParts.push(`Your note: ${gatherNotesData[f]}`);
     const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' '))}"` : '';
 
     return `<button class="${classes.join(' ')}"${tip} data-node="${escapeHtml(f)}">${escapeHtml(f)}${count}${newBadge}</button>`;
@@ -1545,7 +1555,43 @@ function openGatherMaterialModal(nodeType) {
   document.getElementById('gather-material-modal-title').textContent = `What did you get from ${nodeType}?`;
   renderGatherMaterialGrid();
   document.getElementById('gather-material-new').value = '';
+  gatherNoteExpanded = false;
+  renderGatherNodeNoteSection();
   document.getElementById('gather-material-modal').classList.add('open');
+}
+
+// Collapsed by default (backlog #8) - this modal opens on every single
+// gather, a fast/repetitive action, so an always-visible note field would
+// clutter the common case. Auto-saves on blur, no separate save button -
+// the note IS the field's value, nothing else to confirm.
+let gatherNoteExpanded = false;
+function renderGatherNodeNoteSection() {
+  const el = document.getElementById('gather-node-note-section');
+  if (!el) return;
+  const node = pendingGatheringNode;
+  const existing = gatherNotesData[node] || '';
+  const toggleLabel = gatherNoteExpanded
+    ? 'Hide note ▲'
+    : (existing ? 'Edit your note about where to find this ▼' : '+ Add a note about where to find this ▼');
+  let body = '';
+  if (gatherNoteExpanded) {
+    body = `<textarea id="gather-node-note-input" rows="2" placeholder="e.g. near the west wall, behind the crates" style="width:100%; margin-top:8px; resize:vertical; font-family:inherit; font-size:13px; padding:8px; border-radius:6px; background:var(--bg-raised); border:1px solid var(--border-strong); color:var(--text-primary);">${escapeHtml(existing)}</textarea>`;
+  }
+  el.innerHTML = `<button type="button" class="mini-btn" id="gather-node-note-toggle">${toggleLabel}</button>${body}`;
+  document.getElementById('gather-node-note-toggle').addEventListener('click', () => {
+    gatherNoteExpanded = !gatherNoteExpanded;
+    renderGatherNodeNoteSection();
+    if (gatherNoteExpanded) document.getElementById('gather-node-note-input').focus();
+  });
+  const input = document.getElementById('gather-node-note-input');
+  if (input) {
+    input.addEventListener('blur', () => {
+      const text = input.value.trim();
+      if (text) { gatherNotesData[node] = text; } else { delete gatherNotesData[node]; }
+      sendToHost({ type: 'saveGatherNote', node, note: text });
+      renderGatherNodeGrid(); // tooltip may have just changed
+    });
+  }
 }
 
 function renderGatherMaterialGrid() {
@@ -1990,6 +2036,13 @@ let sharedFishRarityBaseline = {};
 // same pattern as fishRarityBaseline above. This app's own data, since the
 // wiki has no numeric level field on any monster and is read-only anyway.
 let combatLevelRangeBaseline = {};
+
+// Gathering node notes (backlog #8) - purely local, per-node-type "where can
+// you find this" comment, keyed by node name. Populated once at 'ready',
+// updated optimistically the moment the user saves one (see
+// renderGatherNodeNoteSection()) so the tooltip on the node grid reflects it
+// immediately without waiting on a host round trip.
+let gatherNotesData = {};
 
 const fishingSession = {
   active: false,        // has "Start fishing!" been pressed
