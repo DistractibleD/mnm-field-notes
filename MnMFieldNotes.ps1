@@ -339,6 +339,33 @@ function Get-FishRarity {
     return $result
 }
 
+# Empirical zone level range (2026-08-27, backlog #6) - min/max of every
+# playerLevel logged against a Combat kill in that zone, across all-time
+# local history. Same reasoning as Get-FishRarity: the wiki has no numeric
+# level field on any monster (checked, 0/660 per CLAUDE.md), and this
+# project's wiki repo is read-only anyway, so an app-computed estimate from
+# this app's own data is the only buildable option, not a stopgap. Skips
+# entries with no playerLevel (the field is optional per-kill) rather than
+# treating a missing value as 0, which would silently drag every zone's
+# minimum down to 0.
+function Get-CombatZoneLevelRange {
+    $result = @{}
+    if (-not (Test-Path $AllTimeLogPath)) { return $result }
+    Get-Content -Path $AllTimeLogPath -Encoding UTF8 | ForEach-Object {
+        if (-not $_.Trim()) { return }
+        try { $o = $_ | ConvertFrom-Json } catch { return }
+        if ($o.sessionType -ne 'combat' -or -not $o.zone -or $null -eq $o.playerLevel) { return }
+        $level = [int]$o.playerLevel
+        if (-not $result.ContainsKey($o.zone)) {
+            $result[$o.zone] = @{ min = $level; max = $level; count = 0 }
+        }
+        if ($level -lt $result[$o.zone].min) { $result[$o.zone].min = $level }
+        if ($level -gt $result[$o.zone].max) { $result[$o.zone].max = $level }
+        $result[$o.zone].count++
+    }
+    return $result
+}
+
 # Rewrites the one matching line in place (by the entry's client-generated
 # id) rather than appending a correction - the all-time log stays append-only
 # for new entries, this is the one deliberate exception, scoped to fixing a
@@ -690,6 +717,7 @@ $wv.add_CoreWebView2InitializationCompleted({
                 $update = Get-UpdateInfo
                 Send-ToUI @{ type = 'updateInfo'; currentVersion = $update.currentVersion; buildDate = $update.buildDate; latestVersion = $update.latestVersion; url = $update.url; available = $update.available; error = $update.error }
                 Send-ToUI @{ type = 'fishRarity'; data = (Get-FishRarity) }
+                Send-ToUI @{ type = 'combatLevelRange'; data = (Get-CombatZoneLevelRange) }
             }
             'checkForUpdates' {
                 $update = Get-UpdateInfo

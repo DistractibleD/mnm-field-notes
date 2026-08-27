@@ -69,6 +69,12 @@ function mockHostRespond(msg) {
           'Shaded Dunes': { totalAttempts: 6, fish: { 'Basa': 2 } }, // deliberately below MIN_RARITY_ATTEMPTS
         },
       });
+      deliverFromHost({
+        type: 'combatLevelRange',
+        data: {
+          'Night Harbor': { min: 3, max: 9, count: 14 },
+        },
+      });
     } else if (msg.type === 'checkForUpdates') {
       deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null, manual: true });
     } else if (msg.type === 'openUrl') {
@@ -142,11 +148,33 @@ function renderCombatLandingInfo() {
     combatLandingZone = landingZoneCtrl.getValue();
     combatNamedListExpanded = false;
     combatRegularListExpanded = false;
+    renderCombatLevelRange();
     renderCombatNamedInfo();
     renderCombatRegularInfo();
   } });
+  renderCombatLevelRange();
   renderCombatNamedInfo();
   renderCombatRegularInfo();
+}
+
+// Empirical level range for the picked zone (backlog #6) - an ESTIMATE from
+// this app's own logged kills, not a wiki figure (no monster in the wiki has
+// a numeric level field, checked - 0/660). MIN_LEVEL_RANGE_KILLS gates the
+// whole zone, same reasoning as Fishing's MIN_RARITY_ATTEMPTS: a couple of
+// kills makes any "range" too noisy to show with a straight face.
+const MIN_LEVEL_RANGE_KILLS = 5;
+function renderCombatLevelRange() {
+  const el = document.getElementById('combat-landing-level-range');
+  if (!el) return;
+  if (!combatLandingZone) { el.innerHTML = ''; return; }
+  const range = combatLevelRangeBaseline[combatLandingZone];
+  const count = range ? range.count : 0;
+  if (count < MIN_LEVEL_RANGE_KILLS) {
+    el.innerHTML = `<p class="landing-info-empty">Not enough logged kills yet to guess a level range here (${count} so far, want at least ${MIN_LEVEL_RANGE_KILLS}).</p>`;
+    return;
+  }
+  const label = range.min === range.max ? `Level ${range.min}` : `Levels ${range.min}&ndash;${range.max}`;
+  el.innerHTML = `<p style="font-size:13px; color:var(--text-secondary); text-align:center; margin:10px 0 0;" data-tip="An estimate from this app's own logged kills, not a wiki figure - the wiki has no numeric level field on any monster.">${label}, from ${range.count} logged kills here</p>`;
 }
 
 function renderCombatNamedInfo() {
@@ -880,6 +908,9 @@ onHostMessage((msg) => {
     // aren't in this snapshot since it's taken once at 'ready'.
     fishRarityBaseline = msg.data || {};
     if (fishingSession.active) renderFishRarityPanel();
+  } else if (msg.type === 'combatLevelRange') {
+    combatLevelRangeBaseline = msg.data || {};
+    if (combatLandingZone) renderCombatLandingInfo();
   } else if (msg.type === 'submitExportResult') {
     const el = document.getElementById('submit-export-banner');
     if (msg.ok) {
@@ -1931,6 +1962,12 @@ function updateCookingStats() {
 // current session's own entries in computeZoneRarity() since this snapshot
 // predates anything caught this session.
 let fishRarityBaseline = {};
+
+// Empirical Combat zone level range (2026-08-27, backlog #6) - {zone: {min,
+// max, count}}, snapshotted once at 'ready' from Get-CombatZoneLevelRange -
+// same pattern as fishRarityBaseline above. This app's own data, since the
+// wiki has no numeric level field on any monster and is read-only anyway.
+let combatLevelRangeBaseline = {};
 
 const fishingSession = {
   active: false,        // has "Start fishing!" been pressed
