@@ -386,8 +386,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   --accent: #000080;
   --accent-strong: #0000a0;
   --accent-soft: #d4d0c8;
-  --accent-craft: #008080;
-  --accent-craft-dim: #005f5f;
+  --accent-craft: #800080;
+  --accent-craft-dim: #55005a;
   --success: #008000;
   --danger: #800000;
   --danger-soft: #ffd4d4;
