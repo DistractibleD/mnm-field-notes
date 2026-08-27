@@ -111,16 +111,18 @@ Rough shape from the user's own description, not yet scoped/confirmed:
   data — this tab produces submittable data, it doesn't write to the wiki directly, matching
   how session exports already work.
 
-## 6. Combat landing info: regular monsters + zone level range (2026-08-27)
+## 6. Combat landing info: zone level range (2026-08-27)
 
-Two additions to Combat's existing "browse a zone" landing section (see `CLAUDE.md`
-"Landing info"), alongside the named-monster list already built:
-- Regular (non-named) monsters found in the picked zone, same `wikiData.monsters`
-  filter/list pattern as the named-monster one, just `named: false` instead.
-- The zone's level range (lowest to highest player level it's meant for) — same open
-  question as #5's zone-level note above: wiki schema addition vs. an app-computed estimate
-  from Combat's own logged `playerLevel`+`con` (empirical, same pattern as `Get-FishRarity`).
-  Decide which before building, don't default to assuming a wiki addition.
+Two additions were scoped to Combat's existing "browse a zone" landing section (see
+`CLAUDE.md` "Landing info"), alongside the named-monster list already built:
+- ~~Regular (non-named) monsters found in the picked zone~~ — done (2026-08-27),
+  `renderCombatRegularInfo()` in `app.js`, mirrors the named-monster list (collapsible,
+  searchable, "View on wiki" link to the wiki's own parallel `#monsters-regular/<zone>`
+  route, confirmed against the wiki's real hash scheme rather than assumed).
+- Still open: the zone's level range (lowest to highest player level it's meant for) — same
+  open question as #5's zone-level note above: wiki schema addition vs. an app-computed
+  estimate from Combat's own logged `playerLevel`+`con` (empirical, same pattern as
+  `Get-FishRarity`). Decide which before building, don't default to assuming a wiki addition.
 
 ## 7. Combat: camp selector + dedicated "add camp/named" entry point (2026-08-27)
 
@@ -308,8 +310,14 @@ rate, so whoever reviews a submission (wiki-side Claude) doesn't have to hand-ta
 lines. This only closes the "does a single submission carry its full statistical picture"
 gap — it's still one submitter's local numbers per file, not pooled across submitters. The
 cross-user aggregation below is still fully open. A briefing for the wiki-side half of this
-was already handed to a separate Claude session working in the wiki repo (2026-08-27) — check
-with the user for its outcome before re-scoping this from scratch.
+was already handed to a separate Claude session working in the wiki repo (2026-08-27).
+
+**Wiki-side status (2026-08-27): that session has reported back that it's finished the task
+it was briefed on.** It has NOT yet reported the actual specifics back through the user
+(the published file's URL/path, its exact JSON shape, the refresh mechanism it landed on) —
+those are needed before the app-side fetch/merge below can actually be built. Ask the user
+for those details (or to relay them from the wiki-side session) before starting the app-side
+work, rather than guessing at a shape that might not match what was actually built.
 
 Natural building block already in place: once a session-export PR (#1) is merged, its file
 already sits in the wiki repo's `session-exports/` folder — that merged set IS the shared
