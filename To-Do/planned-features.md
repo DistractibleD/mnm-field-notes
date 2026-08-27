@@ -181,14 +181,18 @@ there". Wording is Claude's call when built, but same standing rule as everywher
 this app: written for the player reading it, not describing the feature back to the project
 owner.
 
-## 12. Tab polish: under-construction marker + hide Lookup (2026-08-27)
+## 12. ~~Tab polish: under-construction marker + hide Lookup~~ — done (2026-08-27)
 
 - Crafting and Multi currently just show a plain `.stub` message — user wants a prominent
   (their words: "big orange") under-construction treatment instead, so an empty tab reads as
-  "not built yet" rather than "broken/empty".
+  "not built yet" rather than "broken/empty". Built as `.under-construction` (`#ff8c00`
+  background, bold) above the existing stub text in both panels.
 - Hide the Lookup tab from the visible tab bar — keep the feature/code, just stop surfacing
-  it in navigation for now. No reason given yet; worth asking why when this is picked up
-  (redundant with the new landing info elsewhere? Superseded by the Maps tab below?).
+  it in navigation for now. Done via `style="display:none;"` on the tab button only — the
+  panel/code/`#lookup-input` are untouched, so it can be un-hidden trivially if needed. Why
+  it's being hidden was never actually asked (redundant with landing info? superseded by
+  Maps below?) — the original instruction was explicit and unconditional, so this was built
+  as asked without blocking on that curiosity.
 
 ## 13. Maps tab — pan/zoom map viewer (2026-08-27)
 
