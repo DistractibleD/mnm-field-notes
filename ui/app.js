@@ -149,7 +149,7 @@ function renderCombatNamedInfo() {
   const el = document.getElementById('combat-landing-named');
   if (!el) return;
   if (!combatLandingZone) {
-    el.innerHTML = `<p class="landing-info-empty">Select a zone to see more.</p>`;
+    el.innerHTML = `<p class="landing-info-empty">Pick a zone to see which named monsters live there.</p>`;
     return;
   }
   const named = wikiData.monsters.filter(m => m.named && (m.locations || []).some(loc => locationMatchesZone(loc, combatLandingZone)));
@@ -1321,7 +1321,7 @@ function renderGatherLandingInfo() {
   const zone = gatheringSession.zone;
   const tradeskills = gatherLandingTradeskills;
   if (!zone || tradeskills.length === 0) {
-    el.innerHTML = `<p class="landing-info-empty">Select a zone and at least one tradeskill to see more.</p>`;
+    el.innerHTML = `<p class="landing-info-empty">Pick a zone and at least one tradeskill to see what you can expect to find there.</p>`;
     return;
   }
   const known = wikiData.nodes.filter(n => tradeskills.includes(n.tradeskill));
@@ -2277,7 +2277,7 @@ function renderFishRarityPanel() {
   const zone = fishZoneCtrl ? fishZoneCtrl.getValue() : fishingSession.zone;
 
   if (!zone) {
-    el.innerHTML = `<p class="landing-info-empty">Select a zone to see more.</p>`;
+    el.innerHTML = `<p class="landing-info-empty">Pick a zone to see how rare each fish is, based on your own logged catches.</p>`;
     return;
   }
 
