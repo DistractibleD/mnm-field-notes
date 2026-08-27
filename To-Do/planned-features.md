@@ -222,15 +222,21 @@ Depends on #13 existing first. User-contributed pins placed on the map:
   re-crop or a swap to a differently-composed image). Decide the coordinate system with this
   in mind, don't bolt it on after the fact.
 
-## 15. Normal-theme text readability (2026-08-27)
+## 15. ~~Normal-theme text readability~~ — done (2026-08-27)
 
 User's own words: "The gray font in the normal app skin is a bit hard to read, messages
 might get lost to users not familiar with the app. Please make the text around the app more
 visible, or in a easier-to-read color." Scoped to the DEFAULT (dark) skin, not the Win98
-easter-egg theme — likely means raising contrast on `--text-secondary`/`--text-muted`
-against `--bg-page`/`--bg-surface` in `style.css`'s base `:root` block, but check which
-specific text (labels, captions, tooltips, empty-states) actually reads as the offender
-before changing the shared variables wholesale, since those colors are reused everywhere.
+easter-egg theme.
+
+Measured actual WCAG contrast ratios (via the standard relative-luminance formula) rather
+than guessing which variable was the offender: `--text-secondary` (#9a9ba3) already cleared
+4.5:1 against every background surface in the app (~5.5-6.6:1), but `--text-muted` (#6b6c74)
+measured only ~2.9-3.5:1 against `--bg-page`/`--bg-surface`/`--bg-raised` — clearly failing
+AA's 4.5:1 minimum for normal text, confirming it was the real offender. Changed
+`--text-muted` to `#8b8c94`, which measures ~4.5-5.5:1 across all three surfaces. Only that
+one variable changed — `--text-primary`/`--text-secondary` were already fine and left as-is.
+Win98 theme is a separate easter egg and wasn't touched.
 
 ## 16. Desktop/taskbar-pinnable icon (2026-08-27)
 
