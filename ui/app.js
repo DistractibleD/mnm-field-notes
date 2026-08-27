@@ -1941,6 +1941,11 @@ const fishingSession = {
   entries: [],
   customFish: [],       // fish names typed in this session that aren't in wikiData.nodes yet
   startSkillSent: false, // has the starting skill for this session already been reported to the host
+  // Timestamp of every real attempt (manual +, or an auto-counted keypress),
+  // this session only - never persisted/exported/compared across sessions,
+  // see the "Avg. time between casts" stat's own tooltip for why (a break
+  // mid-session, e.g. alt-tabbing, would silently skew it).
+  attemptTimestamps: [],
 };
 
 const keyState = {
@@ -2150,6 +2155,7 @@ function bindCounterEvents() {
 }
 function adjustAttempts(delta) {
   fishingSession.liveAttempts = Math.max(0, fishingSession.liveAttempts + delta);
+  if (delta > 0) fishingSession.attemptTimestamps.push(Date.now());
   updateCounterBox();
   updateFishStats();
   renderFishRarityPanel();
@@ -2205,6 +2211,7 @@ onHostMessage((msg) => {
     }, 700);
   } else if (msg.type === 'keyCounted') {
     fishingSession.liveAttempts++;
+    fishingSession.attemptTimestamps.push(Date.now());
     updateCounterBox();
     updateFishStats();
     checkKeySpam();
@@ -2587,6 +2594,18 @@ function updateFishStats() {
   document.getElementById('fs-attempts').textContent = totalAttempts;
   document.getElementById('fs-skill').textContent = fishingSession.skill;
   document.getElementById('fs-new').textContent = newForWiki;
+  document.getElementById('fs-avgtime').textContent = formatAvgCastTime(fishingSession.attemptTimestamps);
+}
+
+// Average gap between consecutive attempts this session, from the first
+// timestamp to the last - not a total-session-time/count average, since
+// that would also (wrongly) count time spent before the very first cast.
+function formatAvgCastTime(timestamps) {
+  if (timestamps.length < 2) return '—';
+  const totalMs = timestamps[timestamps.length - 1] - timestamps[0];
+  const avgSec = Math.round(totalMs / (timestamps.length - 1) / 1000);
+  if (avgSec < 60) return avgSec + 's';
+  return Math.floor(avgSec / 60) + 'm ' + (avgSec % 60) + 's';
 }
 
 // ---------------------------------------------------------------------------
