@@ -8,6 +8,7 @@ Installing MnM Field Notes
 What's inside
 --------------
 - Start.vbs / MnMFieldNotes.ps1 - the app itself.
+- app.ico - its icon, used for the window and the taskbar.
 - ui\ - the window's interface (HTML/CSS/JS), loaded by the app.
 - lib\webview2\ - small loader files the app needs to talk to the WebView2
   Runtime (see "If something goes wrong" below). Already included in this
@@ -22,6 +23,13 @@ Two new folders appear next to Start.vbs the first time you launch:
 - Sessions\ - one text file per session, written when you click "End session
   & export." Hand the relevant file to whoever's updating the wiki when
   you're ready to share what you logged.
+
+Pinning it to your taskbar
+-----------------------------
+Once it's running, right-click its icon on the taskbar and choose "Pin to
+taskbar." That pin will keep working on future launches too. (Pinning a
+shortcut before ever running the app once isn't supported yet - run it at
+least once first.)
 
 Removing it
 ------------

@@ -260,25 +260,31 @@ AA's 4.5:1 minimum for normal text, confirming it was the real offender. Changed
 one variable changed — `--text-primary`/`--text-secondary` were already fine and left as-is.
 Win98 theme is a separate easter egg and wasn't touched.
 
-## 16. Desktop/taskbar-pinnable icon (2026-08-27)
+## 16. ~~Desktop/taskbar-pinnable icon~~ — done for the main path (2026-08-28)
 
-User asked whether the app can be pinned to the Windows taskbar today — confirmed it can't,
-for three compounding reasons, all currently true:
-- `Start.vbs` launches the app (see file layout in `CLAUDE.md`) but is itself a script, and
-  Windows doesn't offer "Pin to taskbar" on `.vbs` files directly.
-- `Start.vbs` launches `powershell.exe` hidden (`objShell.Run "powershell.exe ..." , 0, False`)
-  to host the WinForms window, so Windows would identify/group any pin under PowerShell's own
-  taskbar identity, not a distinct app one.
-- The WinForms `$form` never sets `.Icon` (`MnMFieldNotes.ps1` only sets `$form.Text`, see
-  around line 559) and nothing calls `SetCurrentProcessExplicitAppUserModelID` — so even a
-  working pin would show a generic PowerShell icon, not something recognizable as this app.
+User asked whether the app can be pinned to the Windows taskbar today — confirmed it
+couldn't, for three compounding reasons (icon + AppUserModelID + `Start.vbs` being a script
+rather than something with its own identity). See "Taskbar-pinnable icon" in `CLAUDE.md` for
+the full mechanism now built: `app.ico` (hand-authored, multi-resolution) set as `$form.Icon`,
+plus `SetCurrentProcessExplicitAppUserModelID` called early with a fixed ID — together these
+mean a user can right-click the RUNNING app's taskbar icon and "Pin to taskbar," and it'll
+correctly re-merge on every future launch. Documented for the recipient in `INSTALL.txt`.
+Verified: the ICO's internal structure (4 correctly-sized PNG-backed entries, byte-verified),
+the P/Invoke call's HRESULT (0/S_OK), `$form.Icon` assigning without error, and the full
+`SV_AUTOTEST` harness running clean with both changes in place. Pinning itself couldn't be
+verified end-to-end (no real interactive taskbar in this environment) — worth a real-machine
+check.
 
-Real fix needs, together, not piecemeal: an actual `.ico` file, `$form.Icon` set to it,
-`SetCurrentProcessExplicitAppUserModelID` called early (so Windows treats the running window
-as its own distinct app identity rather than grouping under `powershell.exe`), and a proper
-`.lnk` shortcut (pointing at the same AppID) as the thing that actually gets pinned — pinning
-`Start.vbs` itself won't work even after the above. Where the shortcut/icon file should live
-(shipped inside the release zip vs. generated on first run) isn't decided yet.
+**Still open, deliberately not attempted**: a pre-made `.lnk` shortcut pinnable BEFORE ever
+running the app once. That needs the shortcut's own `System.AppUserModel.ID` property set to
+match, which isn't reachable through the simple `WScript.Shell` COM object `Start.vbs` itself
+uses — it needs direct `IShellLinkW`/`IPersistFile`/`IPropertyStore` COM interop, which is
+fragile to get right without being able to click a real taskbar to verify grouping behavior.
+Left open rather than shipped unverified.
+
+**Whoever builds the next release zip must include `app.ico`** at the top level alongside
+`MnMFieldNotes.ps1`/`Start.vbs`/etc. — without it the app silently falls back to no custom
+icon (wrapped in try/catch, so it fails quietly, not loudly).
 
 ## 17. ~~Fishing: clarify "click the fish you caught" wording~~ — done (2026-08-27)
 

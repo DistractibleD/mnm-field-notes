@@ -497,6 +497,10 @@ pass when picked up.
 ## File layout
 
 - `MnMFieldNotes.ps1` — WinForms host, all file I/O + networking, all message handlers.
+- `app.ico` — the app's icon (window + taskbar), committed (not gitignored, unlike
+  `lib/webview2/`'s DLLs) — small and hand-authored, not a fetched redistributable.
+  **Whoever builds a release zip must include this file** alongside `MnMFieldNotes.ps1`/
+  `Start.vbs`/etc. — see "Taskbar-pinnable icon" below for what breaks if it's left out.
 - `ui/` — `index.html`+`style.css`+`app.js`, served via `SetVirtualHostNameToFolderMapping`
   (origin `appassets.local`, not `file://`). `hasHost` check + dev mock (`mockHostRespond`)
   for browser preview via `lib/serve-ui.ps1` (mock never runs in the real app).
@@ -512,6 +516,42 @@ pass when picked up.
 - `Data\` (gitignored): `AllTimeLog.jsonl`, `Profiles.json`, `GatherNotes.json`,
   `WebView2UserData\`, `error.log` (ThreadException handler).
 - `Sessions\` (gitignored): per-session export txts.
+
+## Taskbar-pinnable icon (2026-08-28, backlog #16)
+
+User asked whether the app could be pinned to the taskbar — it couldn't, for three
+compounding reasons (see backlog #16 for the full original diagnosis): `Start.vbs` is a
+script (Windows won't offer "Pin to taskbar" on it directly), it launches `powershell.exe`
+hidden to host the window (so any pin would group under PowerShell's own identity, not a
+distinct app one), and the window never had its own icon.
+
+**What's built**: `app.ico` (multi-resolution — 16/32/48/256px, PNG-compressed entries per
+the Vista+ ICO format, hand-authored via `System.Drawing` since no external image tool was
+available — a bevelled dark rounded square with a bold gold "M", matching this app's own
+`--bg-page`/`--accent` colors) is now set as `$form.Icon`. Separately,
+`SetCurrentProcessExplicitAppUserModelID` (P/Invoke to `shell32.dll`, via an inline
+`Add-Type -TypeDefinition` C# snippet — this JITs through the .NET Framework's own bundled
+compiler, no external SDK needed, consistent with this project's existing "no Node/npm/.NET
+SDK" constraint) is called with a fixed string (`DistractibleD.MnMFieldNotes`) early in the
+script, before any window exists. Both wrapped in `try`/`catch` — neither should ever be
+able to stop the app from starting.
+
+**Why this combination is what actually solves it**: an explicit AppUserModelID is what
+gives the RUNNING window its own distinct taskbar identity (instead of inheriting
+`powershell.exe`'s). Because the ID is a fixed string set the same way on every launch, a
+user can right-click the running app's taskbar icon and choose "Pin to taskbar" — Windows
+pins that identity, and every future launch (same fixed ID) correctly re-merges into that
+same pinned slot. Documented for the recipient in `INSTALL.txt`.
+
+**Deliberately NOT attempted**: a pre-made `.lnk` shortcut a user could pin BEFORE ever
+running the app once. That's a materially harder, riskier problem — a shortcut's own
+`System.AppUserModel.ID` property (needed so a pre-pinned shortcut merges correctly with the
+later-running window) isn't exposed by the simple `WScript.Shell` COM automation object
+(`Start.vbs`'s own technique); setting it requires direct `IShellLinkW`/`IPersistFile`/
+`IPropertyStore` COM interop, which is fragile to get right blind and impossible to verify
+in a sandbox with no real interactive taskbar to click "Pin" on and observe grouping
+behavior. Left open rather than shipped unverified — see backlog #16's remaining note if
+picked up again.
 
 ## Update checking
 

@@ -20,8 +20,37 @@ $uiRoot = Join-Path $root 'ui'
 $webview2Root = Join-Path $root 'lib\webview2'
 $dataDir = Join-Path $root 'Data'
 $sessionsDir = Join-Path $root 'Sessions'
+$iconPath = Join-Path $root 'app.ico'
 New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 New-Item -ItemType Directory -Path $sessionsDir -Force | Out-Null
+
+# ---------------------------------------------------------------------------
+# Taskbar-pinnable icon, part 1 of 2 (backlog #16). Without this, Windows
+# groups the running window under powershell.exe's OWN taskbar identity (it's
+# the process that actually created the window - Start.vbs just launches it
+# hidden), so right-clicking to "Pin to taskbar" would pin generic
+# PowerShell, not this app. A fixed, never-changing AppUserModelID here means
+# every launch reports the same identity, so a pin created by right-clicking
+# the running icon correctly re-merges on every future launch. Must be called
+# before any window is created. Part 2 is $form.Icon, set below at form
+# creation - the two together are what make the running window recognizable
+# and separately pinnable; see CLAUDE.md "Taskbar-pinnable icon" for the full
+# picture, including what this does NOT solve (a shortcut pinnable BEFORE
+# ever running the app once - that needs COM property-store work on the .lnk
+# itself, not attempted here).
+# ---------------------------------------------------------------------------
+try {
+    Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+public static class AppId {
+    [DllImport("shell32.dll", SetLastError = true)]
+    public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+}
+'@
+    [AppId]::SetCurrentProcessExplicitAppUserModelID('DistractibleD.MnMFieldNotes') | Out-Null
+} catch {
+    # Never let a taskbar-identity nicety block the app from starting.
+}
 
 Add-Type -Path (Join-Path $webview2Root 'Microsoft.Web.WebView2.Core.dll')
 Add-Type -Path (Join-Path $webview2Root 'Microsoft.Web.WebView2.WinForms.dll')
@@ -688,6 +717,13 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = 'MnM Field Notes'
 $form.Width = 900
 $form.Height = 1500
+# Part 2 of the taskbar-pinnable icon (backlog #16, see the
+# SetCurrentProcessExplicitAppUserModelID call near the top of this file for
+# part 1). Wrapped in try/catch - a missing/corrupt icon should never stop
+# the app from starting, it'd just fall back to the default WinForms icon.
+try {
+    if (Test-Path $iconPath) { $form.Icon = New-Object System.Drawing.Icon($iconPath) }
+} catch {}
 
 # This app is designed to run on a second monitor while playing (see
 # CLAUDE.md "Visual style"), not share the primary one - open there
