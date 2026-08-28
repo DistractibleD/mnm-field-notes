@@ -4,3 +4,4 @@ lib/webview2/*.dll
 lib/autotest-result.txt
 MnMFieldNotes.exe
 crash.txt
+MnM-Field-Notes-*.zip
