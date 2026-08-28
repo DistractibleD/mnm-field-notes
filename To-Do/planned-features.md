@@ -402,24 +402,41 @@ of scope, no side buttons) still shows its native spinner as expected; the activ
 Confirmed via `document.styleSheets` inspection that both CSS rules load and target the
 correct IDs.
 
-## 23. App-side "home" screen, like the wiki's (2026-08-28)
+## 23. ~~App-side "home" screen, like the wiki's~~ — done (2026-08-28)
 
 User's own words: "Like we have on the wiki i think we should have a 'home' screen on the
 app, wishing users welcome, explaining what the app does (in not too many words), telling
-them how it works and how to navigate." Mirrors the wiki's own `renderHomePage` — a welcome
-blurb + nav cards — but scoped down for this app's own audience (someone who already has the
-zip and is looking at a running desktop window, not a first-time visitor landing on a public
-site from a search engine), so needs its own pass rather than a straight port.
+them how it works and how to navigate." Built as a new first/default tab (`#panel-home`) —
+short welcome blurb + a nav-card grid, one card per real tab, each a one-line description of
+what it does; clicking a card jumps straight there. Adapted from the wiki's own
+`renderHomePage`, scoped down (no changelog, no per-tab icons) since "not too many words"
+was an explicit part of the ask. Full mechanism in `CLAUDE.md` "Home tab."
 
-Not yet scoped: whether this is its own top-level tab/screen (competing with the existing
-Combat/Gathering/Fishing/etc. tab bar - see "Landing info" in `CLAUDE.md`, which already
-gives every tab a no-session-needed browse view, arguably covering some of the same "come in
-and find something useful immediately" goal) or a one-time/dismissible first-launch panel
-(closer to how `#profile-modal` already greets a brand-new install). Whichever it is, keep it
-short per the user's own explicit ask ("in not too many words") — this app's own portrait
-2nd-monitor layout is already tight on space (see CLAUDE.md "Visual style"), and the existing
-`README.txt`/in-app tooltips already cover most of the explaining in more detail than a home
-screen should try to repeat.
+**Asked the user directly** whether this should be a permanent tab or a one-time/dismissible
+first-launch panel — a real fork in how the feature works, not something to guess at.
+Confirmed: permanent tab, matching how the wiki's own Home page works.
+
+Found and fixed a real latent bug while wiring this up: `#tooltip-hint`'s visibility was
+only ever set by the tab-click handler, never initialized at page load — invisible before
+because Combat (both the old default tab AND tooltip-enabled) happened to make the unset
+default look correct by coincidence. Home becoming the new default (no tooltips) surfaced
+it. Fixed by defaulting the element to `display:none` in the markup itself.
+
+Verified in the browser preview: Home renders as the default tab, the tooltip hint stays
+hidden there and correctly reappears when a card navigates to a tooltip-enabled tab (tested
+via the Fishing card), and no console errors.
+
+**Still open, not built in this pass** — user's own follow-up: the Home tab could show
+stats too, e.g. how many submissions (screenshots/session exports) have been sent.
+**Explicitly GLOBAL/guild-wide, not just this install's own local count** (user's own
+follow-up correction) — meaning a simple local counter in `Data\` isn't enough on its own;
+this needs the same shape as "Rarity bars"' pooled-data mechanism in `CLAUDE.md` (Fishing
+rarity: a wiki-side GitHub Action aggregates merged `session-exports/*.txt`/submission PRs
+into a published JSON file, `Get-SharedFishRarity` fetches it) — a wiki-side counting
+mechanism that doesn't exist yet for submissions generally, not just an app-side change.
+Scope this properly (what counts as "a submission" across both the session-export AND
+screenshot pipelines, whether it's a single combined number or split by type) before
+building, rather than assuming a local count is what was actually asked for.
 
 ## 24. Maps: pop-out the viewer into its own window (2026-08-28)
 

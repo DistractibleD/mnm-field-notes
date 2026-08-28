@@ -694,6 +694,44 @@ the alphabetical grid) — that's wiki homepage curation, not needed for a looku
 - **No pins/annotations** (backlog #14) — explicitly deferred, user's own call (2026-08-28):
   "wait until we have better maps." Not attempted in this pass.
 
+## Home tab (2026-08-28, backlog #23) — permanent, not a first-run modal
+
+Now the FIRST tab, active by default on launch (`#panel-home`, `.tab[data-tab="home"]` first
+in the tab bar) — welcome blurb + a `.home-nav-card` grid, one card per real tab
+(Combat/Gathering/Fishing/Cooking/Crafting/Multi/Maps), each a one-line "what this tab does"
+description; clicking a card triggers the real tab button's own `.click()` rather than
+duplicating any tab-switch logic. Adapted from the wiki's own `renderHomePage`/
+`.home-nav-grid` (confirmed via that repo's `script.js`/`style.css`), but text-only (no
+per-tab icon set exists in this app, and the whole point is brevity) and each card describes
+what clicking it DOES rather than just naming an already-self-explanatory wiki page title.
+No changelog section (wiki-only concept, nothing analogous here).
+
+**Explicitly a permanent tab, not a one-time/dismissible first-launch panel** — asked the
+user directly given this was a real fork in how the feature works (adds a permanent 8th tab
+vs. a lighter "shown once" experience); they confirmed the permanent-tab reading, matching
+the wiki's own Home page being a normal, always-reachable nav destination rather than a
+first-visit-only interstitial.
+
+**Bug found and fixed while wiring this up**: `#tooltip-hint`'s visibility was ONLY ever set
+by the tab-click handler (`TABS_WITH_TOOLTIPS.has(...)`) — never initialized at page load.
+This was invisible before because Combat (which DOES have tooltips) was both the default
+tab AND in `TABS_WITH_TOOLTIPS`, so the hint's un-set default state happened to already be
+correct by coincidence. Making Home (which has none) the new default tab surfaced it — the
+hint incorrectly showed on first paint until any tab was clicked. Fixed by defaulting
+`#tooltip-hint` to `style="display:none;"` in `index.html` itself, same pattern already used
+for `#update-banner`/`#submit-export-banner`, rather than adding an extra init-time call.
+
+**Still open, not built in this pass**: the user's own follow-up suggested the Home tab
+could show stats too, e.g. how many submissions (screenshots/session exports) have been
+sent — then corrected (2026-08-28): **explicitly a GLOBAL/guild-wide count, not just this
+install's own local total.** `SessionExportSubmit.cs`/`ScreenshotSubmit.cs` only report
+success/failure per call today, no running total anywhere, local or otherwise. A global
+count needs the same shape as the "Rarity bars" pooled-data mechanism (Fishing rarity: a
+GitHub Action on the wiki side aggregates merged submission PRs into a published JSON file,
+`WikiService.GetSharedFishRarityAsync()` fetches it) — this doesn't exist yet for
+submissions generally. See `To-Do/planned-features.md` #23 for the still-open scoping
+questions (what counts as "a submission" across both pipelines, combined vs. split by type).
+
 ## Session export submission (2026-08-27) — the one outbound-write exception
 
 Until now this app only ever READ the wiki (JSON fetch) or opened it in a browser (`openUrl`)

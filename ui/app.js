@@ -1068,6 +1068,17 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   updateCombatSessionVisibility();
 }));
 
+// Home tab's nav cards (backlog #23) just trigger the real tab button's own
+// click - reuses every side effect that already has (session.type update,
+// stats visibility, tooltip hint) for free, rather than duplicating any of
+// it here.
+document.querySelectorAll('.home-nav-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const tab = document.querySelector(`.tab[data-tab="${card.dataset.tab}"]`);
+    if (tab) tab.click();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Session start/end - one button, state-dependent (2026-08-27). Used to be
 // two separate buttons, but the plain "Start session" one could bypass

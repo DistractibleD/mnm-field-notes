@@ -415,6 +415,41 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .detail { padding: 14px 14px; }
 }
 
+/* ---------- Home tab (2026-08-28, backlog #23) - welcome blurb + nav-card
+   grid, adapted from the wiki's own #home-nav-grid/.home-nav-card (that
+   repo's renderHomePage/style.css) but text-only (no icons - this app has
+   no equivalent icon set to reuse, and the whole point here is "not too
+   many words," so a two-line card is plenty) and each card describes what
+   the tab DOES rather than just naming it, since the wiki's version links
+   to already-self-explanatory page titles (Items, Monsters, Maps) while
+   this app's tabs need a one-line "why click this" per the user's own
+   "how it works and how to navigate" ask. ---------- */
+.home-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.home-nav-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.home-nav-card:hover { border-color: var(--accent); }
+.home-nav-card-name {
+  font-family: 'Sora', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+.home-nav-card:hover .home-nav-card-name { color: var(--accent); }
+.home-nav-card-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 /* ---------- Maps tab (2026-08-28, backlog #13) - grid + pan/zoom viewer,
    adapted from the wiki's own #map-viewer/.maps-grid (that repo's
    style.css) rather than invented fresh, using this app's own CSS variable
