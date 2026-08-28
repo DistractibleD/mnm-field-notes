@@ -6,25 +6,19 @@ something a session should treat as a current spec. Claude picks the order when 
 says "keep building" without naming something specific; when the user names a specific
 idea from here, that's the one to build.
 
-## 1. ~~Push session exports to GitHub~~ — built (2026-08-27), needs deployment to actually work
+## 1. ~~Push session exports to GitHub~~ — done, deployed and confirmed working (2026-08-28)
 
 Built exactly as scoped below: reused the wiki's own Worker (extended, not replaced), one
 new hard rule, human-review-by-PR as the trust model. Full mechanism documented in
 `CLAUDE.md` "Session export submission" — not duplicated here.
 
-**One remaining step before this does anything real: the user has to paste
-`lib/cloudflare-worker/submit-worker.js` into the Cloudflare dashboard and redeploy.**
-Until that happens, the "Submit" banner will always come back with an error (verified —
-the currently-live Worker doesn't recognize the `sessionExport` field yet, and correctly,
-safely rejects it with its own existing "Please attach a screenshot or write a note." error
-rather than doing anything unexpected).
-
-Verified before deployment: the Worker's routing/honeypot/oversized-export/backward-compat
-logic (browser-based unit tests against the actual file), the PS-built multipart body
-(round-tripped through a real `Request.formData()` parse), and the real network path itself
-(a live POST to the actual deployed Worker, which correctly parsed it and rejected it for
-the expected reason — confirms the wire format and connectivity both work, with zero side
-effects since no PR was possible without a recognized field).
+**Deployed**: the user pasted `lib/cloudflare-worker/submit-worker.js` into the Cloudflare
+dashboard and redeployed. A real session export was submitted from the C#-era app and
+succeeded end-to-end — confirmed by the user ("Submitted — thanks! It's waiting for review
+on the wiki now."), opening a real PR against the wiki repo. This closed out a real bug hit
+during the exe migration (unquoted `Content-Disposition` `name` param breaking Cloudflare's
+`request.formData()` parser — see CLAUDE.md's "Session export submission" and the
+`MultipartFormDataContent` gotcha in "Architecture").
 
 Original scoping notes, all resolved as above:
 - ~~Reuse, don't rebuild, if possible~~ — confirmed with the user, reused.
@@ -78,10 +72,11 @@ Still open:
   i am happy" — the dev folder's name is exempt from that, only the distributed artifact
   isn't.
 - **No installer, and intentionally so** — the app is portable (no registry/Program
-  Files/services), so "install" = unzip + run `Start.vbs`, "uninstall" = delete the folder.
-  A traditional installer would add real downsides (unsigned `.exe` triggers SmartScreen)
-  for no real benefit at guild scale. Still needs an `INSTALL.txt` in the distributed zip
-  explaining what's inside and why, for guild members who aren't the project owner.
+  Files/services), so "install" = unzip + run `MnMFieldNotes.exe`, "uninstall" = delete the
+  folder. A traditional installer would add real downsides (unsigned `.exe` triggers
+  SmartScreen) for no real benefit at guild scale. Still needs an `INSTALL.txt` in the
+  distributed zip explaining what's inside and why, for guild members who aren't the project
+  owner.
 
 ## 5. "Add info" contribution tab (2026-08-27)
 
