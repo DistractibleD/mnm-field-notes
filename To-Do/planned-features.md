@@ -28,12 +28,28 @@ Original scoping notes, all resolved as above:
 - ~~Every submission still needs a human merge/review step~~ — this is exactly what merging
   the Worker's PR already requires; no separate gate was added on top.
 
-## 2. Photo attachments (2026-08-24)
+## 2. ~~Photo attachments~~ — done, scoped to monsters/nodes (2026-08-28)
 
-Let a session log entry attach a screenshot (e.g. a chat message, an item card, a faction
-change) alongside the typed fields, sent through the same submission pipeline as #1 once
-that exists. Depends on #1 being built first — no separate submission path planned for
-just images.
+Originally scoped as "attach a screenshot to a session log entry, through the same pipeline
+as #1" — built differently once #1 was actually built and its Worker inspected: rather than
+extending the session-export path, this reuses the wiki's OWN existing screenshot/notes
+submission path (`handleWikiSubmission` in the Worker) completely unchanged, since that's a
+much closer match — a screenshot is fundamentally "about a monster/node," not "about a
+session." **Zero Worker code changes needed.** Full mechanism in `CLAUDE.md` "Screenshot
+submissions."
+
+Scoped to named/boss monsters (Combat) and gathering nodes (Gathering) specifically — not a
+generic "attach to any log entry" — per the wiki's own submission guide, which says regular
+monsters don't need pictures at all. Verified against the real live Worker (two
+side-effect-free requests hitting specific rejection messages, no PR/branch created either
+way) before considering this done, not just tested against the mock preview.
+
+**Still open, not built in this pass**: attaching a screenshot to other subjects (items,
+faction changes, crafting recipes) the wiki's own submit form also supports — this was
+scoped to what the user actually asked for ("nodes, bosses or mobs"), not every possible
+subject the underlying pipeline could theoretically support. Extending to more subjects
+later is mostly UI work (the shared `openScreenshotModal(subject, kind, zone)` already
+takes an arbitrary kind label) — the plumbing doesn't need to change.
 
 ## 3. ~~Cooking as its own tab~~ — done (2026-08-25)
 

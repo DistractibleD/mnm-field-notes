@@ -68,6 +68,9 @@ internal static class WebMessageRouter
             case "submitExport":
                 await HandleSubmitExportAsync(msg, ui);
                 break;
+            case "submitScreenshot":
+                await HandleSubmitScreenshotAsync(msg, ui);
+                break;
             case "startKeyCapture":
                 keyHook.Start("capture", null);
                 break;
@@ -122,6 +125,37 @@ internal static class WebMessageRouter
         {
             { "type", "submitExportResult" }, { "ok", result.Ok }, { "error", result.Error }, { "fileName", fileName },
         });
+    }
+
+    // imageBase64 is optional - the wiki's own Worker accepts a notes-only
+    // submission with no screenshot attached (see ScreenshotSubmit.cs).
+    private static async Task HandleSubmitScreenshotAsync(Dictionary<string, object> msg, UiBridge ui)
+    {
+        string subject = msg.GetValueOrDefault("subject") as string;
+        string kind = msg.GetValueOrDefault("kind") as string;
+        string zone = msg.GetValueOrDefault("zone") as string;
+        string note = msg.GetValueOrDefault("note") as string;
+        string fileName = msg.GetValueOrDefault("fileName") as string;
+        string mimeType = msg.GetValueOrDefault("mimeType") as string;
+        string imageBase64 = msg.GetValueOrDefault("imageBase64") as string;
+
+        byte[] imageBytes = null;
+        if (!string.IsNullOrEmpty(imageBase64))
+        {
+            try { imageBytes = Convert.FromBase64String(imageBase64); }
+            catch (FormatException)
+            {
+                ui.Send(new Dictionary<string, object>
+                {
+                    { "type", "screenshotSubmitted" }, { "ok", false },
+                    { "error", "Could not read that image - try a different file." },
+                });
+                return;
+            }
+        }
+
+        var result = await ScreenshotSubmitter.SubmitAsync(subject, kind, zone, note, imageBytes, fileName, mimeType);
+        ui.Send(new Dictionary<string, object> { { "type", "screenshotSubmitted" }, { "ok", result.Ok }, { "error", result.Error } });
     }
 
     private static void HandleStartSession(Dictionary<string, object> msg, UiBridge ui)

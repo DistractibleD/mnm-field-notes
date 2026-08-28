@@ -287,6 +287,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="screenshot-modal">
+  <div class="modal-box">
+    <h2 id="screenshot-modal-title">Submit a screenshot</h2>
+    <p style="font-size:13px; color:var(--text-secondary);">Goes to the wiki's review queue &mdash;
+      nothing is added automatically, a human decides.</p>
+    <label>Screenshot <span style="color:var(--text-muted); font-weight:400;">(optional if you're just leaving a note)</span></label>
+    <input type="file" id="screenshot-modal-file" accept="image/png,image/jpeg,image/webp,image/gif" />
+    <label style="margin-top:10px;">Note <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+    <textarea id="screenshot-modal-note" rows="2" placeholder="Anything worth calling out?" style="width:100%; resize:vertical; font-family:inherit; font-size:13.5px; padding:8px 10px; border-radius:6px; background:var(--bg-raised); border:1px solid var(--border-strong); color:var(--text-primary);"></textarea>
+    <div class="err" id="screenshot-modal-status"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="screenshot-modal-submit" style="margin:0;">Submit</button>
+      <button class="secondary-btn" id="screenshot-modal-cancel" style="margin:0;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

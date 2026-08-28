@@ -110,6 +110,9 @@ function mockHostRespond(msg) {
     } else if (msg.type === 'submitExport') {
       console.log('[mock host] would POST export to the wiki Worker:', msg.fileName);
       deliverFromHost({ type: 'submitExportResult', ok: true, error: null, fileName: msg.fileName });
+    } else if (msg.type === 'submitScreenshot') {
+      console.log('[mock host] would POST screenshot to the wiki Worker:', msg.subject, msg.fileName || '(no file)');
+      deliverFromHost({ type: 'screenshotSubmitted', ok: true, error: null });
     }
   }, 50);
 }
@@ -215,7 +218,7 @@ function renderCombatNamedInfo() {
       if (m.areas && m.areas.length) tipParts.push(`Found in: ${m.areas.join(', ')}`);
       if (m.drops && m.drops.length) tipParts.push(`Drops: ${m.drops.join(', ')}`);
       const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' — '))}"` : '';
-      return `<span class="fish-pick-btn" style="cursor:default; display:inline-block; margin:3px;" data-search="${escapeHtml(m.name.toLowerCase())}"${tip}>${escapeHtml(m.name)}</span>`;
+      return `<span class="fish-pick-btn" style="cursor:default; display:inline-flex; align-items:center; gap:4px; margin:3px;" data-search="${escapeHtml(m.name.toLowerCase())}"${tip}>${escapeHtml(m.name)}<button type="button" class="screenshot-trigger-btn icon-btn" data-subject="${escapeHtml(m.name)}" data-kind="monster" data-zone="${escapeHtml(combatLandingZone)}" data-tip="Submit a screenshot of this monster">📷</button></span>`;
     }).join('');
     const wikiLink = wikiData.pageUrl
       ? `<a href="#" id="combat-named-wiki-link" style="font-size:11px; color:var(--accent); white-space:nowrap; flex-shrink:0;">View on wiki ↗</a>`
@@ -610,6 +613,87 @@ function showSubmitExportBanner(fileName) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Screenshot submissions (2026-08-28, backlog #2) - a shared modal reused
+// from Combat (named/regular monsters) and Gathering (nodes), reusing the
+// wiki's OWN existing "Submit a Screenshot" pipeline exactly as-is (same
+// screenshot/notes/website fields the wiki's own form sends) rather than
+// inventing a new one - the app just folds "Regarding: <kind> — <name>" and
+// "Zone/Map: <zone>" onto the front of `notes` as their own labeled lines,
+// the exact same format the wiki's own script.js already builds, so a
+// submission from this app is indistinguishable from one made on the wiki
+// itself once it reaches the Worker (which never parses `notes` anyway).
+// Session/host does the actual POST (exe owns all networking) - this only
+// reads the file as base64 and hands it over via postMessage.
+let screenshotModalContext = null; // { subject, kind, zone }
+
+function openScreenshotModal(subject, kind, zone) {
+  screenshotModalContext = { subject, kind, zone: zone || null };
+  document.getElementById('screenshot-modal-title').textContent = `Submit a screenshot — ${subject}`;
+  document.getElementById('screenshot-modal-file').value = '';
+  document.getElementById('screenshot-modal-note').value = '';
+  document.getElementById('screenshot-modal-status').textContent = '';
+  const btn = document.getElementById('screenshot-modal-submit');
+  btn.disabled = false;
+  btn.textContent = 'Submit';
+  document.getElementById('screenshot-modal').classList.add('open');
+}
+function closeScreenshotModal() {
+  document.getElementById('screenshot-modal').classList.remove('open');
+  screenshotModalContext = null;
+}
+document.getElementById('screenshot-modal-cancel').addEventListener('click', closeScreenshotModal);
+// Delegated (not re-bound per render) since .screenshot-trigger-btn appears in
+// several innerHTML-rebuilt lists (Combat's named/regular monster rows,
+// Gathering's material modal) - same reasoning as the tooltip/checklist
+// delegation above.
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.screenshot-trigger-btn');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openScreenshotModal(btn.dataset.subject, btn.dataset.kind, btn.dataset.zone || null);
+});
+document.getElementById('screenshot-modal-submit').addEventListener('click', () => {
+  const ctx = screenshotModalContext;
+  if (!ctx) return;
+  const fileInput = document.getElementById('screenshot-modal-file');
+  const noteInput = document.getElementById('screenshot-modal-note');
+  const statusEl = document.getElementById('screenshot-modal-status');
+  const file = fileInput.files[0];
+  const note = noteInput.value.trim();
+  if (!file && !note) {
+    statusEl.textContent = 'Attach a screenshot or write a note.';
+    return;
+  }
+  const btn = document.getElementById('screenshot-modal-submit');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  statusEl.textContent = '';
+  const send = (fileName, mimeType, imageBase64) => sendToHost({
+    type: 'submitScreenshot',
+    subject: ctx.subject,
+    kind: ctx.kind,
+    zone: ctx.zone,
+    note,
+    fileName: fileName || '',
+    mimeType: mimeType || '',
+    imageBase64: imageBase64 || ''
+  });
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => send(file.name, file.type, (reader.result || '').split(',')[1] || '');
+    reader.onerror = () => {
+      btn.disabled = false;
+      btn.textContent = 'Submit';
+      statusEl.textContent = 'Could not read that file — try a different one.';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    send(null, null, null);
+  }
+});
+
 document.getElementById('check-updates-link').addEventListener('click', e => {
   e.preventDefault();
   sendToHost({ type: 'checkForUpdates' });
@@ -939,6 +1023,16 @@ onHostMessage((msg) => {
       if (retry) retry.addEventListener('click', e => { e.preventDefault(); showSubmitExportBanner(msg.fileName); document.getElementById('submit-export-go').click(); });
     }
     document.getElementById('submit-export-dismiss').addEventListener('click', e => { e.preventDefault(); el.style.display = 'none'; });
+  } else if (msg.type === 'screenshotSubmitted') {
+    if (msg.ok) {
+      closeScreenshotModal();
+      showToast('Submitted — thanks! It\'s waiting for review on the wiki now.');
+    } else {
+      const btn = document.getElementById('screenshot-modal-submit');
+      btn.disabled = false;
+      btn.textContent = 'Submit';
+      document.getElementById('screenshot-modal-status').textContent = msg.error || 'Something went wrong — try again.';
+    }
   } else if (msg.type === 'error') {
     showToast('Error: ' + msg.message);
     // Safety net: if a session is still genuinely running (host-side export
@@ -1577,7 +1671,9 @@ function renderGatherNodeNoteSection() {
   if (gatherNoteExpanded) {
     body = `<textarea id="gather-node-note-input" rows="2" placeholder="e.g. near the west wall, behind the crates" style="width:100%; margin-top:8px; resize:vertical; font-family:inherit; font-size:13px; padding:8px; border-radius:6px; background:var(--bg-raised); border:1px solid var(--border-strong); color:var(--text-primary);">${escapeHtml(existing)}</textarea>`;
   }
-  el.innerHTML = `<button type="button" class="mini-btn" id="gather-node-note-toggle">${toggleLabel}</button>${body}`;
+  const zone = gatherZoneCtrl ? gatherZoneCtrl.getValue() : gatheringSession.zone;
+  const screenshotBtn = `<button type="button" class="mini-btn screenshot-trigger-btn" data-subject="${escapeHtml(node)}" data-kind="node" data-zone="${escapeHtml(zone || '')}" style="margin-left:8px;">📷 Submit a screenshot</button>`;
+  el.innerHTML = `<button type="button" class="mini-btn" id="gather-node-note-toggle">${toggleLabel}</button>${screenshotBtn}${body}`;
   document.getElementById('gather-node-note-toggle').addEventListener('click', () => {
     gatherNoteExpanded = !gatherNoteExpanded;
     renderGatherNodeNoteSection();

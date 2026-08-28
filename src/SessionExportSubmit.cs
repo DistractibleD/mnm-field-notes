@@ -1,7 +1,5 @@
 using System;
-using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
 // Mirrors Submit-SessionExport - the one exception to "never write
@@ -26,46 +24,19 @@ internal static class SessionExportSubmitter
         public string Error;
     }
 
-    // MultipartFormDataContent.Add(content, name) does NOT quote the name in
-    // the resulting Content-Disposition header (produces
-    // "name=sessionExport" instead of the RFC 7578-standard
-    // "name=\"sessionExport\""), and Cloudflare Workers' own
-    // request.formData() parser rejects that as unparseable - the Worker
-    // then reports a generic "Invalid submission" error that looks like a
-    // deliberate rejection but is actually just a parse failure. Confirmed
-    // directly against the real Worker: unquoted name always fails,
-    // manually forcing quotes always succeeds. Also strips the quotes .NET
-    // DOES add around the boundary parameter, matching what most real-world
-    // multipart parsers expect there instead.
-    private static StringContent MakeQuotedPart(string value, string name)
-    {
-        var part = new StringContent(value ?? "");
-        part.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
-        {
-            Name = "\"" + name + "\"",
-        };
-        return part;
-    }
-
     public static async Task<Result> SubmitAsync(string sessionText, string title)
     {
         try
         {
             using (var content = new MultipartFormDataContent())
             {
-                content.Add(MakeQuotedPart(sessionText, "sessionExport"));
-                content.Add(MakeQuotedPart(title, "title"));
+                content.Add(MultipartUtil.MakeQuotedPart(sessionText, "sessionExport"));
+                content.Add(MultipartUtil.MakeQuotedPart(title, "title"));
                 // Honeypot field the Worker checks on every submission (real
                 // callers never fill it) - always sent empty, matching the
                 // wiki's own form, even though this isn't a public-facing one.
-                content.Add(MakeQuotedPart("", "website"));
-
-                var boundaryParam = content.Headers.ContentType.Parameters
-                    .FirstOrDefault(p => p.Name == "boundary");
-                if (boundaryParam != null && boundaryParam.Value != null)
-                {
-                    boundaryParam.Value = boundaryParam.Value.Trim('"');
-                }
+                content.Add(MultipartUtil.MakeQuotedPart("", "website"));
+                MultipartUtil.StripBoundaryQuotes(content);
 
                 var response = await Http.PostAsync(Config.SubmitWorkerUrl, content);
                 string body = await response.Content.ReadAsStringAsync();

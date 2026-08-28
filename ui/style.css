@@ -153,6 +153,18 @@ html, body {
 .mini-btn:hover { color: var(--accent-strong); border-color: var(--accent); }
 .mini-btn.active { background: var(--accent-craft); border-color: var(--accent-craft); color: var(--bg-page); font-weight: 600; }
 
+/* Icon-only look for the shared screenshot-submit trigger (backlog #2), used
+   inline next to a monster name where a full .mini-btn with text would be
+   too wide. .screenshot-trigger-btn itself is a bare marker class (delegated
+   click handler matches on it, see setupTooltips-style delegation in app.js)
+   with no styling of its own, so it can also be combined with .mini-btn
+   (Gathering's own trigger, which has room for a label) without clashing. */
+.icon-btn {
+  background: none; border: none; cursor: pointer; font-size: 13px; line-height: 1;
+  padding: 2px; border-radius: 4px; opacity: 0.7;
+}
+.icon-btn:hover { opacity: 1; background: var(--bg-surface); }
+
 /* Fish/Gather skill counters pair a number input with their own -/+ mini-btns -
    the browser's native spinner arrows are redundant next to those, backlog #22. */
 #fish-skill-input, #gather-skill-input { -moz-appearance: textfield; }

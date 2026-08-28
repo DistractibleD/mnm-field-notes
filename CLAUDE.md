@@ -729,3 +729,58 @@ before any code existed: reuse-vs-new-infrastructure, and this hard-rule update 
   ported there). This is still just ONE submitter's local numbers, not a cross-user pooled
   stat — see planned-features.md #21 for the still-open "aggregate across everyone's merged
   submissions" piece, which needs its own design pass on the wiki repo's side.
+
+## Screenshot submissions (2026-08-28, backlog #2) — reuses the wiki's existing pipeline as-is
+
+Attach a screenshot and/or a note to a named monster (Combat) or a gathering node
+(Gathering) — a second, independent use of the same outbound-write exception as session
+export submission above, but this one needed **zero Worker changes**: the wiki's Worker
+already has a complete `screenshot`/`notes`/`website` code path (`handleWikiSubmission` in
+`lib/cloudflare-worker/submit-worker.js`) behind the wiki's own "Submit a Screenshot" form —
+this app just POSTs to those exact same fields, so a submission from the app is
+indistinguishable from one made on the wiki directly once it reaches the Worker.
+
+- **`notes` folding matches the wiki's own client exactly**: `Regarding: Monster — <name>` /
+  `Regarding: Gathering node — <name>`, then `Zone/Map: <zone>` if known, then the user's own
+  note — same labeled-line format the wiki repo's `script.js` (`renderSubmitPage`'s form
+  handler) already builds before POSTing, confirmed by reading that file rather than
+  guessing. The Worker never parses `notes` either way (by design, keeps it domain-agnostic)
+  — matching the format only matters for a human reading the resulting PR.
+- **Only named/boss monsters get the trigger** — the wiki's own submission guide (`script.js`
+  `renderSubmitPage`) states plainly "Only named/boss monsters need a picture — regular
+  monsters don't," so `renderCombatRegularInfo()`'s monster list deliberately has no
+  screenshot button, only `renderCombatNamedInfo()` does. Checked the actual guidance instead
+  of adding it everywhere by default.
+- **UI**: one shared modal (`#screenshot-modal` in `ui/index.html`, `openScreenshotModal()`
+  in `app.js`) reused from two entry points — a small icon-only `.icon-btn` next to each
+  named monster in Combat's landing list, and a `.mini-btn`-styled trigger next to
+  Gathering's per-node note toggle (`renderGatherNodeNoteSection()`) in the material modal,
+  since the node grid's own tiles are already a click-to-log target and can't also host a
+  second click target without ambiguity. `.screenshot-trigger-btn` is a bare marker class
+  with no styling of its own (`.icon-btn`/`.mini-btn` carry the actual look) so the SAME
+  delegated `document`-level click handler (matching the tooltip/checklist delegation
+  pattern already used elsewhere) works for both, regardless of which list rebuilt it most
+  recently via `innerHTML`.
+- **The image never touches the exe's filesystem** — same "webview = UI only" split as
+  everywhere else: `ui/app.js` reads the chosen file via the standard `FileReader`/
+  `readAsDataURL` browser API, sends it to the host as base64 in a `submitScreenshot`
+  message, and `WebMessageRouter.HandleSubmitScreenshotAsync` decodes + POSTs it — the exe
+  still owns 100% of the actual networking, matching Hard Rule #3 and the existing
+  `logEntry`/`submitExport` pattern.
+- **`src/MultipartUtil.cs`** — the `MakeQuotedPart`/boundary-quote-stripping fix from
+  `SessionExportSubmit.cs`'s hard-won `Content-Disposition` gotcha (see "Architecture" above)
+  was factored out into a shared helper the moment a second submitter needed it, plus a new
+  `MakeQuotedFilePart` for a binary part with a quoted `FileName` and a `Content-Type` header
+  — same underlying `ContentDispositionHeaderValue` mechanism as the text-part fix, so the
+  same quoting requirement was assumed (correctly) to generalize to it.
+  `SessionExportSubmitter` was refactored to use the shared helper too, so the fix only has
+  to be right in one place.
+- **Verified against the real live Worker before considering this done**, per the project's
+  own "never trust a generic error" lesson from the session-export bug — two side-effect-free
+  requests via a disposable standalone test program (compiled and run once, then deleted, not
+  part of the shipped app): an unsupported mimetype (`text/plain`) got back the *specific*
+  `"Please attach an image file (PNG, JPG, WEBP, or GIF)."` message, and a 9MB `image/png`
+  payload got back the *specific* `"That screenshot is too large (8MB max)."` message — both
+  prove the binary file part parses correctly through Cloudflare's `request.formData()` and
+  reaches real business logic, and both reject *before* the Worker's `commitAndOpenPr` step,
+  so neither created a real PR or branch.
