@@ -420,3 +420,34 @@ short per the user's own explicit ask ("in not too many words") — this app's o
 2nd-monitor layout is already tight on space (see CLAUDE.md "Visual style"), and the existing
 `README.txt`/in-app tooltips already cover most of the explaining in more detail than a home
 screen should try to repeat.
+
+## 24. Maps: pop-out the viewer into its own window (2026-08-28)
+
+User's own words: "A pop-out function for map. Makes it possible to have the map open and
+still use the app's other tabs." Today's `#map-viewer` (see "Maps tab" in `CLAUDE.md`,
+backlog #13) is a full-screen overlay inside the SAME WebView2 window — `position:fixed;
+inset:0` over everything else, `document.body.style.overflow:'hidden'` while open — so it
+blocks every other tab until closed, by design (matches the wiki's own lightbox, which has
+no reason to support this since it's a single-purpose page). This app is different: someone
+might want the map open for reference (e.g. "where am I relative to that named-mob camp")
+while still tapping through Combat/Gathering to log something.
+
+Not yet scoped - real architectural decision, needs its own pass before building:
+- **A second real OS window** (a second WinForms `Form` + its own `WebView2` control,
+  probably reusing the exact same `SetVirtualHostNameToFolderMapping`/`appassets.local`
+  origin) is the only way to get a genuinely independent, separately-movable/resizable
+  window the user could put on the OTHER monitor while the main app sits on the usual one -
+  closest to what "pop-out" implies. Bigger lift than it sounds: needs its own WebView2
+  environment/user-data-folder handling (or share the main one - check whether WebView2
+  supports two controls on one environment before assuming), a way to hand the SAME
+  `wikiData.maps` array to a second page instance (a fresh `postMessage` round trip from the
+  host, or serialize once and pass at window-creation time), and lifecycle questions (does
+  closing the main window close the map window too, can only one be open at a time, etc).
+- **Alternative, cheaper option worth weighing first**: keep it inside the one window but
+  make the overlay non-blocking - e.g. a docked/resizable panel instead of a full-screen
+  `position:fixed` layer, or just letting clicks outside the image pass through to the tab
+  bar instead of closing the viewer. Doesn't give a genuinely separate window (can't drag it
+  to the other monitor), but is far less work and might satisfy the actual want ("still use
+  the app's other tabs") without the WebView2-multi-window complexity above. Worth explicitly
+  asking the user which they actually want before starting, rather than assuming the literal
+  "pop-out" reading requires a second OS window.
