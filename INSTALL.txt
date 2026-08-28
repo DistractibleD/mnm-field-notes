@@ -50,15 +50,23 @@ Getting updates
 -----------------
 The app checks for a newer version automatically when it opens (and any time
 via "Check for updates" near the top of the window). If one's available
-you'll see a banner with a link to the release page - download that zip and
-unzip it the same way you did this one. Your Data\ and Sessions\ folders are
-just files, so copy them into the new folder first if you want to keep your
-history, or start fresh - either way is fine.
+you'll see a banner with an "Update now" option that downloads and applies it
+for you, then restarts the app - your Data\ and Sessions\ folders are never
+touched by this. "View release" is also there if you'd rather download and
+unzip it yourself the way you did this one (works the same either way; copy
+Data\/Sessions\ into the new folder first if you want to keep your history).
 
 If something goes wrong
 --------------------------
-If the app shows an error message, check Data\error.log - it has more detail
-than the popup does.
+If the app shows an error message while running, check Data\error.log - it
+has more detail than the popup does. If the app fails to even open, look for
+a file called crash.txt next to MnMFieldNotes.exe instead.
+
+If you'd like to help fix whatever went wrong, message Sw4nki#1044 on
+Discord with whatever's in that file. Worth knowing before you do: both
+error.log and crash.txt include full Windows file paths, which means your
+Windows username will be visible in the text you'd be sending - up to you
+whether that's fine to share.
 
 If the very first launch fails with a message about the "WebView2 Runtime"
 or the embedded browser not starting: this app needs Microsoft's WebView2

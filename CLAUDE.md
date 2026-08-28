@@ -738,6 +738,51 @@ update.
   same way taskbar pinning and the native key hook needed it — this sandbox has no
   interactive desktop to drive that specific click through a real WebView2 session.
 
+## Error handling & reporting
+
+Three distinct paths, all funneling into one of two files — no telemetry, nothing ever sent
+anywhere automatically, matching this app's own "nothing is sent automatically" promise
+(README.txt):
+
+1. **`crash.txt`** (repo root, next to the exe) — catches a failure during **startup**,
+   before the app's own window/message loop is even running (`Program.cs` `Main()`'s
+   try/catch around `LaunchApp()`). This is what caught the real MOTW bug from a real
+   recipient (see the `Assembly.LoadFrom` gotcha above) — the one file worth asking for when
+   the app won't even open.
+2. **`Data\error.log`** (`DebugLog.Write`) — catches everything **after** the app is running,
+   from two native C# paths (`Application.ThreadException` for a UI-action failure, shows a
+   MessageBox too; `WebMessageReceived`'s own try/catch for a bug in a `WebMessageRouter`
+   case, logged silently, no popup — a backend logic slip shouldn't interrupt the user the
+   same way a UI-thread crash should) — **plus, as of 2026-08-28, a `jsError` case** closing
+   the one real gap that used to exist: nothing previously caught an error thrown in
+   `ui/app.js` outside its own explicit `{ok, error}` message paths (submitExport/
+   submitScreenshot/applyUpdate/etc.) — it would just vanish into the WebView2 devtools
+   console with nothing surfaced or logged anywhere. `window.addEventListener('error', ...)`
+   and `window.addEventListener('unhandledrejection', ...)` in `app.js` now forward every
+   such error to the host via `sendToHost({type:'jsError', message, source, stack})`, logged
+   into the SAME `error.log` `DebugLog.Write` already uses — one unified log, not a second
+   one. Deliberately silent (no toast/popup) here too, same reasoning as the
+   `WebMessageReceived` path — a JS error could be a real problem or a minor rendering
+   glitch, and popping a dialog for every one would be noisy relative to how rarely this
+   should actually fire. Verified in the browser preview: both a thrown error and a rejected
+   promise correctly produced a `jsError` message with message/source/stack all populated.
+3. **Per-feature inline errors** — session export submission, screenshot submission, and
+   self-update all report their own `{ok, error}` result straight to the page, rendered as
+   specific inline text (a banner or modal), rather than routing through either file above —
+   these are the "did the thing I just clicked work" case, not the "something broke
+   unexpectedly" case the two files above exist for.
+
+**Pointing a user at Discord** (2026-08-28, user's own ask) — the `ThreadException` MessageBox
+and `INSTALL.txt`'s "If something goes wrong" section both now say: if you'd like to help fix
+it, message `Sw4nki#1044` on Discord with what's in `error.log`/`crash.txt`. **Both messages
+explicitly warn that these files contain the user's full Windows file path** (visible
+directly in the friend's own real crash.txt earlier — `C:\Users\jozzd\Downloads\...`), so
+sending one reveals their Windows username — the user's own explicit call: tell people this
+plainly and let them decide, rather than silently including it or building any kind of
+automatic upload. This is deliberately NOT a new outbound-network capability — no code sends
+anything anywhere; it's just clearer in-app/doc text pointing at an already-manual channel
+(a person copy-pasting a file into a DM), so it doesn't touch Hard Rule #3 at all.
+
 ## Wiki data — read-only reference
 
 Wiki JSON files: items/monsters/crafting/gathering-nodes/vendors/trainers/maps/companions/

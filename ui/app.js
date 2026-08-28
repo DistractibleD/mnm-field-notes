@@ -137,12 +137,47 @@ function mockHostRespond(msg) {
     } else if (msg.type === 'setOrientation') {
       mockOrientation = msg.orientation;
       console.log('[mock host] would resize the window + remember orientation:', msg.orientation);
+    } else if (msg.type === 'jsError') {
+      console.log('[mock host] would log to Data\\error.log:', msg.message, msg.source);
     } else if (msg.type === 'applyUpdate') {
       console.log('[mock host] would download+apply update from:', msg.zipUrl);
       deliverFromHost({ type: 'updateApplied', ok: true, error: null });
     }
   }, 50);
 }
+
+// ---------------------------------------------------------------------------
+// Global JS error catching (2026-08-28) - closes a real gap: everywhere else
+// in the app that can fail already reports back through its own explicit
+// {ok, error} message (submitExport/submitScreenshot/applyUpdate/etc.), but
+// nothing caught an error thrown OUTSIDE those paths - it would just vanish
+// into the WebView2 console with nothing surfaced or logged anywhere.
+// Forwards to the SAME Data\error.log every other host-side error already
+// uses (DebugLog.Write, via WebMessageRouter's 'jsError' case) - one
+// unified log, not a second one. Deliberately silent here (no toast/popup),
+// matching WebMessageReceived's own quiet handling of a backend logic
+// error rather than ThreadException's user-facing MessageBox - a JS error
+// could be anything from a real problem to a minor rendering glitch, and
+// popping a dialog for every one would be noisy relative to how rarely
+// this should ever actually fire.
+// ---------------------------------------------------------------------------
+window.addEventListener('error', e => {
+  sendToHost({
+    type: 'jsError',
+    message: e.message || 'Unknown error',
+    source: (e.filename || '') + ':' + e.lineno + ':' + e.colno,
+    stack: e.error && e.error.stack ? e.error.stack : '',
+  });
+});
+window.addEventListener('unhandledrejection', e => {
+  const reason = e.reason;
+  sendToHost({
+    type: 'jsError',
+    message: 'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : String(reason)),
+    source: '',
+    stack: reason && reason.stack ? reason.stack : '',
+  });
+});
 
 // ---------------------------------------------------------------------------
 // State

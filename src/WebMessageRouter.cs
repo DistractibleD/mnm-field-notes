@@ -93,6 +93,11 @@ internal static class WebMessageRouter
             case "applyUpdate":
                 await HandleApplyUpdateAsync(msg, ui, form);
                 break;
+            case "jsError":
+                DebugLog.Write("jsError",
+                    (msg.GetValueOrDefault("message") as string) + " at " + (msg.GetValueOrDefault("source") as string)
+                    + Environment.NewLine + (msg.GetValueOrDefault("stack") as string));
+                break;
         }
     }
 

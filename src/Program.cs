@@ -72,7 +72,8 @@ internal static class Program
             if (Environment.GetEnvironmentVariable("SV_AUTOTEST") != "1")
             {
                 MessageBox.Show(
-                    "Something went wrong and that last action may not have saved. You can keep using the app - if this keeps happening, check Data\\error.log.",
+                    "Something went wrong and that last action may not have saved. You can keep using the app - if this keeps happening, check Data\\error.log for details.\n\n"
+                    + "If you'd like to help fix it, message Sw4nki#1044 on Discord with what's in that file. Just know it includes your full Windows file path, so your username will be visible in it.",
                     "MnM Field Notes");
             }
         };
