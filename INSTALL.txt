@@ -21,15 +21,22 @@ Two new folders appear next to Start.vbs the first time you launch:
 - Data\ - your saved profile name and the running log of everything you log.
   Stays on your computer; nothing here is sent anywhere automatically.
 - Sessions\ - one text file per session, written when you click "End session
-  & export." Hand the relevant file to whoever's updating the wiki when
-  you're ready to share what you logged.
+  & export." Right after, the app offers to submit it straight to the wiki
+  for review (opens a pull request - nothing goes live until a human
+  approves it) - or you can hand the file to whoever's updating the wiki
+  yourself instead, whichever you prefer.
 
 Pinning it to your taskbar
 -----------------------------
-Once it's running, right-click its icon on the taskbar and choose "Pin to
-taskbar." That pin will keep working on future launches too. (Pinning a
-shortcut before ever running the app once isn't supported yet - run it at
-least once first.)
+Run it once first (double-click Start.vbs, same as always). While it's open,
+right-click its icon on the taskbar and choose "Pin to taskbar." From then
+on, that pin will keep showing the right icon and correctly reopen/reactivate
+this same app every time you launch it again.
+
+Note: making a shortcut to Start.vbs (or anything else) and pinning THAT
+before ever running the app doesn't work yet - it'll show a plain script
+icon instead of this app's icon, and won't merge cleanly with the running
+app. Run it at least once, then pin from its taskbar icon while it's open.
 
 Removing it
 ------------
