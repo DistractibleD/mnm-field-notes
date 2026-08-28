@@ -448,6 +448,24 @@ Not yet scoped - real architectural decision, needs its own pass before building
   `position:fixed` layer, or just letting clicks outside the image pass through to the tab
   bar instead of closing the viewer. Doesn't give a genuinely separate window (can't drag it
   to the other monitor), but is far less work and might satisfy the actual want ("still use
-  the app's other tabs") without the WebView2-multi-window complexity above. Worth explicitly
-  asking the user which they actually want before starting, rather than assuming the literal
-  "pop-out" reading requires a second OS window.
+  the app's other tabs") without the WebView2-multi-window complexity above.
+- **User's own follow-up (2026-08-28), adding two more shapes to weigh against the two
+  above**: (a) a side-by-side split view within the app itself - the map stays visible in
+  one pane while whichever tab is active (Combat/Gathering/etc.) renders in the other,
+  rather than a full-screen overlay OR a separate OS window; (b) maps as their own persistent
+  space rather than a tab that has to be switched into/out of - reachable from anywhere in
+  the app regardless of what's currently active, so it's less "pop out of the current view"
+  and more "always available alongside it." Any of these four shapes (second OS window,
+  non-blocking overlay, side-by-side split, always-available space) could satisfy the actual
+  want - this needs a real decision with the user before building, not a guess.
+- **Why this matters enough to get right**: the user's own words - "The big issue that needs
+  to get solved somehow is that the user might very well want to watch the map and use other
+  activities at the same time - Especially when we later add the pins [backlog #14]. The user
+  would run around looking for the locations on the map to harvest the pinned nodes." **The
+  game itself has no in-game map at all** - this is the user's own stated reason the 2nd-monitor
+  map is valuable in the first place, and it's exactly why #14 (pins) was put on hold until
+  "we have better maps" rather than dropped - the pin-and-navigate workflow this is really
+  building toward needs the map visible WHILE the player is actively moving/gathering in-game,
+  not as a thing you close before going back to logging. Keep this framing in mind when #14
+  gets picked up too, not just when this item does - the two are more connected than their
+  separate numbering suggests.
