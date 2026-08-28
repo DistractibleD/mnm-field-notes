@@ -1,7 +1,7 @@
 // Mirrors the top-level config variables in the old MnMFieldNotes.ps1.
 internal static class Config
 {
-    public const string AppVersion = "0.8";
+    public const string AppVersion = "0.9";
     public const string AppBuildDate = "2026-08-28";
     public const string WikiBaseUrl = "https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/";
     public const string UpdateCheckUrl = "https://raw.githubusercontent.com/DistractibleD/mnm-field-notes/main/latest.json";
