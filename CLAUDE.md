@@ -723,21 +723,28 @@ hint incorrectly showed on first paint until any tab was clicked. Fixed by defau
 `#tooltip-hint` to `style="display:none;"` in `index.html` itself, same pattern already used
 for `#update-banner`/`#submit-export-banner`, rather than adding an extra init-time call.
 
-**Still open, not built in this pass**: the user's own follow-up suggested the Home tab
-could show stats too — refined across several messages (2026-08-28) into: activity counts
-broken down by category ("Monsters killed, fish caught, mining nodes mined, trees chopped,
-herbs picked" — the user's own examples, one per tradeskill/Combat rather than one combined
-number), **both GLOBAL/guild-wide AND this install's own LOCAL total, shown alongside each
-other** (the user's own words on the local half: "it would be interesting for the user to
-see how much they have done to contribute"). The local half is the easy one — every category
-count it needs is already sitting in `AllTimeLog.jsonl` today (same file
-`AllTimeLog.GetFishRarity()`/`GetCombatZoneLevelRange()` already read all-time, locally), so
-it's a pure app-side read + Home tab UI, no wiki-side work, buildable independently of the
-global half. The global half needs the same shape as the "Rarity bars" pooled-data mechanism
-(Fishing rarity: a GitHub Action on the wiki side aggregates merged submission PRs into a
-published JSON file, `WikiService.GetSharedFishRarityAsync()` fetches it), generalized from
-"Fishing catch-rate" to "every category's raw activity count" — genuinely bigger scope than
-the existing mechanism covers today, not something built entirely in this repo. See
+**Local activity stats — done (2026-08-28)**: "Your contribution so far" section, below
+"Your data" — one `.stat` tile per real category (Monsters killed/Fish caught/Mining nodes
+mined/Trees chopped/Herbs picked/Dishes cooked, matching the user's own named examples plus
+Cooking for completeness), reusing the exact `.stats`/`.stat` component the session stats
+bars already use rather than inventing new CSS. `AllTimeLog.GetLocalActivityStats()`
+(`SessionLog.cs`) reads `AllTimeLog.jsonl` fresh (same "no new persistence" pattern as
+`GetFishRarity`/`GetCombatZoneLevelRange`), keyed off each entry's `sessionType`/`tradeskill`/
+`success` — Combat entries count as 1 kill each, Fishing/Gathering/Cooking only count
+`success:true` entries, split by `tradeskill`. Sent once as `localActivityStats` alongside
+the other `ready`-time baselines (`WebMessageRouter.HandleReadyAsync`) — a snapshot, not
+live-updating per log entry, since Home isn't an active logging surface. **Hidden entirely
+when every category is 0** (a fresh install with nothing logged yet) — same "all-zero stats
+are noise" reasoning as the session stats bars' own visibility gating. Verified in the
+browser preview both ways: renders correctly with real values, hides itself when all-zero.
+
+**Still open, not built in this pass**: the GLOBAL/guild-wide half of the same idea (shown
+alongside the local numbers above, not instead of them) — needs the same shape as the
+"Rarity bars" pooled-data mechanism (Fishing rarity: a GitHub Action on the wiki side
+aggregates merged submission PRs into a published JSON file,
+`WikiService.GetSharedFishRarityAsync()` fetches it), generalized from "Fishing catch-rate"
+to "every category's raw activity count" — genuinely bigger scope than the existing
+mechanism covers today, not something built entirely in this repo. See
 `To-Do/planned-features.md` #23 for the still-open scoping questions.
 
 ## Session export submission (2026-08-27) — the one outbound-write exception

@@ -82,6 +82,47 @@ internal static class AllTimeLog
         return result;
     }
 
+    // Backlog #23 (Home tab local stats) - this install's own all-time
+    // activity counts, one per real category, same "read AllTimeLog.jsonl
+    // fresh every time" pattern as GetFishRarity/GetCombatZoneLevelRange
+    // above. No new persistence, no wiki-side dependency - unlike the
+    // still-open GLOBAL half of #23, this only needs what's already here.
+    public static Dictionary<string, object> GetLocalActivityStats()
+    {
+        int combatKills = 0, fishCaught = 0, miningNodes = 0, lumberjackingNodes = 0, herbalismNodes = 0, dishesCooked = 0;
+        foreach (var o in ReadAllEntries())
+        {
+            string sessionType = o.GetValueOrDefault("sessionType") as string;
+            string tradeskill = o.GetValueOrDefault("tradeskill") as string;
+            bool success = ToBool(o.GetValueOrDefault("success"));
+
+            if (sessionType == "combat")
+            {
+                combatKills++;
+            }
+            else if (sessionType == "harvesting" && success)
+            {
+                if (tradeskill == "Fishing") fishCaught++;
+                else if (tradeskill == "Mining") miningNodes++;
+                else if (tradeskill == "Lumberjacking") lumberjackingNodes++;
+                else if (tradeskill == "Herbalism") herbalismNodes++;
+            }
+            else if (sessionType == "crafting" && tradeskill == "Cooking" && success)
+            {
+                dishesCooked++;
+            }
+        }
+        return new Dictionary<string, object>
+        {
+            { "combatKills", combatKills },
+            { "fishCaught", fishCaught },
+            { "miningNodes", miningNodes },
+            { "lumberjackingNodes", lumberjackingNodes },
+            { "herbalismNodes", herbalismNodes },
+            { "dishesCooked", dishesCooked },
+        };
+    }
+
     // Rewrites the one matching line in place (by the entry's
     // client-generated id) rather than appending a correction - the log
     // stays append-only for new entries, this is the one deliberate

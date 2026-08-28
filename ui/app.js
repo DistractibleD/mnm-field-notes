@@ -100,6 +100,10 @@ function mockHostRespond(msg) {
           'Night Harbor': { min: 3, max: 9, count: 14 },
         },
       });
+      deliverFromHost({
+        type: 'localActivityStats',
+        data: { combatKills: 42, fishCaught: 15, miningNodes: 8, lumberjackingNodes: 3, herbalismNodes: 0, dishesCooked: 1 },
+      });
     } else if (msg.type === 'checkForUpdates') {
       deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null, manual: true });
     } else if (msg.type === 'openUrl') {
@@ -1068,6 +1072,32 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   updateCombatSessionVisibility();
 }));
 
+// Home tab's local stats (2026-08-28, backlog #23) - this install's own
+// all-time activity counts, sent once at 'ready' (host reads AllTimeLog.jsonl
+// fresh, same as the fishRarity/combatLevelRange baselines). A snapshot, not
+// live-updating per log entry - Home isn't an active logging surface, so
+// there's no reason to wire it into every logKill/logGatherAttempt/etc. call
+// the way the session-scoped stats bars are. Hidden entirely on a fresh
+// install with nothing logged yet - an all-zero grid would just be noise
+// competing with the rest of the tab, same reasoning CLAUDE.md's "This
+// session UI only shows once a session exists" already established for the
+// session stats bars.
+function renderHomeLocalStats(data) {
+  const el = document.getElementById('home-local-stats');
+  if (!el) return;
+  const vals = {
+    'hs-combat': data.combatKills || 0,
+    'hs-fish': data.fishCaught || 0,
+    'hs-mining': data.miningNodes || 0,
+    'hs-lumberjacking': data.lumberjackingNodes || 0,
+    'hs-herbalism': data.herbalismNodes || 0,
+    'hs-cooking': data.dishesCooked || 0,
+  };
+  const anyActivity = Object.values(vals).some(v => v > 0);
+  el.style.display = anyActivity ? '' : 'none';
+  Object.keys(vals).forEach(id => { document.getElementById(id).textContent = vals[id]; });
+}
+
 // ---------------------------------------------------------------------------
 // Session start/end - one button, state-dependent (2026-08-27). Used to be
 // two separate buttons, but the plain "Start session" one could bypass
@@ -1275,6 +1305,8 @@ onHostMessage((msg) => {
   } else if (msg.type === 'gatherNotes') {
     gatherNotesData = msg.data || {};
     if (gatheringSession.active) renderGatherNodeGrid();
+  } else if (msg.type === 'localActivityStats') {
+    renderHomeLocalStats(msg.data || {});
   } else if (msg.type === 'submitExportResult') {
     const el = document.getElementById('submit-export-banner');
     if (msg.ok) {

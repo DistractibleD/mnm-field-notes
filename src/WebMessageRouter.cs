@@ -278,6 +278,7 @@ internal static class WebMessageRouter
         ui.Send(new Dictionary<string, object> { { "type", "sharedFishRarity" }, { "data", await WikiService.GetSharedFishRarityAsync() } });
         ui.Send(new Dictionary<string, object> { { "type", "combatLevelRange" }, { "data", AllTimeLog.GetCombatZoneLevelRange() } });
         ui.Send(new Dictionary<string, object> { { "type", "gatherNotes" }, { "data", GatherNotesStore.Get() } });
+        ui.Send(new Dictionary<string, object> { { "type", "localActivityStats" }, { "data", AllTimeLog.GetLocalActivityStats() } });
     }
 
     private static async Task HandleCheckForUpdatesAsync(UiBridge ui)

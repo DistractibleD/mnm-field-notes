@@ -430,34 +430,31 @@ Verified in the browser preview both before and after the nav-card removal: Home
 the default tab, the tooltip hint stays hidden there and correctly reappears on a
 tooltip-enabled tab, no console errors.
 
-**Still open, not built in this pass** — the stats idea, refined across the user's own
-several follow-ups (2026-08-28) into a fairly specific shape: activity counts broken down
-by category on the Home tab — the user's own examples were "Monsters killed, fish caught,
-mining nodes mined, trees chopped, herbs picked" (i.e. one count per Combat/tradeskill
-category, not one combined number), and **explicitly GLOBAL/guild-wide, not just this
-install's own local total.** Nothing in this app counts/persists any of this today, locally
-or otherwise. This is a bigger lift than the app-side Home tab work above:
+**Local half — done (2026-08-28)**: "Your contribution so far" section added below "Your
+data" on the Home tab — one stat tile per category (Monsters killed, Fish caught, Mining
+nodes mined, Trees chopped, Herbs picked, Dishes cooked — the user's own named examples plus
+Cooking for completeness), reusing the app's existing `.stats`/`.stat` component. Reads
+`AllTimeLog.jsonl` fresh via a new `AllTimeLog.GetLocalActivityStats()`, same pattern as
+`GetFishRarity`/`GetCombatZoneLevelRange`, no new persistence needed. Hides itself entirely
+when every category is 0 (fresh install, nothing logged yet) rather than showing an all-zero
+grid. Full mechanism in `CLAUDE.md` "Home tab." Verified in the browser preview both ways.
+
+**Still open, not built in this pass** — the GLOBAL/guild-wide half of the same idea, shown
+alongside the local numbers above rather than instead of them (user's own words: "In
+adition to the global stats, add local stats too"). The user's original examples ("Monsters
+killed, fish caught, mining nodes mined, trees chopped, herbs picked") are one count per
+Combat/tradeskill category, not one combined number — same category breakdown the local half
+above already uses. This is a bigger lift than the local half:
 - Needs the same shape as "Rarity bars"' pooled-data mechanism (Fishing rarity: a wiki-side
   GitHub Action aggregates merged `session-exports/*.txt` into a published JSON file,
   `Get-SharedFishRarity` fetches it) — but generalized from "Fishing catch-rate specifically"
   to "every category's raw activity count," which the existing mechanism doesn't do today.
   That's wiki-side infrastructure work, not something built entirely in this repo.
-- Real open questions before building: does this read from `AllTimeLog.jsonl`'s existing
-  entry `sessionType`/`target` fields (already has everything needed locally per-install —
-  just needs the wiki-side aggregation to pool it across installs), or does it need its own
-  new counting mechanism; whether it only counts what's actually been submitted/merged
-  (matching how Fishing rarity's own pooled half already works) or every local entry
-  regardless of submission status; and the exact category list/grouping (does "gathering"
-  split by tradeskill like the user's examples suggest, or stay one number).
-- **User's own follow-up (2026-08-28)**: wants LOCAL stats shown too, alongside the global
-  ones, not instead of — "it would be interesting for the user to see how much they have
-  done to contribute." This half is meaningfully easier and doesn't block on any wiki-side
-  work: `AllTimeLog.jsonl` already has everything needed per-install (same file
-  `Get-FishRarity`/`Get-CombatZoneLevelRange` already read all-time, locally, today), so a
-  per-category local count is a pure app-side read + a bit of Home tab UI — no GitHub Action,
-  no published JSON file, no wiki-repo dependency. Worth building this half first/on its own
-  rather than waiting on the global half's bigger wiki-side lift, since it's genuinely
-  independent - the two can land as separate passes.
+- Real open questions before building: whether it only counts what's actually been
+  submitted/merged (matching how Fishing rarity's own pooled half already works) or every
+  local entry regardless of submission status across every install; and whether the
+  wiki-side Action gets extended to compute the same category breakdown the local half now
+  uses, or ends up with its own separate shape.
 
 ## 24. Maps: pop-out the viewer into its own window (2026-08-28)
 
