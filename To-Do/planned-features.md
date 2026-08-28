@@ -260,31 +260,25 @@ AA's 4.5:1 minimum for normal text, confirming it was the real offender. Changed
 one variable changed — `--text-primary`/`--text-secondary` were already fine and left as-is.
 Win98 theme is a separate easter egg and wasn't touched.
 
-## 16. ~~Desktop/taskbar-pinnable icon~~ — done for the main path (2026-08-28)
+## 16. ~~Desktop/taskbar-pinnable icon~~ — done, confirmed on a real machine (2026-08-28)
 
 User asked whether the app can be pinned to the Windows taskbar today — confirmed it
 couldn't, for three compounding reasons (icon + AppUserModelID + `Start.vbs` being a script
-rather than something with its own identity). See "Taskbar-pinnable icon" in `CLAUDE.md` for
-the full mechanism now built: `app.ico` (hand-authored, multi-resolution) set as `$form.Icon`,
-plus `SetCurrentProcessExplicitAppUserModelID` called early with a fixed ID — together these
-mean a user can right-click the RUNNING app's taskbar icon and "Pin to taskbar," and it'll
-correctly re-merge on every future launch. Documented for the recipient in `INSTALL.txt`.
-Verified: the ICO's internal structure (4 correctly-sized PNG-backed entries, byte-verified),
-the P/Invoke call's HRESULT (0/S_OK), `$form.Icon` assigning without error, and the full
-`SV_AUTOTEST` harness running clean with both changes in place. Pinning itself couldn't be
-verified end-to-end (no real interactive taskbar in this environment) — worth a real-machine
-check.
+rather than something with its own identity). The first fix attempt (`$form.Icon` set at
+runtime + `SetCurrentProcessExplicitAppUserModelID`, PS1 era) **turned out insufficient** —
+user tested pinning on a real machine and it still showed the plain PowerShell icon, because
+Windows resolves a pin's icon/identity from the launch executable's own file, not anything
+set at runtime inside it.
 
-**Still open, deliberately not attempted**: a pre-made `.lnk` shortcut pinnable BEFORE ever
-running the app once. That needs the shortcut's own `System.AppUserModel.ID` property set to
-match, which isn't reachable through the simple `WScript.Shell` COM object `Start.vbs` itself
-uses — it needs direct `IShellLinkW`/`IPersistFile`/`IPropertyStore` COM interop, which is
-fragile to get right without being able to click a real taskbar to verify grouping behavior.
-Left open rather than shipped unverified.
+**Actual fix**: migrated the app to a compiled `MnMFieldNotes.exe` (see CLAUDE-HISTORY for
+the full migration writeup) with `app.ico` embedded directly into the exe's PE resources at
+build time (`csc.exe /win32icon:app.ico`, `src/build.ps1`). User re-tested pinning after the
+migration and **confirmed it now shows the app's own icon correctly**. See "Taskbar-pinnable
+icon" in `CLAUDE.md` for the full mechanism.
 
-**Whoever builds the next release zip must include `app.ico`** at the top level alongside
-`MnMFieldNotes.ps1`/`Start.vbs`/etc. — without it the app silently falls back to no custom
-icon (wrapped in try/catch, so it fails quietly, not loudly).
+`legacy/Start.vbs`/`legacy/MnMFieldNotes.ps1` (the old host) no longer need `app.ico` copied
+alongside them — they're not shipped in release zips any more. Whoever builds a release now
+just needs to run `src/build.ps1` with `app.ico` present before zipping.
 
 ## 17. ~~Fishing: clarify "click the fish you caught" wording~~ — done (2026-08-27)
 

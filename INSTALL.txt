@@ -3,12 +3,21 @@ Installing MnM Field Notes
 
 1. Unzip this folder anywhere you like - Desktop, Documents, wherever. No
    installer, no admin rights needed.
-2. Double-click "Start.vbs" to launch it. That's it.
+2. Double-click "MnMFieldNotes.exe" to launch it. That's it.
+
+A note about the security warning
+-----------------------------------
+The first time you run MnMFieldNotes.exe, Windows SmartScreen may show a
+blue "Windows protected your PC" warning, because this app isn't digitally
+signed (a code-signing certificate isn't practical for a small guild tool).
+Click "More info" then "Run anyway" - this only appears once. See
+README.txt for what the app actually does if you'd like to double-check
+first.
 
 What's inside
 --------------
-- Start.vbs / MnMFieldNotes.ps1 - the app itself.
-- app.ico - its icon, used for the window and the taskbar.
+- MnMFieldNotes.exe - the app itself. Its icon is built in, used for the
+  window and the taskbar.
 - ui\ - the window's interface (HTML/CSS/JS), loaded by the app.
 - lib\webview2\ - small loader files the app needs to talk to the WebView2
   Runtime (see "If something goes wrong" below). Already included in this
@@ -17,7 +26,7 @@ What's inside
 
 What shows up after you first run it
 ---------------------------------------
-Two new folders appear next to Start.vbs the first time you launch:
+Two new folders appear next to MnMFieldNotes.exe the first time you launch:
 - Data\ - your saved profile name and the running log of everything you log.
   Stays on your computer; nothing here is sent anywhere automatically.
 - Sessions\ - one text file per session, written when you click "End session
@@ -28,15 +37,9 @@ Two new folders appear next to Start.vbs the first time you launch:
 
 Pinning it to your taskbar
 -----------------------------
-Run it once first (double-click Start.vbs, same as always). While it's open,
-right-click its icon on the taskbar and choose "Pin to taskbar." From then
-on, that pin will keep showing the right icon and correctly reopen/reactivate
-this same app every time you launch it again.
-
-Note: making a shortcut to Start.vbs (or anything else) and pinning THAT
-before ever running the app doesn't work yet - it'll show a plain script
-icon instead of this app's icon, and won't merge cleanly with the running
-app. Run it at least once, then pin from its taskbar icon while it's open.
+Right-click MnMFieldNotes.exe and choose "Pin to taskbar" - or run it first
+and pin from its icon on the taskbar while it's open. Either way works and
+shows the app's own icon, not a generic one.
 
 Removing it
 ------------

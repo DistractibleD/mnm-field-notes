@@ -53,30 +53,72 @@ stacks <900px width. `.stats`/`.field-grid` use `repeat(auto-fit,minmax(...))`.
 
 ## Architecture
 
-PS 5.1 + WinForms hosting a WebView2 control (no browser chrome), HTML/CSS/JS UI. No
-Node/npm/.NET SDK needed — WebView2 Runtime ships with Win11/Edge, the 3 control assemblies
-pulled raw from NuGet. Setup details: CLAUDE-HISTORY.
+Compiled C# (`src/*.cs`) + WinForms hosting a WebView2 control (no browser chrome),
+HTML/CSS/JS UI — built to `MnMFieldNotes.exe` via `src/build.ps1`, which invokes `csc.exe`
+(`C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, the .NET Framework compiler
+already on every Windows install — same one PS's own `Add-Type -TypeDefinition` always used)
+directly: no MSBuild, no `.csproj`, no NuGet client, no SDK install. `/target:winexe`
+(no console) `/platform:x64` (required — `lib\webview2\WebView2Loader.dll` is a native x64
+PE) `/win32icon:app.ico` (embeds the icon in the exe's own PE resources — this is what
+actually fixed taskbar pinning, see "Taskbar-pinnable icon" below). End users need nothing
+beyond what every Windows 10/11 machine already has (.NET Framework + WebView2 Runtime,
+both core OS components) — the `csc.exe` requirement is a *build-time* concern only,
+irrelevant to anyone just running the released zip.
 
-- PS host owns ALL file I/O + networking (wiki fetch, all-time log, session export).
-  WebView2 page = UI only, round-trips via `WebMessageReceived`/`PostWebMessageAsString`.
+- exe owns ALL file I/O + networking (wiki fetch, all-time log, session export).
+  WebView2 page = UI only, round-trips via `WebMessageReceived`/`PostWebMessageAsJson`.
 - `lib/webview2/*.dll` — gitignored redistributables. Re-fetch from NuGet's flat-container
   API if missing (URL pattern + init sequence: CLAUDE-HISTORY).
+- Migrated 2026-08-28 from a PS 5.1 + `Add-Type` host (`legacy/MnMFieldNotes.ps1`) — see
+  CLAUDE-HISTORY for why. Kept only as an unmaintained fallback, not shipped in releases.
 
-### Gotcha: Timer inside a nested handler must be `$script:`-scoped
+### Gotcha: JIT resolves a method's types before running any of its statements
 
-A Timer created inside another handler's own scriptblock (e.g. inside `Add_Shown` or a
-`WebMessageReceived` case) MUST be `$script:` scope, never local —
-`$timer.Add_Tick({$timer.Stop()...})` resolves `$timer` to `$null` inside its own closure
-when declared ≥2 levels nested → "cannot call method on null-valued expression" every tick,
-infinite loop. Caused 2 real crashes (CLAUDE-HISTORY "Harvesting/Fishing keypress counter").
-Top-level-scope Timers (1 level nesting) are fine. When in doubt: `$script:` it.
+Registering `AppDomain.AssemblyResolve` (needed so `lib/webview2`'s managed DLLs get found —
+a compiled exe doesn't auto-probe that folder the way `Add-Type -Path` did) and touching a
+WebView2 type in the SAME method silently fails to load, even with the registration written
+first — the JIT resolves every type a method body references before executing any of that
+method's statements, so "textually first" doesn't mean "in effect first." Fix: `Main()` has
+ZERO WebView2 type references (just registers the resolver + calls `LaunchApp()`);
+`LaunchApp()` (marked `[MethodImpl(MethodImplOptions.NoInlining)]`, so the optimizer can't
+merge it back into `Main()`) is where all WebView2-touching code actually lives.
+`CoreWebView2Environment.SetLoaderDllFolderPath` handles the separate native
+`WebView2Loader.dll` (native DLL loading doesn't go through `AssemblyResolve` at all).
+
+### Gotcha: `JavaScriptSerializer.DeserializeObject` returns `object[]`, not `ArrayList`, for JSON arrays
+
+Checking only `ArrayList` (the commonly-documented return type) silently produced empty
+lists — monsters/zones/items all `Count=0` — with **no exception anywhere**, for every
+nested array value too (a monster's `drops`/`areas`, `Profiles.json`'s `"profiles"` array,
+not just top-level responses). Fixed with one centralized `JsonUtil.AsObjectList(value)`
+checking `ArrayList`/`object[]`/`List<object>` in order — use it everywhere a JSON array is
+read, never an ad-hoc `as ArrayList` cast.
+
+### Gotcha: `MultipartFormDataContent` doesn't quote the `name` param
+
+`.Add(content, name)` produces `Content-Disposition: form-data; name=sessionExport`
+(unquoted) instead of the RFC 7578-standard `name="sessionExport"` — Cloudflare Workers'
+`request.formData()` throws on the unquoted form, surfaced as a generic
+`"Invalid submission — please try again."` that looks like a deliberate rejection but is
+actually just a parse failure. Fixed in `SessionExportSubmit.cs`'s `MakeQuotedPart` by
+manually building `ContentDispositionHeaderValue` with `Name = "\"" + name + "\""`. **Lesson
+that cost real debugging time**: an earlier "verification" during the migration had hit this
+same bug on an oversized payload and misread it as the size-safety check working — never
+trust a generic error as proof a specific check fired; verify you're hitting the SPECIFIC
+message that code path actually produces.
 
 ### Gotcha: native hook callbacks must be minimal
 
-`SetWindowsHookEx` callback = flag/counter only, nothing else. NEVER call `Send-ToUI` or
-anything that re-enters PS/WebView2/COM from inside the native callback. Use a separate
-`$script:`-scoped polling Timer to actually react. Why: (1) caused the crash above, (2)
-Windows silently uninstalls slow hooks.
+`SetWindowsHookEx` callback = flag/counter only, nothing else, still true in C#. NEVER call
+`UiBridge.Send`/`.Stop()`/anything that re-enters WinForms/COM from inside the native
+callback (`KeyHookController.HookCallback`) — use a separate `Timer` (`PollTick`, on the
+normal UI thread) to actually react. Why: (1) caused 2 real crashes in the PS1 era
+(CLAUDE-HISTORY "Harvesting/Fishing keypress counter"), (2) Windows silently uninstalls slow
+hooks. The delegate (`_delegate` in `KeyHook.cs`) must be a live instance field, not a local
+— the GC can collect it while the native hook still holds a pointer to its thunk. This is a
+P/Invoke fundamental, not PS-specific — carried over unchanged. (The PS1-era
+`$script:`-scoped-Timer gotcha this callback rule used to be paired with was PowerShell-only
+and doesn't apply in C#; retired to CLAUDE-HISTORY.)
 
 ### Profiles
 
@@ -496,15 +538,25 @@ pass when picked up.
 
 ## File layout
 
-- `MnMFieldNotes.ps1` — WinForms host, all file I/O + networking, all message handlers.
-- `app.ico` — the app's icon (window + taskbar), committed (not gitignored, unlike
-  `lib/webview2/`'s DLLs) — small and hand-authored, not a fetched redistributable.
-  **Whoever builds a release zip must include this file** alongside `MnMFieldNotes.ps1`/
-  `Start.vbs`/etc. — see "Taskbar-pinnable icon" below for what breaks if it's left out.
+- `src/*.cs` — the app itself, one file per concern (`Program.cs` entry point,
+  `MainForm.cs` window/WebView2 setup, `WebMessageRouter.cs` the message-type switch,
+  `WikiData.cs`/`Profiles.cs`/`SessionLog.cs`/`SessionExport.cs`/`SessionExportSubmit.cs`/
+  `GatherNotes.cs` data + networking, `KeyHook.cs`+`Native/` the low-level hook,
+  `JsonUtil.cs`/`UiBridge.cs`/`AppPaths.cs`/`Config.cs`/`DebugLog.cs` shared plumbing,
+  `Autotest.cs` the SV_AUTOTEST harness). `src/build.ps1` compiles all of it via `csc.exe`
+  into `MnMFieldNotes.exe` at the repo root (gitignored build output, rebuild before every
+  release).
+- `app.ico` — the app's icon, committed (not gitignored, unlike `lib/webview2/`'s DLLs) —
+  small and hand-authored, not a fetched redistributable. Embedded directly into the exe's
+  PE resources at build time via `/win32icon` — **whoever builds a release must run
+  `src/build.ps1` with `app.ico` present**, not just zip up a stale exe.
 - `ui/` — `index.html`+`style.css`+`app.js`, served via `SetVirtualHostNameToFolderMapping`
   (origin `appassets.local`, not `file://`). `hasHost` check + dev mock (`mockHostRespond`)
-  for browser preview via `lib/serve-ui.ps1` (mock never runs in the real app).
-- `Start.vbs` — silent launcher.
+  for browser preview via `lib/serve-ui.ps1` (mock never runs in the real app). Unchanged by
+  the C# migration — same DOM/JS bridge either host speaks.
+- `legacy/` — `MnMFieldNotes.ps1` + `Start.vbs`, the original PS 5.1 host, kept only as an
+  unmaintained fallback (see CLAUDE-HISTORY for why it was replaced). Not shipped in release
+  zips, not touched for new features.
 - `lib/webview2/` — gitignored DLLs.
 - `lib/serve-ui.ps1` — dev-only preview server, not shipped.
 - `lib/webview2-smoketest.ps1`, `lib/keyhook-spike*.ps1` — isolated diagnostic scripts,
@@ -517,7 +569,7 @@ pass when picked up.
   `WebView2UserData\`, `error.log` (ThreadException handler).
 - `Sessions\` (gitignored): per-session export txts.
 
-## Taskbar-pinnable icon (2026-08-28, backlog #16)
+## Taskbar-pinnable icon (2026-08-28, backlog #16 — done)
 
 User asked whether the app could be pinned to the taskbar — it couldn't, for three
 compounding reasons (see backlog #16 for the full original diagnosis): `Start.vbs` is a
@@ -525,42 +577,35 @@ script (Windows won't offer "Pin to taskbar" on it directly), it launches `power
 hidden to host the window (so any pin would group under PowerShell's own identity, not a
 distinct app one), and the window never had its own icon.
 
-**What's built**: `app.ico` (multi-resolution — 16/32/48/256px, PNG-compressed entries per
-the Vista+ ICO format) is now set as `$form.Icon`. Artwork went through two iterations:
-first a hand-drawn placeholder via `System.Drawing` (a plain notepad glyph, since no
-external image tool was available to Claude directly), then replaced (2026-08-28) with
-user-supplied artwork generated via ChatGPT — a flat two-tone gold-on-`--bg-page`-dark icon
-combining a sword, hammer, mining pick, and book (matching Combat/Crafting/Gathering/
-Fishing), no text, resized down from the source PNG via `System.Drawing`'s high-quality
-bicubic scaling into the same 4-size ICO container. **Known accepted tradeoff**: four
-distinct objects is a lot of detail for a 16-32px taskbar icon specifically — verified via
-scaled-down previews that it reads clearly at 256px/48px but blurs into a less distinct
-shape at 32px and especially 16px. Kept anyway, user's own call, since it still reads fine
-at every OTHER size the icon actually appears at (title bar, Alt-Tab, desktop/Start).
-Separately,
-`SetCurrentProcessExplicitAppUserModelID` (P/Invoke to `shell32.dll`, via an inline
-`Add-Type -TypeDefinition` C# snippet — this JITs through the .NET Framework's own bundled
-compiler, no external SDK needed, consistent with this project's existing "no Node/npm/.NET
-SDK" constraint) is called with a fixed string (`DistractibleD.MnMFieldNotes`) early in the
-script, before any window exists. Both wrapped in `try`/`catch` — neither should ever be
-able to stop the app from starting.
+**First attempt (PS1 era, insufficient)**: `$form.Icon` set at runtime +
+`SetCurrentProcessExplicitAppUserModelID` called early in the script. This looked right in
+reasoning but **failed real-world testing** — user confirmed pinning still showed the plain
+PowerShell icon. Root cause: Windows resolves a pin's icon/identity from the **launch
+executable's own PE resources/path**, not anything set at runtime inside the process —
+`powershell.exe` is still what gets pinned no matter what the hosted window does to itself
+after launch. This is exactly why the exe migration happened (see CLAUDE-HISTORY) — no
+runtime trick can fix this for a script-launched process.
 
-**Why this combination is what actually solves it**: an explicit AppUserModelID is what
-gives the RUNNING window its own distinct taskbar identity (instead of inheriting
-`powershell.exe`'s). Because the ID is a fixed string set the same way on every launch, a
-user can right-click the running app's taskbar icon and choose "Pin to taskbar" — Windows
-pins that identity, and every future launch (same fixed ID) correctly re-merges into that
-same pinned slot. Documented for the recipient in `INSTALL.txt`.
+**Actual fix**: `app.ico` (multi-resolution — 16/32/48/256px, PNG-compressed entries per
+the Vista+ ICO format; artwork = user-supplied ChatGPT-generated flat two-tone
+gold-on-`--bg-page`-dark icon combining a sword/hammer/pick/book) is embedded directly into
+`MnMFieldNotes.exe`'s own PE resources at build time via `csc.exe /win32icon:app.ico` (see
+`src/build.ps1`). Because the icon lives in the exe's own file data rather than being set
+after the process starts, Explorer can show the correct icon on `MnMFieldNotes.exe` even
+before it's ever been run, and pinning it — from the file directly, or from its running
+taskbar icon — resolves to that same identity every time. `SetCurrentProcessExplicitAppUserModelID`
+(now `Native/AppIdentity.cs`, called from `Program.cs`, still fixed string
+`DistractibleD.MnMFieldNotes`, still wrapped in try/catch so it can never block startup) is
+still set for good measure (keeps grouping correct across window instances) but is no longer
+carrying the whole fix by itself the way the PS1-era attempt assumed. **Confirmed on a real
+machine** — user tested pinning after the exe migration and confirmed the app's own icon
+now shows correctly, not PowerShell's.
 
-**Deliberately NOT attempted**: a pre-made `.lnk` shortcut a user could pin BEFORE ever
-running the app once. That's a materially harder, riskier problem — a shortcut's own
-`System.AppUserModel.ID` property (needed so a pre-pinned shortcut merges correctly with the
-later-running window) isn't exposed by the simple `WScript.Shell` COM automation object
-(`Start.vbs`'s own technique); setting it requires direct `IShellLinkW`/`IPersistFile`/
-`IPropertyStore` COM interop, which is fragile to get right blind and impossible to verify
-in a sandbox with no real interactive taskbar to click "Pin" on and observe grouping
-behavior. Left open rather than shipped unverified — see backlog #16's remaining note if
-picked up again.
+**Known accepted tradeoff**: four distinct objects is a lot of detail for a 16-32px taskbar
+icon specifically — verified via scaled-down previews that it reads clearly at 256px/48px
+but blurs into a less distinct shape at 32px and especially 16px. Kept anyway, user's own
+call ("use as is"), since it still reads fine at every OTHER size the icon appears at (title
+bar, Alt-Tab, desktop/Start).
 
 ## Update checking
 

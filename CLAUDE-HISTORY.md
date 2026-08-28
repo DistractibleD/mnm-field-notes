@@ -264,3 +264,60 @@ this documentation change did on its own. If update-checking or guild distributi
 infrastructure gets built next (see `To-Do/planned-features.md` #5), it can now be scoped
 on its own technical merits instead of first re-litigating whether hosting anything
 anywhere is acceptable at all.
+
+
+## PS1 → compiled C# .exe migration (2026-08-28)
+
+Backlog #16 (taskbar pinning) shipped a first fix — `$form.Icon` + `SetCurrentProcessExplicitAppUserModelID`
+called at runtime from `MnMFieldNotes.ps1` — that looked complete in reasoning but **failed
+real-machine testing**: the user pinned the app and it still showed the plain PowerShell
+icon. Root cause: `Start.vbs` launches `powershell.exe -File ... -WindowStyle Hidden`, so
+Windows always resolves a taskbar pin's icon/identity from `powershell.exe` itself — nothing
+set at runtime *inside* the hosted window can change what gets pinned, because a pin has to
+resolve correctly even when the app isn't running.
+
+The only real fix is a dedicated compiled `.exe` with the icon embedded in its own PE
+resources — how every normal Windows app works. User confirmed they wanted this ("I want us
+to make the app run as a normal windows app, with exe files"), explicitly still with **no
+installer** (same portable unzip-anywhere experience), and accepted the one real trade-off
+(an unsigned exe triggers a SmartScreen warning on first run) with a request to document it
+plainly in `INSTALL.txt` without repeating the app's whole privacy story there.
+
+**Toolchain constraint**: this machine has no .NET SDK (`dotnet` fails entirely), but
+`csc.exe` (`C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`) — the legacy .NET
+Framework C# compiler, the same one PowerShell's own `Add-Type -TypeDefinition` already used
+for this project's two inline-C# blocks — is present on every Windows install. `src/build.ps1`
+invokes it directly: no MSBuild, no `.csproj`, no NuGet client. End users need nothing new
+either way — .NET Framework is already a core OS component, exactly like the WebView2
+Runtime already was.
+
+**Ported file-for-file** from `MnMFieldNotes.ps1`'s own section boundaries into `src/*.cs`
+(see `CLAUDE.md` "File layout" for the map), staged so each stage left a runnable exe:
+toolchain proof → empty shell (verify the actual pinning fix on a real machine before
+investing further) → data/session core (`ready`, wiki fetch, profiles) → session logging +
+local export (diffed byte-for-byte against the PS1 build's own `SV_AUTOTEST` output) →
+submit-export → native key hook last (most crash-prone, verified via both `SendKeys`
+simulation and real physical keypresses on a real machine) → docs.
+
+Three genuinely non-obvious bugs found and fixed during the port, each documented as its own
+gotcha in `CLAUDE.md` "Architecture": the JIT resolving a method's referenced types before
+running any of its own statements (broke `AssemblyResolve` registration when done in the same
+method that first touches a WebView2 type), `JavaScriptSerializer.DeserializeObject` returning
+`object[]` rather than the commonly-assumed `ArrayList` for JSON arrays (silently produced
+empty lists everywhere, no exception), and `MultipartFormDataContent` not quoting the `name`
+parameter in `Content-Disposition` (broke real submissions against the wiki's Cloudflare
+Worker, surfaced only as a generic "Invalid submission" error indistinguishable from a
+deliberate rejection).
+
+**Verified on a real machine, not just in this sandbox**: taskbar pinning now shows the
+app's own icon correctly (the entire point of the migration); the native key hook counted a
+real physical keypress correctly during an actual Fishing test; a real session export
+submission succeeded end-to-end against the live Cloudflare Worker + wiki PR flow.
+
+`MnMFieldNotes.ps1`/`Start.vbs` moved to `legacy/` once all three of the above were
+confirmed (the condition the migration plan itself set for retiring them) — kept only as an
+unmaintained fallback, not shipped in release zips, not touched for new features going
+forward. The PS1-only `$script:`-scoped-Timer closure gotcha (see "Harvesting/Fishing
+keypress counter" above) doesn't exist in C# and was dropped from `CLAUDE.md`'s active rules
+for that reason, not because the underlying lesson (native hook callbacks must stay minimal)
+stopped mattering — that half carried over unchanged.

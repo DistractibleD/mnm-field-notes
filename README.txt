@@ -25,9 +25,7 @@ anything directly. Nothing is ever sent automatically.
 
 How to run it
 --------------
-Double-click "Start.vbs". This starts the app with no console window popping
-up. (You can also right-click MnMFieldNotes.ps1 and choose "Run with
-PowerShell" if you prefer to see the console.)
+Double-click "MnMFieldNotes.exe".
 
 Using it
 --------
