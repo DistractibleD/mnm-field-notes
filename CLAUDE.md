@@ -697,14 +697,16 @@ the alphabetical grid) — that's wiki homepage curation, not needed for a looku
 ## Home tab (2026-08-28, backlog #23) — permanent, not a first-run modal
 
 Now the FIRST tab, active by default on launch (`#panel-home`, `.tab[data-tab="home"]` first
-in the tab bar) — welcome blurb + a `.home-nav-card` grid, one card per real tab
-(Combat/Gathering/Fishing/Cooking/Crafting/Multi/Maps), each a one-line "what this tab does"
-description; clicking a card triggers the real tab button's own `.click()` rather than
-duplicating any tab-switch logic. Adapted from the wiki's own `renderHomePage`/
-`.home-nav-grid` (confirmed via that repo's `script.js`/`style.css`), but text-only (no
-per-tab icon set exists in this app, and the whole point is brevity) and each card describes
-what clicking it DOES rather than just naming an already-self-explanatory wiki page title.
-No changelog section (wiki-only concept, nothing analogous here).
+in the tab bar) — plain static HTML in `index.html` (no dynamic wiki data needed, so no JS
+render function): a welcome blurb, a short "How it works" bulleted list (landing info without
+a session, starting a session, one-tap logging, export/submit), and a short "Your data"
+paragraph (local-by-default, submissions go through review, the profile name isn't an
+account). Initially built with a `renderHomePage`-style nav-card grid mirroring the wiki's
+own Home page, one card per tab — **removed** (2026-08-28, user's own call): "we don't need
+the button... as the tabs are easily accessible and not too many. Use the space for general
+information instead." The tab bar itself already does what the cards were duplicating; the
+freed-up space went to the fuller "How it works"/"Your data" text instead. No changelog
+section either way (wiki-only concept, nothing analogous here).
 
 **Explicitly a permanent tab, not a one-time/dismissible first-launch panel** — asked the
 user directly given this was a real fork in how the feature works (adds a permanent 8th tab
@@ -722,15 +724,18 @@ hint incorrectly showed on first paint until any tab was clicked. Fixed by defau
 for `#update-banner`/`#submit-export-banner`, rather than adding an extra init-time call.
 
 **Still open, not built in this pass**: the user's own follow-up suggested the Home tab
-could show stats too, e.g. how many submissions (screenshots/session exports) have been
-sent — then corrected (2026-08-28): **explicitly a GLOBAL/guild-wide count, not just this
-install's own local total.** `SessionExportSubmit.cs`/`ScreenshotSubmit.cs` only report
-success/failure per call today, no running total anywhere, local or otherwise. A global
-count needs the same shape as the "Rarity bars" pooled-data mechanism (Fishing rarity: a
-GitHub Action on the wiki side aggregates merged submission PRs into a published JSON file,
-`WikiService.GetSharedFishRarityAsync()` fetches it) — this doesn't exist yet for
-submissions generally. See `To-Do/planned-features.md` #23 for the still-open scoping
-questions (what counts as "a submission" across both pipelines, combined vs. split by type).
+could show stats too — refined across three messages (2026-08-28) into: activity counts
+broken down by category ("Monsters killed, fish caught, mining nodes mined, trees chopped,
+herbs picked" — the user's own examples, one per tradeskill/Combat rather than one combined
+number), and **explicitly GLOBAL/guild-wide, not just this install's own local total.**
+Nothing in this app counts/persists any of this today, locally or otherwise —
+`SessionExportSubmit.cs`/`ScreenshotSubmit.cs` only report success/failure per call. A
+global per-category count needs the same shape as the "Rarity bars" pooled-data mechanism
+(Fishing rarity: a GitHub Action on the wiki side aggregates merged submission PRs into a
+published JSON file, `WikiService.GetSharedFishRarityAsync()` fetches it), generalized from
+"Fishing catch-rate" to "every category's raw activity count" — a bigger scope than the
+existing mechanism covers today. See `To-Do/planned-features.md` #23 for the still-open
+scoping questions.
 
 ## Session export submission (2026-08-27) — the one outbound-write exception
 

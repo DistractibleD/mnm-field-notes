@@ -88,45 +88,27 @@
 
   <div class="panel-body active" id="panel-home">
     <h2 style="font-family:'Sora',sans-serif; font-weight:600; margin:0 0 8px;">Welcome</h2>
-    <p style="color:var(--text-secondary); font-size:13.5px; max-width:56ch;">
+    <p style="color:var(--text-secondary); font-size:13.5px; max-width:60ch;">
       MnM Field Notes is a manual-entry companion for logging what you do in
       <em>Monsters and Memories</em>, so a session's kills, catches, and gathers can help
       update the wiki later. Everything here is typed by hand &mdash; the app never reads or
-      touches the game itself. Pick a tab below to get started.
+      touches the game itself, the same way keeping a notebook open next to it wouldn't.
     </p>
-    <div class="home-nav-grid">
-      <div class="home-nav-card" data-tab="combat">
-        <div class="home-nav-card-name">Combat</div>
-        <div class="home-nav-card-desc">Log kills, loot, and faction changes as you fight.</div>
-      </div>
-      <div class="home-nav-card" data-tab="gathering">
-        <div class="home-nav-card-name">Gathering</div>
-        <div class="home-nav-card-desc">Log nodes, materials, and skill as you gather.</div>
-      </div>
-      <div class="home-nav-card" data-tab="fishing">
-        <div class="home-nav-card-name">Fishing</div>
-        <div class="home-nav-card-desc">Log casts and catches with minimal taps.</div>
-      </div>
-      <div class="home-nav-card" data-tab="cooking">
-        <div class="home-nav-card-name">Cooking</div>
-        <div class="home-nav-card-desc">Log dish attempts and the buffs they give.</div>
-      </div>
-      <div class="home-nav-card" data-tab="craft">
-        <div class="home-nav-card-name">Crafting</div>
-        <div class="home-nav-card-desc">Still being built.</div>
-      </div>
-      <div class="home-nav-card" data-tab="multi">
-        <div class="home-nav-card-name">Multi</div>
-        <div class="home-nav-card-desc">Still being built &mdash; mixed sessions.</div>
-      </div>
-      <div class="home-nav-card" data-tab="maps">
-        <div class="home-nav-card-name">Maps</div>
-        <div class="home-nav-card-desc">Browse zone maps &mdash; pan and zoom to explore.</div>
-      </div>
-    </div>
-    <p style="color:var(--text-muted); font-size:12.5px; margin-top:6px;">
-      Most tabs show useful info even before you start a session &mdash; pick one and look
-      around. Start a session from the bar up top whenever you're ready to log something.
+
+    <h3 style="font-family:'Sora',sans-serif; font-weight:600; font-size:14px; margin:22px 0 8px;">How it works</h3>
+    <ul style="color:var(--text-secondary); font-size:13.5px; max-width:60ch; margin:0; padding-left:20px; line-height:1.6;">
+      <li>Combat, Gathering, Fishing, and Cooking all show useful info for whatever zone you pick &mdash; named/regular monsters, expected nodes, catch-rate estimates &mdash; even before you start a session.</li>
+      <li>Start a session from the bar up top when you're ready to log something. Gathering and Fishing walk you through their own quick setup (zone, skill) and start one for you.</li>
+      <li>Logging is built for speed, not forms &mdash; mostly one-tap grids and small counters, not long fields to fill in every time.</li>
+      <li>"End session &amp; export" writes a plain-text summary to the <code>Sessions\</code> folder, and offers to submit it straight to the wiki for review.</li>
+    </ul>
+
+    <h3 style="font-family:'Sora',sans-serif; font-weight:600; font-size:14px; margin:22px 0 8px;">Your data</h3>
+    <p style="color:var(--text-secondary); font-size:13.5px; max-width:60ch;">
+      Everything you log stays on your own computer unless you choose to submit it. A
+      submission goes to the wiki's review queue as a pull request &mdash; nothing is added
+      automatically, a human decides. The name you picked on first launch is just a plain
+      text label attached to what you log, not an account of any kind.
     </p>
   </div>
 

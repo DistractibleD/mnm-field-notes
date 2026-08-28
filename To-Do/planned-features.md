@@ -407,14 +407,18 @@ correct IDs.
 User's own words: "Like we have on the wiki i think we should have a 'home' screen on the
 app, wishing users welcome, explaining what the app does (in not too many words), telling
 them how it works and how to navigate." Built as a new first/default tab (`#panel-home`) —
-short welcome blurb + a nav-card grid, one card per real tab, each a one-line description of
-what it does; clicking a card jumps straight there. Adapted from the wiki's own
-`renderHomePage`, scoped down (no changelog, no per-tab icons) since "not too many words"
-was an explicit part of the ask. Full mechanism in `CLAUDE.md` "Home tab."
+welcome blurb, a short "How it works" list, and a short "Your data" note. Full mechanism in
+`CLAUDE.md` "Home tab."
 
 **Asked the user directly** whether this should be a permanent tab or a one-time/dismissible
 first-launch panel — a real fork in how the feature works, not something to guess at.
 Confirmed: permanent tab, matching how the wiki's own Home page works.
+
+**Iterated once already**: first built with a `renderHomePage`-style nav-card grid (one card
+per tab, mirroring the wiki's own Home page) — then the user asked for it to be removed
+("we don't need the button... as the tabs are easily accessible and not too many. Use the
+space for general information instead"), so the grid came out and the freed space went to
+the fuller "How it works"/"Your data" text instead.
 
 Found and fixed a real latent bug while wiring this up: `#tooltip-hint`'s visibility was
 only ever set by the tab-click handler, never initialized at page load — invisible before
@@ -422,21 +426,29 @@ because Combat (both the old default tab AND tooltip-enabled) happened to make t
 default look correct by coincidence. Home becoming the new default (no tooltips) surfaced
 it. Fixed by defaulting the element to `display:none` in the markup itself.
 
-Verified in the browser preview: Home renders as the default tab, the tooltip hint stays
-hidden there and correctly reappears when a card navigates to a tooltip-enabled tab (tested
-via the Fishing card), and no console errors.
+Verified in the browser preview both before and after the nav-card removal: Home renders as
+the default tab, the tooltip hint stays hidden there and correctly reappears on a
+tooltip-enabled tab, no console errors.
 
-**Still open, not built in this pass** — user's own follow-up: the Home tab could show
-stats too, e.g. how many submissions (screenshots/session exports) have been sent.
-**Explicitly GLOBAL/guild-wide, not just this install's own local count** (user's own
-follow-up correction) — meaning a simple local counter in `Data\` isn't enough on its own;
-this needs the same shape as "Rarity bars"' pooled-data mechanism in `CLAUDE.md` (Fishing
-rarity: a wiki-side GitHub Action aggregates merged `session-exports/*.txt`/submission PRs
-into a published JSON file, `Get-SharedFishRarity` fetches it) — a wiki-side counting
-mechanism that doesn't exist yet for submissions generally, not just an app-side change.
-Scope this properly (what counts as "a submission" across both the session-export AND
-screenshot pipelines, whether it's a single combined number or split by type) before
-building, rather than assuming a local count is what was actually asked for.
+**Still open, not built in this pass** — the stats idea, refined across the user's own
+several follow-ups (2026-08-28) into a fairly specific shape: activity counts broken down
+by category on the Home tab — the user's own examples were "Monsters killed, fish caught,
+mining nodes mined, trees chopped, herbs picked" (i.e. one count per Combat/tradeskill
+category, not one combined number), and **explicitly GLOBAL/guild-wide, not just this
+install's own local total.** Nothing in this app counts/persists any of this today, locally
+or otherwise. This is a bigger lift than the app-side Home tab work above:
+- Needs the same shape as "Rarity bars"' pooled-data mechanism (Fishing rarity: a wiki-side
+  GitHub Action aggregates merged `session-exports/*.txt` into a published JSON file,
+  `Get-SharedFishRarity` fetches it) — but generalized from "Fishing catch-rate specifically"
+  to "every category's raw activity count," which the existing mechanism doesn't do today.
+  That's wiki-side infrastructure work, not something built entirely in this repo.
+- Real open questions before building: does this read from `AllTimeLog.jsonl`'s existing
+  entry `sessionType`/`target` fields (already has everything needed locally per-install —
+  just needs the wiki-side aggregation to pool it across installs), or does it need its own
+  new counting mechanism; whether it only counts what's actually been submitted/merged
+  (matching how Fishing rarity's own pooled half already works) or every local entry
+  regardless of submission status; and the exact category list/grouping (does "gathering"
+  split by tradeskill like the user's examples suggest, or stay one number).
 
 ## 24. Maps: pop-out the viewer into its own window (2026-08-28)
 
