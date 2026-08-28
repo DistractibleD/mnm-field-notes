@@ -526,10 +526,18 @@ hidden to host the window (so any pin would group under PowerShell's own identit
 distinct app one), and the window never had its own icon.
 
 **What's built**: `app.ico` (multi-resolution — 16/32/48/256px, PNG-compressed entries per
-the Vista+ ICO format, hand-authored via `System.Drawing` since no external image tool was
-available — a dark rounded square with a gold spiral-bound notepad glyph, reflecting the
-"Field Notes" name rather than a generic monogram; matches this app's own `--bg-page`/
-`--accent` colors) is now set as `$form.Icon`. Separately,
+the Vista+ ICO format) is now set as `$form.Icon`. Artwork went through two iterations:
+first a hand-drawn placeholder via `System.Drawing` (a plain notepad glyph, since no
+external image tool was available to Claude directly), then replaced (2026-08-28) with
+user-supplied artwork generated via ChatGPT — a flat two-tone gold-on-`--bg-page`-dark icon
+combining a sword, hammer, mining pick, and book (matching Combat/Crafting/Gathering/
+Fishing), no text, resized down from the source PNG via `System.Drawing`'s high-quality
+bicubic scaling into the same 4-size ICO container. **Known accepted tradeoff**: four
+distinct objects is a lot of detail for a 16-32px taskbar icon specifically — verified via
+scaled-down previews that it reads clearly at 256px/48px but blurs into a less distinct
+shape at 32px and especially 16px. Kept anyway, user's own call, since it still reads fine
+at every OTHER size the icon actually appears at (title bar, Alt-Tab, desktop/Start).
+Separately,
 `SetCurrentProcessExplicitAppUserModelID` (P/Invoke to `shell32.dll`, via an inline
 `Add-Type -TypeDefinition` C# snippet — this JITs through the .NET Framework's own bundled
 compiler, no external SDK needed, consistent with this project's existing "no Node/npm/.NET
