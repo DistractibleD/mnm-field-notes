@@ -527,8 +527,9 @@ distinct app one), and the window never had its own icon.
 
 **What's built**: `app.ico` (multi-resolution — 16/32/48/256px, PNG-compressed entries per
 the Vista+ ICO format, hand-authored via `System.Drawing` since no external image tool was
-available — a bevelled dark rounded square with a bold gold "M", matching this app's own
-`--bg-page`/`--accent` colors) is now set as `$form.Icon`. Separately,
+available — a dark rounded square with a gold spiral-bound notepad glyph, reflecting the
+"Field Notes" name rather than a generic monogram; matches this app's own `--bg-page`/
+`--accent` colors) is now set as `$form.Icon`. Separately,
 `SetCurrentProcessExplicitAppUserModelID` (P/Invoke to `shell32.dll`, via an inline
 `Add-Type -TypeDefinition` C# snippet — this JITs through the .NET Framework's own bundled
 compiler, no external SDK needed, consistent with this project's existing "no Node/npm/.NET
