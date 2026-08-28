@@ -662,6 +662,38 @@ already hosts source-for, not a git write, and this project's own copy of that W
 lives here, not there — the wiki repo's copy stays untouched). Published site = `GET` only,
 never written to.
 
+## Maps tab (2026-08-28, backlog #13) — pan/zoom viewer, ported from the wiki
+
+New top-level tab (`#panel-maps`, `renderMapsPanel()` in `app.js`). Grid of map cards
+grouped by base name (`Shaded Dunes` / `Shaded Dunes (Numbered)` collapse into one card with
+a variant link) → click opens a full-size pan/zoom overlay (`#map-viewer`). Deliberately
+ported near-verbatim from the wiki's own `#map-viewer`/`.maps-grid` (`script.js`/`style.css`
+there) rather than built fresh — same fit-to-view scale computation, same scroll-to-zoom/
+click-drag-to-pan mechanics, same thumbnail-then-full-swap loading (full maps can be tens of
+MB), same prev/next blink-once animation when a multi-variant area first opens. CSS ported
+with this app's own variable names substituted for the wiki's (`--bg`/`--bg-panel`/
+`--text-dim`/`--accent-dim` → `--bg-surface`/`--bg-raised`/`--text-muted`/`--border-strong`).
+No "featured maps" curation panel (the wiki pins "Aethoril"/"Calafrey & Szurr Regions" above
+the alphabetical grid) — that's wiki homepage curation, not needed for a lookup tool tab here.
+
+- **`WikiService.FetchWikiDataAsync()` already fetched `maps.json`** (only used it for
+  `Zones` before) — now also forwards `{name, image, thumbnail}` as `wikiData.Maps`, with
+  `image`/`thumbnail` turned into absolute URLs (`Config.WikiBaseUrl + relative path`) host-side.
+- **The image bytes never touch the exe** — unlike every other wiki fetch (JSON, all
+  `HttpClient`-routed per "exe owns ALL file I/O + networking"), a map image is loaded by a
+  plain `<img src="https://...">` tag directly in the WebView2 page, the same way the wiki
+  itself displays it. This is a deliberate, reasoned exception, not an oversight: there's no
+  processing benefit to routing image bytes through the host (unlike JSON, which gets
+  reshaped/combined with local data), and doing so would mean base64 bloat (~33%), blocking
+  the postMessage channel on tens-of-MB payloads, and reinventing browser caching that a
+  native `<img>` tag already gets for free. Still `GET`-only, still HTTPS, still the published
+  site — doesn't touch the "read-only for DATA" rule above, that rule is about writes.
+  Incidentally resolves backlog #13's one open loose end (`aethoril.webp` failing a .NET
+  image-format check) without any special-casing — nothing here ever decodes the bytes in
+  C#, only passes the URL through as a string; Chromium's own `<img>` handles WebP natively.
+- **No pins/annotations** (backlog #14) — explicitly deferred, user's own call (2026-08-28):
+  "wait until we have better maps." Not attempted in this pass.
+
 ## Session export submission (2026-08-27) — the one outbound-write exception
 
 Until now this app only ever READ the wiki (JSON fetch) or opened it in a browser (`openUrl`)

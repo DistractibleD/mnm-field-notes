@@ -213,25 +213,40 @@ owner.
   Maps below?) — the original instruction was explicit and unconditional, so this was built
   as asked without blocking on that curiosity.
 
-## 13. Maps tab — pan/zoom map viewer (2026-08-27)
+## 13. ~~Maps tab — pan/zoom map viewer~~ — done (2026-08-28)
 
-A new top-level tab. Existing precedent worth reusing rather than building pan/zoom from
-scratch: the wiki already has its own full-screen pan/zoom map lightbox
-(`#map-viewer`/`#map-viewer-img` in the wiki's `style.css`/`script.js`) — check whether that
-implementation (or its approach) can be mirrored/adapted here before inventing a new one.
+Built exactly as scoped below: mirrored the wiki's own `#map-viewer` pan/zoom lightbox
+(that repo's `script.js`/`style.css`) near-verbatim rather than inventing a new one — same
+fit-to-view scale math, scroll-to-zoom/drag-to-pan mechanics, thumbnail-then-full swap, and
+prev/next blink animation for multi-variant areas. Full mechanism in `CLAUDE.md` "Maps tab" —
+not duplicated here.
 
-The wiki's 29 map images vary wildly in resolution (400×631 up to 9702×5821, 20x+
-difference), aspect ratio, and per-zone variant count (several zones have 2-4 map images —
-isometric/mob-levels/numbered/schematic — not one canonical map). **User's own call,
-2026-08-27, after checking the actual assets: this is NOT a blocker for the viewer itself**
-— pan/zoom just adapts to whatever image it's given, same as it already does on the wiki
-today. Only relevant once pins (#14) exist — see that item for why. One unrelated loose end:
-`aethoril.webp` couldn't be read by a standard .NET image check while inspecting these —
-likely fine in WebView2's own Chromium engine, but worth confirming rather than assuming.
+The map-inconsistency concern (varying resolutions/aspect ratios/variant counts) turned out
+to be a non-issue for the viewer itself, confirmed by the user's own 2026-08-27 call below —
+pan/zoom just adapts to whatever it's given. The `aethoril.webp` loose end resolved itself:
+the image is loaded by a plain `<img>` tag directly in the WebView2 page (Chromium), never
+decoded by any .NET code on the host side, so the earlier "couldn't be read by a standard
+.NET image check" finding never applied to how this actually got built.
 
-## 14. Maps tab — user pin annotations (2026-08-27)
+Verified in the browser preview (mock host, placeholder SVG "maps" standing in for real wiki
+images): grid renders grouped-by-area with variant links, viewer opens fit-to-screen,
+scroll-to-zoom confirmed via a dispatched wheel event, prev/next navigation between variants
+works with the blink animation, a single-image area correctly hides the nav arrows, and
+Escape closes the viewer.
 
-Depends on #13 existing first. User-contributed pins placed on the map:
+**Still open, deliberately not attempted**: no "featured maps" curated panel (the wiki pins
+"Aethoril"/"Calafrey & Szurr Regions" above its alphabetical grid) — that's homepage
+curation content specific to the wiki's own audience, not needed for a lookup tool tab here.
+
+## 14. Maps tab — user pin annotations (2026-08-27) — on hold, waiting on better map assets
+
+Depends on #13 (now built). **User's own call, 2026-08-28, right as #13 was being picked up:
+"Wait with the map pin function - This has to wait untill we have better maps."** Don't start
+this until the user explicitly says the map assets are ready — this reinforces (doesn't just
+repeat) the #13 note below about why map-image inconsistency specifically matters here even
+though it didn't block the viewer itself.
+
+User-contributed pins placed on the map:
 - Small icon + tooltip (reuses the app's own `data-tip` system) — the tooltip is the user's
   own free-text comment about what's found there or why the spot's worth noting.
 - Two pin-ownership tiers: the user's OWN pins (local, immediate, no review needed), and

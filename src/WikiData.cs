@@ -22,6 +22,7 @@ internal static class WikiService
         public List<object> Recipes = new List<object>();
         public List<string> Factions = new List<string>();
         public List<string> Zones = new List<string>();
+        public List<object> Maps = new List<object>();
         public string PageUrl = Config.WikiBaseUrl;
         public string Error;
     }
@@ -104,6 +105,27 @@ internal static class WikiService
                 .Distinct()
                 .OrderBy(z => z, StringComparer.Ordinal)
                 .ToList();
+
+            // Full name (with any "(Variant)" suffix intact - the client
+            // groups by base name itself, same as the wiki's own
+            // groupMapsByArea) + absolute image URLs, so ui/app.js can just
+            // point an <img> straight at the published site - the image
+            // itself is a plain browser-native fetch, never routed through
+            // this exe's own HttpClient (unlike the JSON data above), since
+            // there's no processing benefit and it would mean re-inventing
+            // browser caching for tens-of-MB map images.
+            result.Maps = maps.Select(m =>
+            {
+                var d = AsMap(m);
+                string image = d.GetValueOrDefault("image") as string;
+                string thumbnail = d.GetValueOrDefault("thumbnail") as string;
+                return (object)new Dictionary<string, object>
+                {
+                    { "name", d.GetValueOrDefault("name") },
+                    { "image", string.IsNullOrEmpty(image) ? null : Config.WikiBaseUrl + image },
+                    { "thumbnail", string.IsNullOrEmpty(thumbnail) ? null : Config.WikiBaseUrl + thumbnail },
+                };
+            }).ToList();
         }
         catch (Exception ex)
         {

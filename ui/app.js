@@ -29,6 +29,15 @@ if (hasHost) {
 // WebView2 app, where `hasHost` is true and this is skipped entirely).
 let mockSessionCounter = 0;
 const mockProfiles = { profiles: [], lastUsed: null }; // start empty to exercise the first-run modal
+// Self-contained placeholder art for the Maps tab's mock data (below) - a
+// big flat-colored rectangle with the name on it, big enough (2000x1400) to
+// meaningfully exercise the real viewer's zoom/pan math in preview, unlike
+// the real multi-thousand-pixel wiki images this mock never fetches.
+function mockMapSvg(label, color) {
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1400"><rect width="2000" height="1400" fill="${color}"/><text x="50%" y="50%" font-size="90" fill="white" text-anchor="middle" font-family="sans-serif">${label}</text></svg>`
+  );
+}
 function mockHostRespond(msg) {
   setTimeout(() => {
     if (msg.type === 'ready') {
@@ -58,6 +67,12 @@ function mockHostRespond(msg) {
         ],
         factions: ['Bends Garrison', 'Citizens of Night Harbor', 'Orcs', 'Pyrmos Mercenaries', 'Steel Talons', 'Ten Hooks', 'Vermahn\'s Brood'],
         zones: ['Night Harbor', 'Shaded Dunes', 'Sungreet Strand', 'Vale of Zintar', 'Evershade Weald'],
+        maps: [
+          { name: 'Night Harbor', image: mockMapSvg('Night Harbor', '#2b6'), thumbnail: null },
+          { name: 'Shaded Dunes', image: mockMapSvg('Shaded Dunes', '#c93'), thumbnail: null },
+          { name: 'Shaded Dunes (Numbered)', image: mockMapSvg('Shaded Dunes (Numbered)', '#a72'), thumbnail: null },
+          { name: 'Sungreet Strand', image: mockMapSvg('Sungreet Strand', '#39c'), thumbnail: null },
+        ],
         pageUrl: 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/',
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
@@ -120,7 +135,7 @@ function mockHostRespond(msg) {
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [], pageUrl: '' };
+const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [], maps: [], pageUrl: '' };
 
 const session = {
   id: null,
@@ -694,6 +709,251 @@ document.getElementById('screenshot-modal-submit').addEventListener('click', () 
   }
 });
 
+// ---------------------------------------------------------------------------
+// Maps tab (2026-08-28, backlog #13) - a pan/zoom map viewer, ported from
+// the wiki's own #map-viewer (that repo's script.js/style.css) rather than
+// built fresh, since this project's own CLAUDE.md explicitly calls that out
+// as existing precedent worth reusing. No pins/annotations here (backlog
+// #14) - user's own call, waiting on better map assets first.
+//
+// wikiData.maps is {name, image, thumbnail} per entry, image/thumbnail
+// already absolute URLs built host-side (WikiData.cs) - the <img> tags
+// below fetch them directly via WebView2's own Chromium networking, same as
+// any web page loading an image, not routed through the exe's HttpClient
+// (unlike the JSON wiki data) - no per-image processing happens on either
+// side, so there's no benefit to a host round trip, only cost (base64
+// bloat, reinventing browser caching for tens-of-MB map images). This also
+// sidesteps the one open question backlog #13 flagged (whether a .NET image
+// decoder could read aethoril.webp) - nothing here ever decodes the image
+// bytes in C#, only passes the URL through as a string.
+// ---------------------------------------------------------------------------
+
+// Maps sharing a base name (e.g. "Shaded Dunes" / "Shaded Dunes (Numbered)")
+// are the same in-game area rendered more than once - strip a trailing
+// "(...)" to get the shared base name, same convention the wiki's own
+// mapBaseName/mapVariantLabel/groupMapsByArea use (ported near-verbatim).
+function mapBaseName(name) {
+  return (name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+function mapVariantLabel(name) {
+  const m = (name || '').match(/\(([^)]*)\)\s*$/);
+  return m ? m[1] : name;
+}
+function groupMapsByArea(maps) {
+  const order = [];
+  const byBase = new Map();
+  maps.forEach(m => {
+    const base = mapBaseName(m.name);
+    if (!byBase.has(base)) { byBase.set(base, []); order.push(base); }
+    byBase.get(base).push(m);
+  });
+  return order.map(base => ({ base, entries: byBase.get(base) })).sort((a, b) => a.base.localeCompare(b.base));
+}
+
+function renderMapCardHTML(g, gi) {
+  const primary = g.entries[0];
+  const variants = g.entries.slice(1);
+  return `
+    <div class="map-card" data-group-index="${gi}">
+      <img class="map-card-thumb" src="${escapeHtml(primary.thumbnail || primary.image)}" alt="${escapeHtml(g.base)}" loading="lazy">
+      <div class="map-card-name">${escapeHtml(g.base)}</div>
+      ${variants.length ? `
+        <div class="map-card-variants">
+          ${variants.map((v, vi) => `<a href="#" class="map-card-variant-link" data-group-index="${gi}" data-variant-index="${vi + 1}">${escapeHtml(mapVariantLabel(v.name))}</a>`).join('')}
+        </div>
+      ` : ''}
+    </div>`;
+}
+
+let mapGroups = [];
+function renderMapsPanel() {
+  const el = document.getElementById('panel-maps');
+  if (!el) return;
+  mapGroups = groupMapsByArea(wikiData.maps || []);
+  if (!mapGroups.length) {
+    el.innerHTML = `<p class="landing-info-empty">No maps loaded yet - needs a working internet connection.</p>`;
+    return;
+  }
+  el.innerHTML = `
+    <p style="color:var(--text-secondary); font-size:13.5px; margin-bottom:14px;">Click a map to view it full size. Scroll to zoom, click and drag to pan.</p>
+    <div class="maps-grid">${mapGroups.map((g, gi) => renderMapCardHTML(g, gi)).join('')}</div>
+  `;
+  el.querySelectorAll('.map-card').forEach(card => {
+    const gi = Number(card.dataset.groupIndex);
+    card.addEventListener('click', () => openMapViewer(mapGroups[gi].entries, 0));
+  });
+  el.querySelectorAll('.map-card-variant-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const gi = Number(link.dataset.groupIndex);
+      const vi = Number(link.dataset.variantIndex);
+      openMapViewer(mapGroups[gi].entries, vi);
+    });
+  });
+}
+
+// Full-size pan/zoom viewer - a single overlay created once and reused for
+// every map. Source images vary wildly in native pixel size (some are
+// 9000px+ wide per the wiki's own asset survey, see backlog #13), so the
+// zoomed-out floor and starting view are computed per image rather than
+// fixed, or a large map would open already too "zoomed in" with no way to
+// scroll out far enough to see the whole thing.
+let mapViewerScale = 1;
+let mapViewerMinScale = 0.1;
+let mapViewerMaxScale = 6;
+let mapViewerX = 0;
+let mapViewerY = 0;
+let mapViewerDragging = false;
+let mapViewerMoved = false;
+let mapViewerStartX = 0;
+let mapViewerStartY = 0;
+let mapViewerGroup = [];
+let mapViewerIndex = 0;
+
+function computeMapViewerFitScale(img) {
+  const naturalW = img.naturalWidth || 1;
+  const naturalH = img.naturalHeight || 1;
+  const availW = window.innerWidth * 0.94;
+  const availH = window.innerHeight * 0.9;
+  return Math.min(availW / naturalW, availH / naturalH);
+}
+function applyMapViewerTransform() {
+  const img = document.getElementById('map-viewer-img');
+  img.style.transform = `translate(${mapViewerX}px, ${mapViewerY}px) scale(${mapViewerScale})`;
+}
+
+function setupMapViewer() {
+  if (document.getElementById('map-viewer')) return;
+  const viewer = document.createElement('div');
+  viewer.id = 'map-viewer';
+  viewer.innerHTML = `
+    <button id="map-viewer-close" aria-label="Close">&times;</button>
+    <button id="map-viewer-prev" aria-label="Previous map of this area" title="Previous map of this area">
+      <svg class="map-viewer-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 L8 12 L15 19"/></svg>
+    </button>
+    <img id="map-viewer-img" alt="">
+    <button id="map-viewer-next" aria-label="Next map of this area" title="Next map of this area">
+      <svg class="map-viewer-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 L16 12 L9 19"/></svg>
+    </button>
+    <div id="map-viewer-hint">Scroll to zoom &middot; drag to pan</div>
+  `;
+  document.body.appendChild(viewer);
+  const img = viewer.querySelector('#map-viewer-img');
+
+  viewer.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    mapViewerScale = Math.min(mapViewerMaxScale, Math.max(mapViewerMinScale, mapViewerScale * factor));
+    applyMapViewerTransform();
+  }, { passive: false });
+
+  img.addEventListener('mousedown', e => {
+    e.preventDefault();
+    mapViewerDragging = true;
+    mapViewerMoved = false;
+    mapViewerStartX = e.clientX - mapViewerX;
+    mapViewerStartY = e.clientY - mapViewerY;
+    img.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!mapViewerDragging) return;
+    mapViewerMoved = true;
+    mapViewerX = e.clientX - mapViewerStartX;
+    mapViewerY = e.clientY - mapViewerStartY;
+    applyMapViewerTransform();
+  });
+  window.addEventListener('mouseup', () => {
+    mapViewerDragging = false;
+    img.classList.remove('dragging');
+  });
+
+  viewer.addEventListener('click', e => {
+    if (mapViewerMoved) { mapViewerMoved = false; return; }
+    if (e.target === viewer) closeMapViewer();
+  });
+  viewer.querySelector('#map-viewer-close').addEventListener('click', closeMapViewer);
+  viewer.querySelector('#map-viewer-prev').addEventListener('click', e => { e.stopPropagation(); navigateMapViewer(-1); });
+  viewer.querySelector('#map-viewer-next').addEventListener('click', e => { e.stopPropagation(); navigateMapViewer(1); });
+
+  document.addEventListener('keydown', e => {
+    if (!viewer.classList.contains('open')) return;
+    if (e.key === 'Escape') closeMapViewer();
+    else if (e.key === 'ArrowLeft') navigateMapViewer(-1);
+    else if (e.key === 'ArrowRight') navigateMapViewer(1);
+  });
+}
+
+// Full-size maps can be tens of MB, so <img> keeps showing whatever was
+// previously open until the new one finishes downloading - show the
+// (usually already-cached) small thumbnail immediately so the correct map
+// appears right away, then swap in the full-quality image once it's done
+// loading in the background.
+function showMapViewerEntry(entry) {
+  const img = document.getElementById('map-viewer-img');
+  img.alt = entry.name;
+  const fitToViewer = () => {
+    const fitScale = computeMapViewerFitScale(img);
+    mapViewerMinScale = fitScale;
+    mapViewerMaxScale = Math.max(6, fitScale * 6);
+    mapViewerScale = fitScale;
+    mapViewerX = 0;
+    mapViewerY = 0;
+    applyMapViewerTransform();
+  };
+  const showAndFit = src => {
+    img.onload = fitToViewer;
+    img.src = src;
+    if (img.complete && img.naturalWidth) fitToViewer();
+  };
+  const thumbSrc = entry.thumbnail;
+  const fullSrc = entry.image;
+  const hasThumb = thumbSrc && thumbSrc !== fullSrc;
+  showAndFit(hasThumb ? thumbSrc : fullSrc);
+  if (hasThumb) {
+    const fullImg = new Image();
+    fullImg.onload = () => showAndFit(fullSrc);
+    fullImg.src = fullSrc;
+  }
+}
+
+function updateMapViewerNav() {
+  const viewer = document.getElementById('map-viewer');
+  const showNav = mapViewerGroup.length > 1;
+  const prev = viewer.querySelector('#map-viewer-prev');
+  const next = viewer.querySelector('#map-viewer-next');
+  prev.style.display = showNav ? 'flex' : 'none';
+  next.style.display = showNav ? 'flex' : 'none';
+  if (showNav) {
+    [prev, next].forEach(btn => {
+      btn.classList.remove('map-viewer-nav-btn-play');
+      void btn.offsetWidth;
+      btn.classList.add('map-viewer-nav-btn-play');
+    });
+  }
+}
+function navigateMapViewer(delta) {
+  if (mapViewerGroup.length < 2) return;
+  mapViewerIndex = (mapViewerIndex + delta + mapViewerGroup.length) % mapViewerGroup.length;
+  showMapViewerEntry(mapViewerGroup[mapViewerIndex]);
+}
+function openMapViewer(group, index) {
+  setupMapViewer();
+  mapViewerGroup = group;
+  mapViewerIndex = index;
+  const viewer = document.getElementById('map-viewer');
+  viewer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  updateMapViewerNav();
+  showMapViewerEntry(mapViewerGroup[mapViewerIndex]);
+}
+function closeMapViewer() {
+  const viewer = document.getElementById('map-viewer');
+  if (!viewer) return;
+  viewer.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
 document.getElementById('check-updates-link').addEventListener('click', e => {
   e.preventDefault();
   sendToHost({ type: 'checkForUpdates' });
@@ -963,10 +1223,12 @@ onHostMessage((msg) => {
     wikiData.recipes = msg.recipes || [];
     wikiData.factions = msg.factions || [];
     wikiData.zones = msg.zones || [];
+    wikiData.maps = msg.maps || [];
     wikiData.pageUrl = msg.pageUrl || '';
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
     refreshDishList();
+    renderMapsPanel();
     // Fishing/Gathering's landing screens build their zone picker's options
     // from wikiData.zones inline in a bigger template rendered once at init
     // (before this message has arrived, so wikiData.zones was still empty

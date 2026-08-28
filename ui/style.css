@@ -415,6 +415,86 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .detail { padding: 14px 14px; }
 }
 
+/* ---------- Maps tab (2026-08-28, backlog #13) - grid + pan/zoom viewer,
+   adapted from the wiki's own #map-viewer/.maps-grid (that repo's
+   style.css) rather than invented fresh, using this app's own CSS variable
+   names (wiki --bg/--bg-panel/--text-dim/--accent-dim -> this app's
+   --bg-surface/--bg-raised/--text-muted/--border-strong). ---------- */
+.maps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+.map-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: zoom-in;
+  text-align: center;
+  overflow: hidden;
+}
+.map-card:hover { border-color: var(--accent); }
+.map-card img.map-card-thumb {
+  width: 100%; height: 140px; object-fit: cover; display: block;
+  margin: 0; border: 0; border-bottom: 1px solid var(--border);
+}
+.map-card-name { padding: 8px 10px; font-size: 13.5px; }
+.map-card:hover .map-card-name { color: var(--accent); }
+.map-card-variants { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; padding: 0 10px 10px; }
+.map-card-variant-link { font-size: 11.5px; color: var(--text-muted); text-decoration: underline; cursor: pointer; }
+.map-card-variant-link:hover { color: var(--accent); }
+
+#map-viewer {
+  display: none; position: fixed; inset: 0; background: rgba(10,11,14,0.94); z-index: 300;
+  align-items: center; justify-content: center; overflow: hidden;
+}
+#map-viewer.open { display: flex; }
+#map-viewer-img {
+  max-width: none; max-height: none; cursor: grab; user-select: none; -webkit-user-drag: none;
+  transform-origin: center center; border-radius: 0; border: 0; margin: 0;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+}
+#map-viewer-img.dragging { cursor: grabbing; }
+#map-viewer-close {
+  position: absolute; top: 18px; right: 24px; background: var(--bg-raised); border: 1px solid var(--border-strong);
+  color: var(--text-primary); font-size: 1.4rem; line-height: 1; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+}
+#map-viewer-close:hover { color: var(--accent); }
+#map-viewer-prev, #map-viewer-next {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: var(--bg-raised); border: 2px solid var(--accent); color: var(--accent);
+  width: 34px; height: 180px; border-radius: 17px; cursor: pointer; display: none;
+  align-items: center; justify-content: center; z-index: 1;
+  box-shadow: 0 0 18px rgba(224,166,64,0.45); transition: background 0.15s ease, color 0.15s ease;
+}
+#map-viewer-prev { left: 20px; }
+#map-viewer-next { right: 20px; }
+#map-viewer-prev:hover, #map-viewer-next:hover { background: var(--accent); color: var(--bg-page); }
+.map-viewer-nav-icon { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+#map-viewer-hint {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); color: var(--text-muted);
+  font-size: 12px; background: var(--bg-raised); border: 1px solid var(--border-strong); padding: 6px 14px;
+  border-radius: 20px; pointer-events: none;
+}
+/* Blinks the prev/next buttons 3x when a multi-map area first opens, so a
+   user notices they exist - same reasoning/animation as the wiki's own. */
+#map-viewer-prev.map-viewer-nav-btn-play, #map-viewer-next.map-viewer-nav-btn-play {
+  animation: map-viewer-nav-btn-blink 3.6s ease-in-out 1;
+}
+@keyframes map-viewer-nav-btn-blink {
+  0%, 100% { background: var(--bg-raised); color: var(--accent); box-shadow: 0 0 18px rgba(224,166,64,0.45); }
+  13%, 37%, 60% { background: var(--accent); color: var(--bg-page); box-shadow: 0 0 30px rgba(224,166,64,0.9); }
+  23%, 47%, 70% { background: var(--bg-raised); color: var(--accent); box-shadow: 0 0 18px rgba(224,166,64,0.45); }
+}
+@media (max-width: 900px) {
+  .maps-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .map-card img.map-card-thumb { height: 100px; }
+  #map-viewer-prev, #map-viewer-next { width: 28px; height: 130px; }
+  #map-viewer-prev { left: 8px; }
+  #map-viewer-next { right: 8px; }
+}
+
 /* ---------- "I am old" theme (2026-08-27) - a fun easter egg toggle, not a
    second real design system: re-skins the app as Windows 98 by redefining
    the same CSS variables everything else already uses, plus flattening

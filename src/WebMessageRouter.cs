@@ -258,6 +258,7 @@ internal static class WebMessageRouter
             { "recipes", wikiData.Recipes },
             { "factions", wikiData.Factions },
             { "zones", wikiData.Zones },
+            { "maps", wikiData.Maps },
             { "pageUrl", wikiData.PageUrl },
             { "error", wikiData.Error },
         });
