@@ -386,3 +386,22 @@ of scope, no side buttons) still shows its native spinner as expected; the activ
 `#fish-skill-input` (in scope) does not, and typing a value into it directly still works.
 Confirmed via `document.styleSheets` inspection that both CSS rules load and target the
 correct IDs.
+
+## 23. App-side "home" screen, like the wiki's (2026-08-28)
+
+User's own words: "Like we have on the wiki i think we should have a 'home' screen on the
+app, wishing users welcome, explaining what the app does (in not too many words), telling
+them how it works and how to navigate." Mirrors the wiki's own `renderHomePage` — a welcome
+blurb + nav cards — but scoped down for this app's own audience (someone who already has the
+zip and is looking at a running desktop window, not a first-time visitor landing on a public
+site from a search engine), so needs its own pass rather than a straight port.
+
+Not yet scoped: whether this is its own top-level tab/screen (competing with the existing
+Combat/Gathering/Fishing/etc. tab bar - see "Landing info" in `CLAUDE.md`, which already
+gives every tab a no-session-needed browse view, arguably covering some of the same "come in
+and find something useful immediately" goal) or a one-time/dismissible first-launch panel
+(closer to how `#profile-modal` already greets a brand-new install). Whichever it is, keep it
+short per the user's own explicit ask ("in not too many words") — this app's own portrait
+2nd-monitor layout is already tight on space (see CLAUDE.md "Visual style"), and the existing
+`README.txt`/in-app tooltips already cover most of the explaining in more detail than a home
+screen should try to repeat.
