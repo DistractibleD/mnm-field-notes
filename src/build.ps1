@@ -26,6 +26,7 @@ foreach ($dll in @($wv2Core, $wv2Forms)) {
 $refs = @(
     'System.dll', 'System.Core.dll', 'System.Windows.Forms.dll',
     'System.Drawing.dll', 'System.Net.Http.dll', 'System.Web.Extensions.dll',
+    'System.IO.Compression.dll', 'System.IO.Compression.FileSystem.dll',
     $wv2Core, $wv2Forms
 ) -join ','
 

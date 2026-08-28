@@ -666,9 +666,77 @@ automatically) and this repo's own history was merged into it (`git merge
 --allow-unrelated-histories`, preserving both commit histories). `$UpdateCheckUrl` and
 `latest.json`'s own `url` field were both repointed to the new name anyway even though
 `raw.githubusercontent.com` turned out to redirect the old one fine — don't lean on that
-redirect for a future rename, repoint both by hand and verify. No self-update — download/replace is manual,
-deliberately, given the
-trust-boundary jump of an app downloading+running its own replacement code.
+redirect for a future rename, repoint both by hand and verify. **Self-update now exists** —
+see "Self-update" below — `latest.json` also carries a `zipUrl` field alongside `version`/
+`url` for this, pointing at that specific version's own release asset directly (not a
+"latest" pattern URL, since GitHub doesn't offer a stable one for an asset whose filename
+changes per version) — **update this by hand alongside `version`/`url` on every release**, or
+the update banner's "Update now" button silently points at stale bytes.
+
+## Self-update (2026-08-28) — a real trust-boundary jump, confirmed with the user first
+
+Until now this app only ever downloaded DATA (JSON) or opened a browser tab (`openUrl`) —
+self-update is the first time it downloads and **executes** code fetched from the internet,
+exactly the risk this file used to cite as the reason self-update wasn't built. Built only
+after explicitly walking the user through that tradeoff and getting a clear go-ahead
+(2026-08-28) — same confirm-first treatment as session export submission's own hard-rule
+update.
+
+- **What it does**: the existing `#update-banner` (see "Update checking" above) gets an
+  "Update now" link alongside "View release"/"Dismiss", shown whenever `latest.json`'s
+  `zipUrl` field is present. Clicking it (after a client-side + host-side "no session
+  running" check, see below) downloads that version's release zip, extracts it, replaces
+  only the release-shipped files, and relaunches — no separate confirmation dialog beyond the
+  banner itself, matching how "Submit" on the export banner already treats one click as
+  sufficient confirmation for an additive, recoverable action.
+- **`Data\`/`Sessions\` survive by construction, not by a preserve-list** — `AppUpdater.
+  ApplyUpdateAsync` (`src/AppUpdater.cs`) only ever touches `MnMFieldNotes.exe`, `ui\`,
+  `lib\webview2\`, `README.txt`, `INSTALL.txt` — the exact set of files the release zip
+  itself contains (see "File layout"). `Data\`/`Sessions\` are gitignored and created fresh
+  on first run, so they were never part of the zip to begin with; the update logic simply
+  never has a reason to mention them, which is a stronger guarantee than an explicit
+  "don't delete these" exception would be.
+- **No separate helper program** — verified directly (a disposable throwaway test, not
+  assumed) that Windows allows renaming a currently-**executing** exe to a new name, writing
+  a brand new file at the vacated original path, and the still-running (renamed) process
+  carries on completely unaffected. So `MnMFieldNotes.exe` can replace its own file in-place:
+  rename the running exe to `MnMFieldNotes.exe.old`, copy the new one into the vacated path,
+  `Process.Start` it, then the OLD (still-running-as-`.old`) process closes itself shortly
+  after (`WebMessageRouter.HandleApplyUpdateAsync`'s short delayed `form.Close()`, mirroring
+  `HandleEndSession`'s own autotest close-timer). `ui\`/`lib\webview2\` files can be
+  overwritten directly, even while the app is running — nothing holds a lock on them
+  (WebView2 serves `ui\` per-request rather than keeping files open, and since the MOTW fix
+  above, the WebView2 managed DLLs load via `Assembly.Load(byte[])`, which never keeps a file
+  handle open either, unlike the `LoadFrom` it replaced).
+- **A stale `.old` file** (left over if a previous update's cleanup never got the chance to
+  run) is cleaned up best-effort on the NEXT launch (`AppUpdater.CleanUpOldExe`, called from
+  `Program.cs`'s `LaunchApp`) — by then the process that owned it has had time to fully exit
+  and release the file. Never allowed to block or fail loudly either way.
+- **Validated before anything live gets touched**: the extracted staging folder is checked
+  for a real `MnMFieldNotes.exe` before any rename/copy begins — a bad download or unexpected
+  zip structure fails cleanly with the current install completely untouched, not discovered
+  mid-swap. The zip's own top-level folder name is discovered generically (`Directory.
+  GetDirectories(stagingDir).FirstOrDefault()`), not hardcoded, so a future rename of that
+  folder inside the release zip doesn't silently break this.
+- **Refuses to run during an active session, both client- and host-side** — a session's own
+  metadata/unflushed UI state only becomes durable at "End session & export" (already-logged
+  entries are safe either way, written to `AllTimeLog.jsonl` in real time), so restarting the
+  app mid-session would lose more than just what's already on disk. `ui/app.js` checks
+  `session.id` before ever sending `applyUpdate`; `SessionState.AnyActive()` checks again
+  host-side for defense in depth, since the client and host are both "this app," not an
+  adversarial boundary, but a cheap double-check costs nothing here.
+- **Verified two ways before considering this done**: (1) the core OS assumption itself — a
+  disposable test proved a running exe really can be renamed-then-replaced without
+  interrupting the running process; (2) a full end-to-end run of the REAL `AppUpdater.cs`
+  against the actual live v0.10 GitHub release, in a fully sandboxed fake install (never the
+  real project folder) seeded with canary `Data\Profiles.json`/`AllTimeLog.jsonl` content —
+  confirmed the canary files came out byte-identical, `MnMFieldNotes.exe`/`ui\`/
+  `lib\webview2\`/`README.txt`/`INSTALL.txt` all came out matching the real release exactly,
+  the old exe's content survived under `.old`, and the relaunch genuinely started a new
+  process from the updated files. Real-machine confirmation of the actual in-app "click
+  Update now" click-through (not just the underlying mechanism) is still worth doing, the
+  same way taskbar pinning and the native key hook needed it — this sandbox has no
+  interactive desktop to drive that specific click through a real WebView2 session.
 
 ## Wiki data — read-only reference
 

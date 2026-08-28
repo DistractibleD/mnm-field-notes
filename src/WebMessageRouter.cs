@@ -90,6 +90,9 @@ internal static class WebMessageRouter
                 var mainForm = form as MainForm;
                 if (mainForm != null) mainForm.SetOrientation(msg.GetValueOrDefault("orientation") as string);
                 break;
+            case "applyUpdate":
+                await HandleApplyUpdateAsync(msg, ui, form);
+                break;
         }
     }
 
@@ -160,6 +163,26 @@ internal static class WebMessageRouter
 
         var result = await ScreenshotSubmitter.SubmitAsync(subject, kind, zone, note, imageBytes, fileName, mimeType);
         ui.Send(new Dictionary<string, object> { { "type", "screenshotSubmitted" }, { "ok", result.Ok }, { "error", result.Error } });
+    }
+
+    // AppUpdater.ApplyUpdateAsync already launched the new exe on success -
+    // this just has to close the current (old) process cleanly so the two
+    // don't both end up running. A short delay isn't needed for the launch
+    // itself (already done), just gives the outgoing 'updateApplied'
+    // message a moment to actually reach the page before the window closes,
+    // same reasoning as HandleEndSession's own autotest close-timer.
+    private static async Task HandleApplyUpdateAsync(Dictionary<string, object> msg, UiBridge ui, System.Windows.Forms.Form form)
+    {
+        string zipUrl = msg.GetValueOrDefault("zipUrl") as string;
+        var result = await AppUpdater.ApplyUpdateAsync(zipUrl);
+        ui.Send(new Dictionary<string, object> { { "type", "updateApplied" }, { "ok", result.Ok }, { "error", result.Error } });
+
+        if (result.Ok)
+        {
+            var closeTimer = new System.Windows.Forms.Timer { Interval = 400 };
+            closeTimer.Tick += (s, e) => { closeTimer.Stop(); form.Close(); };
+            closeTimer.Start();
+        }
     }
 
     private static void HandleStartSession(Dictionary<string, object> msg, UiBridge ui)
@@ -301,6 +324,7 @@ internal static class WebMessageRouter
             { "buildDate", update.BuildDate },
             { "latestVersion", update.LatestVersion },
             { "url", update.Url },
+            { "zipUrl", update.ZipUrl },
             { "available", update.Available },
             { "error", update.Error },
         };

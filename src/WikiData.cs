@@ -140,6 +140,7 @@ internal static class WikiService
         public string BuildDate = Config.AppBuildDate;
         public string LatestVersion;
         public string Url;
+        public string ZipUrl;
         public bool Available;
         public string Error;
     }
@@ -153,6 +154,7 @@ internal static class WikiService
             var latest = JsonUtil.DeserializeObjectMap(json);
             result.LatestVersion = latest.GetValueOrDefault("version") as string;
             result.Url = latest.GetValueOrDefault("url") as string;
+            result.ZipUrl = latest.GetValueOrDefault("zipUrl") as string;
             result.Available = CompareAppVersion(result.LatestVersion, Config.AppVersion) > 0;
         }
         catch (Exception ex)

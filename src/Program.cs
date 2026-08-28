@@ -52,6 +52,11 @@ internal static class Program
 
         AppPaths.EnsureDataDirsExist();
 
+        // Best-effort cleanup of a leftover MnMFieldNotes.exe.old from a
+        // previous self-update (AppUpdater.cs) - harmless no-op on a normal
+        // launch where no update has ever run.
+        AppUpdater.CleanUpOldExe();
+
         try
         {
             AppIdentity.SetCurrentProcessExplicitAppUserModelID("DistractibleD.MnMFieldNotes");

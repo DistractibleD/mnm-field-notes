@@ -25,6 +25,16 @@ internal static class SessionState
         return Sessions.ContainsKey(sessionId);
     }
 
+    // Used to refuse a self-update while a session is running (see
+    // AppUpdater.cs) - a session's own metadata/unflushed UI state only
+    // gets durably written at "End session & export", so restarting the
+    // app mid-session would lose more than just already-logged entries
+    // (those are already safe, written to AllTimeLog.jsonl in real time).
+    public static bool AnyActive()
+    {
+        return Sessions.Count > 0;
+    }
+
     public static void End(string sessionId)
     {
         Sessions.Remove(sessionId);

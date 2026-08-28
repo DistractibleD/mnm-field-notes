@@ -77,7 +77,7 @@ function mockHostRespond(msg) {
         pageUrl: 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/',
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
-      deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null });
+      deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', zipUrl: 'https://github.com/DistractibleD/mnm-field-notes/releases/download/v0.2/MnM-Field-Notes-v0.2.zip', available: true, error: null });
       deliverFromHost({
         type: 'fishRarity',
         data: {
@@ -107,7 +107,7 @@ function mockHostRespond(msg) {
       });
       deliverFromHost({ type: 'orientation', value: mockOrientation });
     } else if (msg.type === 'checkForUpdates') {
-      deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null, manual: true });
+      deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', zipUrl: 'https://github.com/DistractibleD/mnm-field-notes/releases/download/v0.2/MnM-Field-Notes-v0.2.zip', available: true, error: null, manual: true });
     } else if (msg.type === 'openUrl') {
       console.log('[mock host] would open URL', msg.url);
     } else if (msg.type === 'setProfile') {
@@ -137,6 +137,9 @@ function mockHostRespond(msg) {
     } else if (msg.type === 'setOrientation') {
       mockOrientation = msg.orientation;
       console.log('[mock host] would resize the window + remember orientation:', msg.orientation);
+    } else if (msg.type === 'applyUpdate') {
+      console.log('[mock host] would download+apply update from:', msg.zipUrl);
+      deliverFromHost({ type: 'updateApplied', ok: true, error: null });
     }
   }, 50);
 }
@@ -625,9 +628,14 @@ function showToast(text, corner) {
 // Update available banner - dismissible, never blocking. "View release"
 // round-trips through the host (openUrl) rather than a plain <a target=_blank>
 // so it always opens the system browser, not a bare WebView2 popup.
-function showUpdateBanner(version, url) {
+// "Update now" (2026-08-28) actually applies the update in place - see
+// AppUpdater.cs. Only shown when the host sent a zipUrl (older installs
+// mid-transition to this feature, or a malformed latest.json, just get the
+// original manual-download banner instead of a dead button).
+function showUpdateBanner(version, url, zipUrl) {
   const el = document.getElementById('update-banner');
-  el.innerHTML = `<span>Version ${escapeHtml(version)} is available.</span><span><a href="#" id="update-banner-view">View release</a><a href="#" id="update-banner-dismiss">Dismiss</a></span>`;
+  const updateNowHtml = zipUrl ? `<a href="#" id="update-banner-now">Update now</a>` : '';
+  el.innerHTML = `<span>Version ${escapeHtml(version)} is available.</span><span>${updateNowHtml}<a href="#" id="update-banner-view">View release</a><a href="#" id="update-banner-dismiss">Dismiss</a></span>`;
   el.style.display = 'flex';
   document.getElementById('update-banner-view').addEventListener('click', e => {
     e.preventDefault();
@@ -637,6 +645,21 @@ function showUpdateBanner(version, url) {
     e.preventDefault();
     el.style.display = 'none';
   });
+  const nowLink = document.getElementById('update-banner-now');
+  if (nowLink) {
+    nowLink.addEventListener('click', e => {
+      e.preventDefault();
+      // Client-side guard, mirrored host-side too (SessionState.AnyActive)
+      // for defense in depth - a session's own metadata/unflushed state
+      // only becomes durable at "End session & export".
+      if (session.id) {
+        showToast('End your current session before updating.');
+        return;
+      }
+      el.innerHTML = `<span>Updating&hellip; the app will restart shortly.</span>`;
+      sendToHost({ type: 'applyUpdate', zipUrl });
+    });
+  }
 }
 
 // Submit-for-review banner (2026-08-27) - dismissible, never blocking, same
@@ -1324,10 +1347,18 @@ onHostMessage((msg) => {
     if (msg.error) {
       if (msg.manual) showToast('Could not check for updates: ' + msg.error);
     } else if (msg.available) {
-      showUpdateBanner(msg.latestVersion, msg.url);
+      showUpdateBanner(msg.latestVersion, msg.url, msg.zipUrl);
     } else if (msg.manual) {
       showToast('You\'re on the latest version.');
     }
+  } else if (msg.type === 'updateApplied') {
+    if (!msg.ok) {
+      const el = document.getElementById('update-banner');
+      el.innerHTML = `<span>Update failed: ${escapeHtml(msg.error || 'unknown error')}</span><span><a href="#" id="update-banner-dismiss">Dismiss</a></span>`;
+      el.style.display = 'flex';
+      document.getElementById('update-banner-dismiss').addEventListener('click', e => { e.preventDefault(); el.style.display = 'none'; });
+    }
+    // else: the app is about to close and relaunch on its own - nothing more to render.
   } else if (msg.type === 'fishRarity') {
     // A one-time snapshot of every Fishing attempt ever logged (all
     // sessions), keyed by zone - see computeZoneRarity() for how this gets
