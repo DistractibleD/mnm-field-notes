@@ -153,6 +153,14 @@ html, body {
 .mini-btn:hover { color: var(--accent-strong); border-color: var(--accent); }
 .mini-btn.active { background: var(--accent-craft); border-color: var(--accent-craft); color: var(--bg-page); font-weight: 600; }
 
+/* Fish/Gather skill counters pair a number input with their own -/+ mini-btns -
+   the browser's native spinner arrows are redundant next to those, backlog #22. */
+#fish-skill-input, #gather-skill-input { -moz-appearance: textfield; }
+#fish-skill-input::-webkit-inner-spin-button, #fish-skill-input::-webkit-outer-spin-button,
+#gather-skill-input::-webkit-inner-spin-button, #gather-skill-input::-webkit-outer-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+
 .detail { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
 .detail-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
 .detail-head h2 { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 18px; margin: 0; }

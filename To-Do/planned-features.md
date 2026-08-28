@@ -332,29 +332,41 @@ gathering yields, etc. would need the same treatment if/when the app computes th
 The wiki-side script's line-parser was written generically enough to be reused for a future
 stat without a rewrite, per the wiki-side session's own report.
 
-## 21. Fishing: trim the key-listening modal's explainer text (2026-08-28)
+## 21. ~~Fishing: trim the key-listening modal's explainer text~~ — done (2026-08-28)
 
-`#fish-key-modal` (`ui/index.html`) currently reads: "Press the key you use to fish. From
-then on the app counts that key everywhere — it never touches the game itself." User's own
-words: remove "the app only ever watches for that one key, and never touches the game
-itself" — that's a trust/policy statement, already covered in `README.txt`, and doesn't need
-to live in the app's own UI. Standing rule going forward, not just this one modal: app copy
-should describe what a button/control *does*, not restate the app's own privacy/safety
-policy — keep it out to save space, especially given this app's portrait-2nd-monitor layout
-is already tight on room (see CLAUDE.md "Visual style"). Worth a quick pass over other modals/
-labels for the same pattern when this is picked up, not just the one sentence flagged here.
+`#fish-key-modal` (`ui/index.html`) read: "Press the key you use to fish. From then on the
+app counts that key everywhere — it never touches the game itself." User's own words: remove
+"the app only ever watches for that one key, and never touches the game itself" — that's a
+trust/policy statement, already covered in `README.txt`, and doesn't need to live in the
+app's own UI. Trimmed to "Press the key you use to fish. From then on the app counts that key
+everywhere."
 
-## 22. Skill counter boxes show doubled up/down controls (2026-08-28)
+Also swept the rest of the UI for the same pattern per the item's own note ("worth a quick
+pass over other modals/labels") and found one more instance: the Fishing pre-start screen's
+own explainer paragraph in `renderFishingPanel()` (`ui/app.js`) had the identical clause
+("the app only ever watches for that one key, and never touches the game itself") — trimmed
+the same way, function description kept, trust/policy statement removed. No other instances
+found (`README.txt`/`INSTALL.txt`'s own trust language is fine, that's exactly what's *meant*
+to live there per the standing rule). Verified in the browser preview (`lib/serve-ui.ps1`):
+both paragraphs render without the trimmed clause.
+
+## 22. ~~Skill counter boxes show doubled up/down controls~~ — done (2026-08-28)
 
 `#fish-skill-input`/`#gather-skill-input` (`ui/app.js`) are real `<input type="number">`
 fields sitting next to the app's own `-`/`+` buttons — but a real number input also gets the
-browser's own native up/down spinner arrows rendered inside the field itself, so there are
-two redundant sets of increment controls stacked together (seen in a real screenshot: the
-side `-`/`+` buttons plus tiny up/down arrows inside the box). User's own words: "the + and -
-on the sides are enough" — hide the native spinner via CSS
-(`::-webkit-inner-spin-button`/`::-webkit-outer-spin-button { display: none; }`, or
-`-webkit-appearance: none` on the input, matching WebView2's Chromium engine) rather than
-switching away from `type="number"`. Also confirm manual typing into the field still works
-after that change — it already should (that's the whole point of using a real number input
-here per CLAUDE.md's Fishing section), just worth double-checking nothing about hiding the
-spinner accidentally affects it.
+browser's own native up/down spinner arrows rendered inside the field itself, so there were
+two redundant sets of increment controls stacked together. User's own words: "the + and - on
+the sides are enough." Fixed in `ui/style.css` (added right after `.mini-btn`, since it's
+specifically about the input paired with those buttons) — `-webkit-appearance: none` on
+`::-webkit-inner-spin-button`/`::-webkit-outer-spin-button` for both IDs (WebView2 is
+Chromium, so only the `-webkit-` prefix actually matters; `-moz-appearance: textfield` added
+too, harmless dead weight outside Firefox). Scoped to just these two IDs, not a blanket
+`input[type=number]` rule — other number inputs in the app (`f-plat`/`f-gold`/etc., `ck-skill`,
+`ck-haste`, Cooking's stat-value inputs) have no adjacent +/- buttons, so their native spinner
+is still the only increment control they have and shouldn't be removed.
+
+Verified in the browser preview: the modal's own skill input (`#fish-skill-modal-input`, out
+of scope, no side buttons) still shows its native spinner as expected; the active screen's
+`#fish-skill-input` (in scope) does not, and typing a value into it directly still works.
+Confirmed via `document.styleSheets` inspection that both CSS rules load and target the
+correct IDs.

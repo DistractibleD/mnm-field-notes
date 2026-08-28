@@ -2081,10 +2081,9 @@ function renderFishingPanel() {
       <div class="detail" style="text-align:center; padding: 48px 20px 24px;">
         <p style="font-size:13px; color:var(--text-secondary); max-width:38ch; margin:0 auto 20px;">
           This lets the app count your casts automatically: pick one key you use to fish, and
-          from then on every press of that key bumps the attempts counter below &mdash; the
-          app only ever watches for that one key, and never touches the game itself. Pressing
-          it rapidly (holding it down, spamming it) throws off the count, so listening
-          auto-pauses if that happens &mdash; you can always add attempts manually instead.
+          from then on every press of that key bumps the attempts counter below. Pressing it
+          rapidly (holding it down, spamming it) throws off the count, so listening auto-pauses
+          if that happens &mdash; you can always add attempts manually instead.
         </p>
         <button class="secondary-btn" id="fish-listen-btn">${keyState.configured ? 'Change key (currently ' + escapeHtml(keyState.configured.label) + ')' : 'Listen for key'}</button>
         <div style="margin-top: 28px;">
