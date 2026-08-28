@@ -342,3 +342,30 @@ the app currently computes — the user's original ask covers "any statistic," s
 gathering yields, etc. would need the same treatment if/when the app computes those itself.
 The wiki-side script's line-parser was written generically enough to be reused for a future
 stat without a rewrite, per the wiki-side session's own report.
+
+## 21. Fishing: trim the key-listening modal's explainer text (2026-08-28)
+
+`#fish-key-modal` (`ui/index.html`) currently reads: "Press the key you use to fish. From
+then on the app counts that key everywhere — it never touches the game itself." User's own
+words: remove "the app only ever watches for that one key, and never touches the game
+itself" — that's a trust/policy statement, already covered in `README.txt`, and doesn't need
+to live in the app's own UI. Standing rule going forward, not just this one modal: app copy
+should describe what a button/control *does*, not restate the app's own privacy/safety
+policy — keep it out to save space, especially given this app's portrait-2nd-monitor layout
+is already tight on room (see CLAUDE.md "Visual style"). Worth a quick pass over other modals/
+labels for the same pattern when this is picked up, not just the one sentence flagged here.
+
+## 22. Skill counter boxes show doubled up/down controls (2026-08-28)
+
+`#fish-skill-input`/`#gather-skill-input` (`ui/app.js`) are real `<input type="number">`
+fields sitting next to the app's own `-`/`+` buttons — but a real number input also gets the
+browser's own native up/down spinner arrows rendered inside the field itself, so there are
+two redundant sets of increment controls stacked together (seen in a real screenshot: the
+side `-`/`+` buttons plus tiny up/down arrows inside the box). User's own words: "the + and -
+on the sides are enough" — hide the native spinner via CSS
+(`::-webkit-inner-spin-button`/`::-webkit-outer-spin-button { display: none; }`, or
+`-webkit-appearance: none` on the input, matching WebView2's Chromium engine) rather than
+switching away from `type="number"`. Also confirm manual typing into the field still works
+after that change — it already should (that's the whole point of using a real number input
+here per CLAUDE.md's Fishing section), just worth double-checking nothing about hiding the
+spinner accidentally affects it.

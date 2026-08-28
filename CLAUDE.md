@@ -646,9 +646,29 @@ before any code existed: reuse-vs-new-infrastructure, and this hard-rule update 
   does not do that sync (would mean editing the wiki repo, see the rule above).
 - **No new secrets in this project** — the Worker's `GITHUB_TOKEN` lives only in Cloudflare's
   own secret storage, never in this repo, never sent to or through this app.
-- PS 5.1 has no `-Form` parameter on `Invoke-WebRequest`/`Invoke-RestMethod` (that's PS 6+
-  only) — the multipart/form-data body is built by hand. See `Submit-SessionExport` in
-  `MnMFieldNotes.ps1`.
+- **PS 5.1 era**: PS 5.1 has no `-Form` parameter on `Invoke-WebRequest`/`Invoke-RestMethod`
+  (that's PS 6+ only) — the multipart/form-data body was built by hand in `Submit-SessionExport`.
+- **C# era (2026-08-28, after the exe migration)**: `SessionExportSubmitter` in
+  `src/SessionExportSubmit.cs` uses `HttpClient`'s `MultipartFormDataContent` — a real
+  simplification over hand-building the body. **Real bug hit and fixed while porting**:
+  `MultipartFormDataContent.Add(content, name)` does NOT quote the name in the resulting
+  header (produces `Content-Disposition: form-data; name=sessionExport`, not the RFC
+  7578-standard `name="sessionExport"`), and Cloudflare Workers' own `request.formData()`
+  parser can't handle the unquoted form — it throws, and the Worker reports a generic
+  `"Invalid submission — please try again."` that looks like a deliberate rejection but is
+  actually just a parse failure. This is what made it dangerously easy to "verify" incorrectly
+  — an early oversized-payload test during the migration got this exact same generic error
+  and was misread as the size-safety check working, when it was really hitting the same parse
+  bug regardless of payload size. Fixed by manually constructing each part's
+  `ContentDispositionHeaderValue` with an explicitly quoted `Name`, rather than relying on the
+  convenience overload. Confirmed against the real live Worker two ways, both side-effect-free:
+  the honeypot field filled in (`{"ok":true}` immediately, proving parsing now succeeds) and a
+  genuinely oversized payload (the *specific* `"That session export is too large."` message,
+  not the generic parse-failure one, proving the real business logic is now reached) — then
+  confirmed for real by the user, whose actual submission went through and opened a real PR.
+  **Takeaway for future multipart work in this codebase**: never trust a generic "invalid
+  submission"-style error as proof a safety check fired — verify you're hitting the SPECIFIC
+  rejection message the code path in question actually produces.
 - **The export includes computed Fishing rarity stats, not just raw entries** (2026-08-27,
   `Write-FishRarityBlock`) — explicit user ask: whoever reviews a submitted export (wiki-side
   Claude, most likely) should see this app's own rarity math already done, not have to
