@@ -85,6 +85,21 @@ internal static class Program
             return null;
         }
         string path = Path.Combine(AppPaths.WebView2Root, simpleName + ".dll");
-        return File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        if (!File.Exists(path)) return null;
+
+        // Assembly.LoadFrom(path) throws FileLoadException/NotSupportedException
+        // (HRESULT 0x80131515) on a file carrying the "Mark of the Web" - the
+        // Zone.Identifier tag Windows stamps on anything downloaded via a
+        // browser, which every recipient's copy of these DLLs has, since the
+        // whole zip came from a browser download. .NET Framework's legacy CAS
+        // policy refuses to LoadFrom a zone-tagged file even though the file
+        // itself is completely fine - confirmed via a real crash.txt from a
+        // real recipient (2026-08-28). Reading the bytes into memory and using
+        // Assembly.Load(byte[]) instead bypasses that check entirely, since it
+        // never touches the file's originating zone - the standard workaround
+        // for this exact .NET Framework gotcha. Never hit in dev/testing here
+        // because a locally-built exe's own sibling DLLs were never downloaded,
+        // so never carried the tag in the first place.
+        return Assembly.Load(File.ReadAllBytes(path));
     }
 }

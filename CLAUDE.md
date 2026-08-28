@@ -85,6 +85,32 @@ merge it back into `Main()`) is where all WebView2-touching code actually lives.
 `CoreWebView2Environment.SetLoaderDllFolderPath` handles the separate native
 `WebView2Loader.dll` (native DLL loading doesn't go through `AssemblyResolve` at all).
 
+### Gotcha: `Assembly.LoadFrom` refuses a file carrying the "Mark of the Web" (2026-08-28)
+
+Windows stamps a `Zone.Identifier` alternate data stream on any file downloaded via a
+browser — the whole released zip included, so every DLL inside it, including
+`lib\webview2\*.dll`, carries this tag after a real recipient downloads and extracts it.
+.NET Framework's legacy CAS (Code Access Security) policy refuses to `Assembly.LoadFrom` a
+zone-tagged file, throwing `FileLoadException`/`NotSupportedException` (HRESULT
+`0x80131515`) even though the file itself is completely intact — this is exactly what
+`ResolveWebView2Assembly` in `Program.cs` used before this fix. **Never hit in dev/testing
+here**, because a locally-built exe's own sibling DLLs were never themselves downloaded, so
+never carried the tag — this shipped broken in every release through v0.8 and was only
+caught when a real recipient's own `crash.txt` (the app's own startup crash-reporting,
+working exactly as designed) showed the exact error. Fixed by reading the DLL's bytes into
+memory and calling `Assembly.Load(byte[])` instead of `Assembly.LoadFrom(path)` — loading
+from a byte array never touches the file's originating zone, bypassing the CAS check
+entirely; this is the standard, well-documented workaround for this specific .NET Framework
+gotcha. **Verified two ways**: a focused throwaway test reproduced the exact same HRESULT
+against a DLL manually tagged with `Set-Content path:Zone.Identifier` (matching a real
+browser download's tag) using the old code, and confirmed the new code loads the same
+tagged file cleanly. **Lesson for future local-DLL-loading code in this codebase**: any
+`Assembly.LoadFrom`/`LoadFile` call on a file that ships inside the release zip needs this
+same treatment — a locally-built dev copy can never catch this class of bug, since MOTW is
+applied at download time, not build time. If a similar load is added later, default to
+`Assembly.Load(File.ReadAllBytes(path))` from the start rather than waiting for a
+real-world crash report to reveal it again.
+
 ### Gotcha: `JavaScriptSerializer.DeserializeObject` returns `object[]`, not `ArrayList`, for JSON arrays
 
 Checking only `ArrayList` (the commonly-documented return type) silently produced empty
