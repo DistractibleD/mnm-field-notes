@@ -449,6 +449,15 @@ or otherwise. This is a bigger lift than the app-side Home tab work above:
   (matching how Fishing rarity's own pooled half already works) or every local entry
   regardless of submission status; and the exact category list/grouping (does "gathering"
   split by tradeskill like the user's examples suggest, or stay one number).
+- **User's own follow-up (2026-08-28)**: wants LOCAL stats shown too, alongside the global
+  ones, not instead of — "it would be interesting for the user to see how much they have
+  done to contribute." This half is meaningfully easier and doesn't block on any wiki-side
+  work: `AllTimeLog.jsonl` already has everything needed per-install (same file
+  `Get-FishRarity`/`Get-CombatZoneLevelRange` already read all-time, locally, today), so a
+  per-category local count is a pure app-side read + a bit of Home tab UI — no GitHub Action,
+  no published JSON file, no wiki-repo dependency. Worth building this half first/on its own
+  rather than waiting on the global half's bigger wiki-side lift, since it's genuinely
+  independent - the two can land as separate passes.
 
 ## 24. Maps: pop-out the viewer into its own window (2026-08-28)
 

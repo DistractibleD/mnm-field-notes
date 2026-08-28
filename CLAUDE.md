@@ -724,18 +724,21 @@ hint incorrectly showed on first paint until any tab was clicked. Fixed by defau
 for `#update-banner`/`#submit-export-banner`, rather than adding an extra init-time call.
 
 **Still open, not built in this pass**: the user's own follow-up suggested the Home tab
-could show stats too — refined across three messages (2026-08-28) into: activity counts
+could show stats too — refined across several messages (2026-08-28) into: activity counts
 broken down by category ("Monsters killed, fish caught, mining nodes mined, trees chopped,
 herbs picked" — the user's own examples, one per tradeskill/Combat rather than one combined
-number), and **explicitly GLOBAL/guild-wide, not just this install's own local total.**
-Nothing in this app counts/persists any of this today, locally or otherwise —
-`SessionExportSubmit.cs`/`ScreenshotSubmit.cs` only report success/failure per call. A
-global per-category count needs the same shape as the "Rarity bars" pooled-data mechanism
+number), **both GLOBAL/guild-wide AND this install's own LOCAL total, shown alongside each
+other** (the user's own words on the local half: "it would be interesting for the user to
+see how much they have done to contribute"). The local half is the easy one — every category
+count it needs is already sitting in `AllTimeLog.jsonl` today (same file
+`AllTimeLog.GetFishRarity()`/`GetCombatZoneLevelRange()` already read all-time, locally), so
+it's a pure app-side read + Home tab UI, no wiki-side work, buildable independently of the
+global half. The global half needs the same shape as the "Rarity bars" pooled-data mechanism
 (Fishing rarity: a GitHub Action on the wiki side aggregates merged submission PRs into a
 published JSON file, `WikiService.GetSharedFishRarityAsync()` fetches it), generalized from
-"Fishing catch-rate" to "every category's raw activity count" — a bigger scope than the
-existing mechanism covers today. See `To-Do/planned-features.md` #23 for the still-open
-scoping questions.
+"Fishing catch-rate" to "every category's raw activity count" — genuinely bigger scope than
+the existing mechanism covers today, not something built entirely in this repo. See
+`To-Do/planned-features.md` #23 for the still-open scoping questions.
 
 ## Session export submission (2026-08-27) — the one outbound-write exception
 
