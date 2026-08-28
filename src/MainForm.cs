@@ -16,32 +16,32 @@ internal sealed class MainForm : Form
     private readonly WebView2 _webView;
     private KeyHookController _keyHook;
 
+    // The live current orientation - may come from a stored preference OR
+    // (first run, nothing stored yet) from DetectDefaultOrientation, so this
+    // is the one source of truth for "what is it right now" rather than
+    // re-reading AppSettingsStore (which stays null until the user actually
+    // toggles - see ApplyOrientation/SetOrientation below).
+    public string CurrentOrientation { get; private set; }
+
+    // Landscape is the new default (backlog: "should start in landscape mode
+    // by default, with a portrait toggle"); portrait is the app's original
+    // size, kept exactly as it was so a user who switches back gets the same
+    // dimensions this app always used. Swapped W/H pair, not two unrelated
+    // sizes, so toggling reads as a literal rotation.
+    private const int LandscapeWidth = 1500;
+    private const int LandscapeHeight = 900;
+    private const int PortraitWidth = 900;
+    private const int PortraitHeight = 1500;
+
     public MainForm()
     {
         Text = "MnM Field Notes";
-        Width = 900;
-        Height = 1500;
+        ApplyOrientation(AppSettingsStore.GetStoredOrientation() ?? DetectDefaultOrientation());
 
         if (File.Exists(AppPaths.IconPath))
         {
             try { Icon = new Icon(AppPaths.IconPath); }
             catch { /* fall back to the default WinForms icon */ }
-        }
-
-        // This app is designed to run on a second monitor while playing, not
-        // share the primary one - open there automatically when one exists.
-        var secondary = Screen.AllScreens.FirstOrDefault(s => !s.Primary);
-        if (secondary != null)
-        {
-            StartPosition = FormStartPosition.Manual;
-            var area = secondary.WorkingArea;
-            Location = new Point(
-                area.X + Math.Max(0, (area.Width - Width) / 2),
-                area.Y + Math.Max(0, (area.Height - Height) / 2));
-        }
-        else
-        {
-            StartPosition = FormStartPosition.CenterScreen;
         }
 
         _webView = new WebView2 { Dock = DockStyle.Fill };
@@ -101,5 +101,69 @@ internal sealed class MainForm : Form
 
             _webView.CoreWebView2.Navigate("https://appassets.local/index.html");
         };
+    }
+
+    // First-run only (no Settings.json yet) - reads the secondary monitor's
+    // own shape rather than guessing a fixed default, so the window starts
+    // matching whatever's actually plugged in. Falls back to landscape (the
+    // app's own new baseline default) when there's no secondary monitor to
+    // check, its dimensions are exactly square, or the check itself fails
+    // for any reason (Screen.AllScreens is a live OS/driver query, not
+    // something to trust blindly) - landscape is the safer failure mode
+    // here specifically: a portrait window that turns out too narrow/tall
+    // for an unexpected setup has previously left real content cut off,
+    // needing a manual resize to actually use the app.
+    private static string DetectDefaultOrientation()
+    {
+        try
+        {
+            var secondary = Screen.AllScreens.FirstOrDefault(s => !s.Primary);
+            if (secondary == null) return "landscape";
+            var area = secondary.WorkingArea;
+            return area.Height > area.Width ? "portrait" : "landscape";
+        }
+        catch
+        {
+            return "landscape";
+        }
+    }
+
+    // Sets Width/Height for the given orientation and (re)centers on the
+    // secondary monitor - shared by the constructor (first paint, before the
+    // setting can be re-derived from anywhere else) and SetOrientation below
+    // (a live toggle), so the two can never drift into different placement
+    // logic. This app is designed to run on a second monitor while playing,
+    // not share the primary one - open/re-center there automatically when
+    // one exists.
+    private void ApplyOrientation(string orientation)
+    {
+        CurrentOrientation = orientation == "portrait" ? "portrait" : "landscape";
+        Width = orientation == "portrait" ? PortraitWidth : LandscapeWidth;
+        Height = orientation == "portrait" ? PortraitHeight : LandscapeHeight;
+
+        var secondary = Screen.AllScreens.FirstOrDefault(s => !s.Primary);
+        if (secondary != null)
+        {
+            StartPosition = FormStartPosition.Manual;
+            var area = secondary.WorkingArea;
+            Location = new Point(
+                area.X + Math.Max(0, (area.Width - Width) / 2),
+                area.Y + Math.Max(0, (area.Height - Height) / 2));
+        }
+        else
+        {
+            StartPosition = FormStartPosition.CenterScreen;
+        }
+    }
+
+    // Called from WebMessageRouter when the UI's orientation toggle is
+    // clicked - resizes/re-centers immediately and persists the choice so
+    // the next launch remembers it (backlog: "the app should remember the
+    // users setting and load in the remembered mode the next time it is
+    // opened").
+    public void SetOrientation(string orientation)
+    {
+        ApplyOrientation(orientation);
+        AppSettingsStore.SetOrientation(orientation);
     }
 }

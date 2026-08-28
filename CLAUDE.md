@@ -47,9 +47,11 @@ keeps its own name (functional label, never part of the old generic-from-devs su
 "different session type" marker, used for Gathering/Fishing/Crafting/Cooking active-tab state
 instead of gold. If the wiki's palette/fonts change, pull from there, don't invent new ones.
 
-Responsive, tuned for portrait 2nd monitor (1080×1920) but fine landscape too. `.layout`
-stacks <900px width. `.stats`/`.field-grid` use `repeat(auto-fit,minmax(...))`.
-`$form.Width`/`Height` = 900×1500 default (resizable).
+Responsive — originally tuned for a portrait 2nd monitor (1080×1920) but works fine in
+landscape too, which is now the actual default (see "Window orientation toggle"). `.layout`
+stacks <900px width. `.stats`/`.field-grid` use `repeat(auto-fit,minmax(...))`. Window size
+is resizable either way and depends on orientation — 1500×900 landscape (default) or
+900×1500 portrait, see `MainForm.cs`.
 
 ## Architecture
 
@@ -719,6 +721,49 @@ the alphabetical grid) — that's wiki homepage curation, not needed for a looku
   C#, only passes the URL through as a string; Chromium's own `<img>` handles WebP natively.
 - **No pins/annotations** (backlog #14) — explicitly deferred, user's own call (2026-08-28):
   "wait until we have better maps." Not attempted in this pass.
+
+## Window orientation toggle (2026-08-28) — landscape by default, remembered
+
+The app originally always opened at a fixed 900×1500 (portrait-shaped, tuned for a portrait
+2nd monitor — see "Visual style"). User's own ask: landscape by default instead, a toggle to
+switch to portrait, and the choice remembered across launches. Landscape/portrait are a
+literal swapped W/H pair (`LandscapeWidth/Height = 1500/900`, `PortraitWidth/Height =
+900/1500` in `MainForm.cs`) — portrait kept at the app's original size unchanged, so a user
+who switches back gets exactly what this app always used, not a new size.
+
+- **First run (nothing stored yet)**: `MainForm.DetectDefaultOrientation()` reads the
+  *secondary* monitor's own `WorkingArea` shape (`Screen.AllScreens.FirstOrDefault(s =>
+  !s.Primary)`) rather than assuming — a portrait-mounted 2nd monitor gets a portrait
+  default, a normal landscape one gets landscape, matching whatever's actually plugged in.
+  Falls back to landscape when there's no secondary monitor, dimensions are exactly square,
+  **or the check itself throws for any reason** — wrapped in try/catch, since `Screen.
+  AllScreens` is a live OS/driver query, not something to trust blindly. Landscape is
+  deliberately the failure-mode default, not just the "no signal" default: a portrait window
+  that turns out too narrow/tall for an unexpected setup has previously left real content
+  cut off, needing a manual resize just to use the app — better to default to the wider,
+  safer shape than risk that again.
+- **After the user ever toggles**: `AppSettingsStore` (`Data\Settings.json`, same flat-JSON
+  pattern as `Profiles.json`/`GatherNotes.json`) remembers the explicit choice, which always
+  wins over re-detecting from the monitor from then on — `GetStoredOrientation()` returns
+  `null` until an explicit choice exists, and `MainForm`'s constructor only falls back to
+  `DetectDefaultOrientation()` when that's `null`. Nothing is written to `Settings.json`
+  before the user's first toggle — the detected first-run default is deliberately NOT
+  persisted, so a still-untouched install keeps re-detecting fresh from whatever monitor is
+  actually connected at each launch, rather than locking in whatever happened to be plugged
+  in the very first time.
+- **UI**: a small icon button in the masthead (`#orientation-toggle-btn`, next to the Win98
+  theme toggle, same `.theme-toggle-icon` styling) — a single `<rect>` whose `x`/`y`/`width`/
+  `height` get swapped between a wide and a tall shape on toggle, so the icon itself visually
+  mirrors the current/target orientation rather than relying on the tooltip alone. Unlike the
+  Win98 toggle (purely client-side CSS, no host involvement needed), this genuinely resizes
+  the native window, so the host has to own the real state — `MainForm.CurrentOrientation`
+  (a live property, not re-read from `AppSettingsStore` each time, since first-run's detected
+  value isn't persisted) is what `ready`'s `orientation` message actually reports, so the
+  toggle's initial icon/tooltip always reflects the window's true current shape. Clicking
+  sends `setOrientation` to the host (`WebMessageRouter` → `MainForm.SetOrientation`, which
+  resizes/re-centers immediately via the same `ApplyOrientation` helper the constructor uses,
+  then persists) and updates its own icon optimistically — a local resize has no real failure
+  mode worth a round-trip confirmation for.
 
 ## Home tab (2026-08-28, backlog #23) — permanent, not a first-run modal
 

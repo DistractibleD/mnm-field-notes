@@ -18,6 +18,7 @@ internal static class AppPaths
     public static readonly string AllTimeLogPath = Path.Combine(DataDir, "AllTimeLog.jsonl");
     public static readonly string ProfilesPath = Path.Combine(DataDir, "Profiles.json");
     public static readonly string GatherNotesPath = Path.Combine(DataDir, "GatherNotes.json");
+    public static readonly string SettingsPath = Path.Combine(DataDir, "Settings.json");
     public static readonly string ErrorLogPath = Path.Combine(DataDir, "error.log");
 
     public static void EnsureDataDirsExist()

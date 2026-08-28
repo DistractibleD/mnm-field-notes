@@ -28,6 +28,7 @@ if (hasHost) {
 // opened in a plain browser for UI iteration (never runs inside the real
 // WebView2 app, where `hasHost` is true and this is skipped entirely).
 let mockSessionCounter = 0;
+let mockOrientation = 'landscape';
 const mockProfiles = { profiles: [], lastUsed: null }; // start empty to exercise the first-run modal
 // Self-contained placeholder art for the Maps tab's mock data (below) - a
 // big flat-colored rectangle with the name on it, big enough (2000x1400) to
@@ -104,6 +105,7 @@ function mockHostRespond(msg) {
         type: 'localActivityStats',
         data: { combatKills: 42, fishCaught: 15, miningNodes: 8, lumberjackingNodes: 3, herbalismNodes: 0, dishesCooked: 1 },
       });
+      deliverFromHost({ type: 'orientation', value: mockOrientation });
     } else if (msg.type === 'checkForUpdates') {
       deliverFromHost({ type: 'updateInfo', currentVersion: '0.1', buildDate: '2026-08-25', latestVersion: '0.2', url: 'https://github.com/DistractibleD/mnm-field-notes/releases/latest', available: true, error: null, manual: true });
     } else if (msg.type === 'openUrl') {
@@ -132,6 +134,9 @@ function mockHostRespond(msg) {
     } else if (msg.type === 'submitScreenshot') {
       console.log('[mock host] would POST screenshot to the wiki Worker:', msg.subject, msg.fileName || '(no file)');
       deliverFromHost({ type: 'screenshotSubmitted', ok: true, error: null });
+    } else if (msg.type === 'setOrientation') {
+      mockOrientation = msg.orientation;
+      console.log('[mock host] would resize the window + remember orientation:', msg.orientation);
     }
   }, 50);
 }
@@ -467,6 +472,40 @@ function ensureChecklistDropdownGlobalClose() {
   document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) show(t); });
   document.addEventListener('focusout', e => { const t = e.target.closest('[data-tip]'); if (t) hide(); });
 })();
+
+// ---------------------------------------------------------------------------
+// Window orientation toggle (2026-08-28) - landscape by default, portrait on
+// request, remembered across launches. Unlike the theme toggle below, this
+// genuinely resizes the native window, so it can't be purely client-side -
+// the host owns the real Width/Height + persistence
+// (MainForm.SetOrientation/AppSettingsStore.SetOrientation), this just sends
+// the click and updates its own icon/tooltip optimistically (a local resize
+// has no real failure mode worth waiting on a round trip for). Initial state
+// comes from the host's own 'orientation' message at 'ready' - not assumed
+// client-side, since first-run detects from the secondary monitor's actual
+// shape (MainForm.DetectDefaultOrientation), which this page has no way to
+// know on its own.
+// ---------------------------------------------------------------------------
+let currentOrientation = 'landscape';
+function applyOrientationIcon(orientation) {
+  currentOrientation = orientation;
+  const rect = document.getElementById('orientation-toggle-rect');
+  const btn = document.getElementById('orientation-toggle-btn');
+  if (orientation === 'portrait') {
+    rect.setAttribute('x', '6'); rect.setAttribute('y', '3');
+    rect.setAttribute('width', '12'); rect.setAttribute('height', '18');
+    btn.setAttribute('data-tip', 'Switch to landscape mode');
+  } else {
+    rect.setAttribute('x', '3'); rect.setAttribute('y', '6');
+    rect.setAttribute('width', '18'); rect.setAttribute('height', '12');
+    btn.setAttribute('data-tip', 'Switch to portrait mode');
+  }
+}
+document.getElementById('orientation-toggle-btn').addEventListener('click', () => {
+  const next = currentOrientation === 'portrait' ? 'landscape' : 'portrait';
+  applyOrientationIcon(next);
+  sendToHost({ type: 'setOrientation', orientation: next });
+});
 
 // ---------------------------------------------------------------------------
 // "I am old" theme toggle (2026-08-27) - a fun easter egg, not a real theme
@@ -1307,6 +1346,8 @@ onHostMessage((msg) => {
     if (gatheringSession.active) renderGatherNodeGrid();
   } else if (msg.type === 'localActivityStats') {
     renderHomeLocalStats(msg.data || {});
+  } else if (msg.type === 'orientation') {
+    applyOrientationIcon(msg.value === 'portrait' ? 'portrait' : 'landscape');
   } else if (msg.type === 'submitExportResult') {
     const el = document.getElementById('submit-export-banner');
     if (msg.ok) {

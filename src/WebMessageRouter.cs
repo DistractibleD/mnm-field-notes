@@ -27,7 +27,7 @@ internal static class WebMessageRouter
         switch (type)
         {
             case "ready":
-                await HandleReadyAsync(ui);
+                await HandleReadyAsync(ui, form as MainForm);
                 break;
             case "checkForUpdates":
                 await HandleCheckForUpdatesAsync(ui);
@@ -85,6 +85,10 @@ internal static class WebMessageRouter
                 break;
             case "stopKeyCounting":
                 keyHook.Stop();
+                break;
+            case "setOrientation":
+                var mainForm = form as MainForm;
+                if (mainForm != null) mainForm.SetOrientation(msg.GetValueOrDefault("orientation") as string);
                 break;
         }
     }
@@ -245,7 +249,7 @@ internal static class WebMessageRouter
         AllTimeLog.EditEntry(entryId, patch);
     }
 
-    private static async Task HandleReadyAsync(UiBridge ui)
+    private static async Task HandleReadyAsync(UiBridge ui, MainForm form)
     {
         var wikiData = await WikiService.FetchWikiDataAsync();
         _lastWikiData = wikiData;
@@ -279,6 +283,7 @@ internal static class WebMessageRouter
         ui.Send(new Dictionary<string, object> { { "type", "combatLevelRange" }, { "data", AllTimeLog.GetCombatZoneLevelRange() } });
         ui.Send(new Dictionary<string, object> { { "type", "gatherNotes" }, { "data", GatherNotesStore.Get() } });
         ui.Send(new Dictionary<string, object> { { "type", "localActivityStats" }, { "data", AllTimeLog.GetLocalActivityStats() } });
+        ui.Send(new Dictionary<string, object> { { "type", "orientation" }, { "value", form != null ? form.CurrentOrientation : "landscape" } });
     }
 
     private static async Task HandleCheckForUpdatesAsync(UiBridge ui)
