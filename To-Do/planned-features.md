@@ -122,6 +122,33 @@ Rough shape from the user's own description, not yet scoped/confirmed:
   data — this tab produces submittable data, it doesn't write to the wiki directly, matching
   how session exports already work.
 
+**Update (2026-08-29), from wiki-claude directly** (see `CLAUDE.md` "Cross-session agreement
+with wiki-claude") — the wiki just built a real Camps feature, meaningfully changing this
+item's shape:
+- **Real schema now exists** — `camps.json` (wiki repo root, flat array): `name`/`slug`
+  (required), `zone` (single string — a camp is one fixed spot), `area` (optional, more
+  specific in-zone description), `monsters` (array of plain name strings, matched against
+  `monsters.json` by exact case-insensitive name — not slug — unmatched names just render as
+  plain text, not an error), `minLevel`/`maxLevel` (optional independent numbers, real
+  numbers not a free-text range, so the wiki's own sort/filter can use them), `raid`
+  (optional bool), `needsInfo` (optional bool, same meaning as elsewhere), `note` (optional
+  visitor text), `lastUpdated` (optional `YYYY-MM-DD`). This settles most of the "Camp"
+  field-shape question above — build the app's own form against these exact fields, not a
+  guess.
+- **Currently empty (`[]`)** — no existing camps to reconcile against yet, builds up
+  incrementally same as monsters.json. Explicitly a SEPARATE dataset from the wiki's existing
+  Leveling Suggestions page (its own informal community-spreadsheet camp names) — don't
+  cross-reference the two.
+- **No submission mechanism exists yet, on either side, and this is now a real open
+  question** — session exports/screenshots always add exactly ONE NEW file
+  (`session-exports/*.txt`, `images/Inbox/*`); a camp submission would need to APPEND one
+  object to an EXISTING array (`camps.json`), which doesn't map onto that pattern cleanly.
+  Wiki-claude flagged this explicitly as needing a three-way conversation (this app's
+  session, wiki-claude, the user) before either side builds against an assumed mechanism —
+  don't design the app's own submission flow for Camp until that's actually settled.
+- Zone-level min/max/avg (separate from Camp's own `minLevel`/`maxLevel`) is still an open
+  fork per the original scoping above — nothing from wiki-claude's answer changes that part.
+
 ## 6. ~~Combat landing info: regular monsters + zone level range~~ — done (2026-08-27)
 
 Two additions were scoped to Combat's existing "browse a zone" landing section (see
@@ -140,12 +167,13 @@ Two additions were scoped to Combat's existing "browse a zone" landing section (
 ## 7. Combat: camp selector + dedicated "add camp/named" entry point (2026-08-27)
 
 - Let the user narrow Combat's landing browse from "whole zone" down to one camp within it.
-  **Blocked on real camp data existing** — checked `monsters.json`/`maps.json`, there is NO
-  structured "camp" concept anywhere in the wiki today (camp names only ever show up as
-  free-text inside a monster's `areas`, e.g. "Corrupted Ashira Camp"). This can't be built
-  until #5's "add camp" authoring flow (or a wiki addition) produces real, structured camp
-  data to select from — check that exists first, don't build a selector with nothing to
-  select from.
+  **Was blocked on real camp data existing at all — that structural half is now resolved**:
+  the wiki built a real `camps.json` (2026-08-29, see backlog #5's own update and `CLAUDE.md`
+  "Cross-session agreement with wiki-claude" for the full schema). **Still practically blocked
+  though** — `camps.json` starts completely empty (`[]`), so there's nothing to actually
+  select from yet; it fills in incrementally as camps get submitted, which itself depends on
+  #5's still-unsettled submission mechanism. Check `camps.json` has real entries before
+  building this selector, not just that the file/schema exists.
 - A dedicated "add camp or named" entry point reachable from the Combat tab specifically —
   this is #5 above, not a new feature (user's own words: "we already talked about this new
   feature"), just confirms Combat should be one of its entry points once #5 is built.

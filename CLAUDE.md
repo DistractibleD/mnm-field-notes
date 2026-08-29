@@ -803,6 +803,30 @@ already hosts source-for, not a git write, and this project's own copy of that W
 lives here, not there — the wiki repo's copy stays untouched). Published site = `GET` only,
 never written to.
 
+### Cross-session agreement with wiki-claude (2026-08-29)
+
+The wiki repo's own Claude session is reachable directly (`ListAgents`/`SendMessage`, both
+sessions running locally on the user's machine) — user's own request, so information doesn't
+have to be relayed by hand every time. **Confirmed mutually with wiki-claude**: information
+shared freely in both directions (answer each other's questions about our own project's
+data/design/state), but **neither session ever edits/creates/deletes files in the other's
+repo, or touches the other's git history/remote** — this is the existing read-only-wiki rule
+above, just now also explicitly held on the wiki side about this repo. `SendMessage` is a
+text channel only, not filesystem access — wiki-claude doesn't get read access to this repo's
+files by virtue of this agreement, it only knows what gets said in a given exchange (and vice
+versa). Scoped to purposeful exchanges when actually relevant to work underway (e.g.
+confirming a data shape before building against it), not standing background chatter — same
+"ask a specific question, get a specific answer" shape as any other information-gathering
+step, just skipping the user as the manual relay.
+
+**Explicitly does NOT extend to design/build decisions that cross both repos** — e.g. a new
+submission mechanism for camp data (see backlog #5/#7) needs the three of us (this session,
+wiki-claude, the user) settling it together, not either Claude session assuming or building
+against an unconfirmed guess. Matches Hard Rule #3's own "no new outbound-write path without
+the same explicit confirm-first treatment" reasoning — a cross-repo channel being open doesn't
+relax that, if anything it raises the bar, since now two sessions could each be wrong in a
+way that looks locally consistent.
+
 ## Maps tab (2026-08-28, backlog #13) — pan/zoom viewer, ported from the wiki
 
 New top-level tab (`#panel-maps`, `renderMapsPanel()` in `app.js`). Grid of map cards
