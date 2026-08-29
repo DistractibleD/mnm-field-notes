@@ -229,14 +229,31 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .log-row:last-child { border-bottom: none; }
 .log-row .when { color: var(--text-muted); font-family: Consolas, monospace; font-size: 11.5px; }
 
+/* Con colors (2026-08-29) - matched to the wiki's own real hex values,
+   not the app's earlier guessed pastels. The wiki has no dedicated con
+   palette of its own (con tiers there only ever render as plain text,
+   confirmed directly with wiki-claude) - these are the wiki's crafting
+   recipe-difficulty colors instead (sampled from real crafting-window
+   screenshots), reused here on the user's own explicit go-ahead despite
+   the tier sets not lining up 1:1: crafting has 6 hex values covering 7
+   named tiers (Trivial+Green share one color) plus an Orange con doesn't
+   use; con keeps Trivial/Green as two distinct tiers and has no Orange.
+   Mapping, confirmed with the user: Trivial uses Green's own color (same
+   as crafting already treats them as one), Light Blue/Dark Blue/White/
+   Yellow/Red map straight across, Orange is unused here (reserved for
+   Crafting's own difficulty UI once that tab gets built - don't repurpose
+   it for anything con-related). Backgrounds are the real saturated hex as
+   given, NOT lightened/pastel-ized like the old guessed values were - text
+   color picked per swatch for contrast (dark text on the light swatches,
+   white text on Dark Blue/Red, the two too dark for dark text to read). */
 .con-pill { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; display: inline-block; }
-.con-trivial { background: #CDEFE3; color: #0F5C46; }
-.con-green { background: #DCF0D3; color: #2E6B1F; }
-.con-lblue { background: #D2F5EE; color: #146357; }
-.con-dblue { background: #D9E6FA; color: #1F4C8C; }
-.con-white { background: #F0EEE6; color: #4A4638; }
-.con-yellow { background: #FBEFC2; color: #7A5E0A; }
-.con-red { background: #FADADA; color: #8C2323; }
+.con-trivial { background: #45FC00; color: #102b00; }
+.con-green { background: #45FC00; color: #102b00; }
+.con-lblue { background: #00FCDF; color: #003d35; }
+.con-dblue { background: #326EFF; color: #ffffff; }
+.con-white { background: #FFFFFF; color: #1a1a1a; }
+.con-yellow { background: #FCE800; color: #3d3600; }
+.con-red { background: #FF1C1C; color: #ffffff; }
 
 /* Con button grid (2026-08-29) - replaces the plain <select>, small colored
    buttons using the exact same con-* classes as the log-row pills above, so

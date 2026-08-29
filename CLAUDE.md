@@ -331,7 +331,15 @@ Gathering/Fishing are NOT this pattern — see their own sections below.
   a tap-grid modal, roster entries are renameable — see "Combat: start-flow, con grid, level
   counter, loot picker, roster edit" for the full mechanism.
 - **Crafting**: tradeskill, recipe, skill, difficultyColor, components. Still a stub
-  (`#panel-craft`) for everything except Cooking (own tab, see below).
+  (`#panel-craft`) for everything except Cooking (own tab, see below). When this gets built
+  for real, `difficultyColor` should use the wiki's own real crafting-difficulty hex palette
+  (confirmed directly with wiki-claude, 2026-08-29 — sampled there from real crafting-window
+  screenshots, lives in that repo's own `CLAUDE.md`): Green/Trivial `#45FC00`, Light Blue
+  `#00FCDF`, Dark Blue `#326EFF`, White `#FFFFFF`, Yellow `#FCE800`, Orange `#E35300`, Red
+  `#FF1C1C`. This is a DIFFERENT 7-tier system from Combat's con colors below — crafting
+  merges Trivial+Green into one color and has an Orange that con doesn't use, so don't reuse
+  Combat's `CON_CLASS`/`.con-*` CSS classes for this, build Crafting's own difficulty-badge
+  classes off this palette instead.
 
 **Session-level export label** (`session.type` in `app.js`, export header/filename) derives
 from the active tab at click time (`TAB_SESSION_TYPE` map — fishing/gathering kept as
@@ -907,6 +915,17 @@ all buildable off patterns/data already in the codebase):
   "Light Blue"/"Dark Blue" con values, but the actual CSS classes are `"con-lblue"`/
   `"con-dblue"` — those two cons were silently rendering with zero color, unnoticed until
   now. Fixed by routing the kill-log pill through the same `CON_CLASS` lookup.
+  **Colors themselves updated (2026-08-29)** — the `.con-*` classes' actual hex values used to
+  be guessed pastels; asked wiki-claude for the wiki's real con colors first, and there aren't
+  any (con tiers only ever render as plain text there). What the wiki DOES have is a real hex
+  palette for a different 7-tier system, crafting recipe difficulty (see the Crafting bullet
+  under "Session types and fields" above for the full list) — the user explicitly OK'd reusing
+  it for con anyway, tier mismatch and all: Trivial uses Green's own color (crafting already
+  treats them as one tier), Light Blue/Dark Blue/White/Yellow/Red map straight across, crafting's
+  Orange is unused here (con has no matching tier — reserved for Crafting's own difficulty UI
+  whenever that gets built for real, don't repurpose it for anything con-related). Backgrounds
+  are the real saturated hex as given, not lightened — text color picked per swatch for
+  contrast (dark text on the light swatches, white text on Dark Blue/Red).
 - **Level counter** (`#combat-level-box`, `renderCombatLevelBox()`/`bindCombatLevelEvents()`)
   — session-level `+`/`-`/type-in box mirroring Fishing/Gathering's skill counters, replacing
   the old per-kill level field. Explicit ask: the user updates this as they level, so `con`
