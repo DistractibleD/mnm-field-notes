@@ -223,6 +223,18 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 }
 .secondary-btn:hover { color: var(--text-primary); border-color: var(--accent); }
 
+/* Orange action button (2026-08-29) - "+ Add loot" was easy to miss as a
+   plain .secondary-btn next to everything else in the "+ Con/Loot" modal
+   (user's own report). Reuses the same #ff8c00 orange .under-construction
+   already uses elsewhere in the app rather than inventing a new color -
+   distinct from .primary-btn's gold accent, so it reads as its own
+   call-to-action, not a second "the" primary action. */
+.btn-orange {
+  background: #ff8c00; color: #1a1200; border: none; border-radius: 7px;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-orange:hover { background: #ffa733; }
+
 .log { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 .log-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; }
 .log-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--border); }
@@ -442,6 +454,20 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .fish-pick-expected-label {
   flex-basis: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--accent-craft); font-weight: 700; margin: 0 0 1px;
+}
+
+/* Caps Combat's monster tap-grid to ~2 rows per box (2026-08-29, backlog
+   #28) - user's own reasoning: a long list of monsters pushes the kill log
+   (with already-logged kills) further down, risking the user not noticing
+   what they've already killed. Internal scroll rather than hard-truncating
+   - nothing becomes unreachable, it's purely a page-height control. Applied
+   to both the "Matches your level" box's own button row and the plain
+   "rest" monsters below it, independently (each gets its own 2-row budget,
+   not a combined one). flex-basis:100% so it takes its own full-width row
+   inside the parent .fish-pick-expected-box (also a flex container). */
+.combat-tap-rows {
+  display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%;
+  max-height: 88px; overflow-y: auto; overflow-x: hidden; padding-right: 2px;
 }
 
 /* ---------- Landing-screen info (2026-08-27) - each tab's pre-session/no-

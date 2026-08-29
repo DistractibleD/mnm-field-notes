@@ -730,7 +730,7 @@ with a real captured `editEntry` payload confirming con/coin/items all patched c
 custom monster's rename propagating to both the tap-grid and the kill log, and a clean
 roster/state reset on session end.
 
-## 28. Combat search: empty-state "add new monster" box (2026-08-29)
+## 28. ~~Combat search: empty-state "add new monster" box~~ — done (2026-08-29)
 
 User's own words: "When i search for a monster, instead of displaying a list, remove the
 monster buttons/boxes under the searchbar that does not match the search. And if no match is
@@ -755,3 +755,24 @@ it? Also worth deciding whether camps get their own similar "no camps match" tre
 just silently stay empty (a zone can genuinely have zero known camps, which isn't really an
 "add a camp" situation - camps are wiki-curated data, not something this tap area lets you
 add ad-hoc the way custom monsters work).
+
+**Built as scoped**: sits ALONGSIDE the existing `+` button, doesn't replace it - shows a
+single "+ Add new monster: '<search text>'" button below both areas only when there's search
+text and zero monsters matched, wired to the same `addCustomMonsterFromSearch()`. Camps got
+no equivalent - left silently empty when a search matches none, per the reasoning above
+(wiki-curated data, not an ad-hoc-addable thing the way custom monsters are).
+
+**Two more asks landed in the same request, both done**:
+- **Monster grid capped to ~2 rows per box** ("Matches your level" and the rest, independent
+  budgets) via internal scroll, not truncation - user's own reasoning: a long list was pushing
+  the kill log (with already-logged kills) further down, risking a user not noticing what
+  they'd already killed.
+- **"+ Add loot" made more visible** - was blending in as a plain secondary button; now uses
+  a new orange `.btn-orange` class (reusing the app's existing `#ff8c00`, not inventing a new
+  color), per the user's own suggestion.
+
+Full mechanism for all three in `CLAUDE.md` "Combat: tap-first workflow" → "Follow-up polish."
+Verified in the browser preview: empty-state fallback appears/disappears correctly and adds
+the monster on click; row-cap confirmed via `scrollHeight`/`clientHeight` inspection (seeded
+extra mock monsters temporarily to force real overflow, reverted after); orange button
+visually confirmed distinct from the modal's gold "OK" and plain "Cancel."

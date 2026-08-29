@@ -1157,6 +1157,34 @@ tap target, logs correctly, and its rename icon in the kill log successfully ren
 everywhere (tap-grid button AND kill-log row) via the reused rename modal; ending the session
 correctly resets `roster`/`combatCustomMonsters` and returns to the pre-start screen.
 
+**Follow-up polish (2026-08-29, backlog #28)**, same day:
+- **Row cap** (`.combat-tap-rows` in `style.css`) — the "Matches your level"/"rest" monster
+  boxes are each wrapped in their own `max-height: 88px; overflow-y: auto` flex container
+  (~2 rows), independent budgets, not a combined one. User's own reasoning: a long monster
+  list was pushing the session-wide kill log (with already-logged kills) further down the
+  page, risking a user not noticing what they'd already killed. Internal scroll, not
+  hard-truncation — nothing becomes unreachable, purely a page-height control. Verified via
+  `getComputedStyle`/`scrollHeight` vs `clientHeight` in the browser preview (seeded 8 mock
+  Shaded Dunes monsters temporarily to force overflow, reverted after) — confirmed content
+  genuinely exceeds the cap and scrolls, and a box whose content fits doesn't add a
+  needless scrollbar.
+- **Empty-state "Add new monster" fallback** (`#combat-search-no-match`, static button in
+  `index.html`, hidden by default) — closes the actual gap backlog #28 flagged (the
+  `.filtered-out` hide-on-search mechanism itself already existed and needed no work — see
+  the item's own note in `To-Do/planned-features.md`). `filterCombatBrowseArea()` now also
+  checks whether any `[data-monster]` button remains visible after filtering; if the search
+  box has text and nothing matches, shows this one button (label includes the searched text)
+  instead of the empty "Camps here"/"Matches your level" section labels a no-match search
+  used to leave behind. Wired to the same `addCustomMonsterFromSearch()` the existing "+"
+  button already uses — no new add-monster logic, just a second, more discoverable entry
+  point into it.
+- **"+ Add loot" made more visible** — was a plain `.secondary-btn`, easy to miss next to
+  everything else in the "+ Con/Loot" modal (user's own report). New `.btn-orange` class
+  (`#ff8c00`, the same orange `.under-construction` already uses elsewhere in the app —
+  reused, not invented) applied to `#conloot-open-loot-btn` only; distinct from
+  `.primary-btn`'s gold accent so it reads as its own call-to-action rather than a second
+  "the" primary action.
+
 ## Coin-drop entry (2026-08-29, backlog #25)
 
 Combat's coin-drop fields (total plat/gold/silver/copper off a corpse) used to be 4 full-width

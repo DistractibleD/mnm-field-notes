@@ -1892,6 +1892,7 @@ setInterval(() => {
 document.getElementById('combat-search-add').addEventListener('click', addCustomMonsterFromSearch);
 document.getElementById('combat-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') addCustomMonsterFromSearch(); });
 document.getElementById('combat-search').addEventListener('input', filterCombatBrowseArea);
+document.getElementById('combat-search-no-match').addEventListener('click', addCustomMonsterFromSearch);
 
 // A monster typed into the search box that isn't already known (wiki or
 // already-tapped this session) becomes a custom tap target, same fallback
@@ -1908,6 +1909,7 @@ function addCustomMonsterFromSearch() {
   const already = roster.has(name) || combatCustomMonsters.some(n => n.toLowerCase() === name.toLowerCase());
   if (!known && !already) combatCustomMonsters.push(name);
   input.value = '';
+  document.getElementById('combat-search-no-match').style.display = 'none';
   renderCombatBrowseArea();
 }
 
@@ -1920,6 +1922,20 @@ function filterCombatBrowseArea() {
   document.querySelectorAll('#combat-camps-area [data-search], #combat-monsters-area [data-search]').forEach(item => {
     item.classList.toggle('filtered-out', !(!q || item.dataset.search.includes(q)));
   });
+  // Empty-state "Add new monster" fallback (2026-08-29, backlog #28) - a
+  // search matching zero monsters used to just leave an empty area with
+  // nothing to do next. Shown only while there's actual search text (an
+  // empty search with zero monsters at all is the "no monsters known here
+  // yet" message renderCombatBrowseArea already handles) and zero visible
+  // monster buttons remain after filtering.
+  const noMatchBtn = document.getElementById('combat-search-no-match');
+  const anyVisible = Array.from(document.querySelectorAll('#combat-monsters-area [data-monster]')).some(el => !el.classList.contains('filtered-out'));
+  if (q && !anyVisible) {
+    noMatchBtn.textContent = `+ Add new monster: "${document.getElementById('combat-search').value.trim()}"`;
+    noMatchBtn.style.display = '';
+  } else {
+    noMatchBtn.style.display = 'none';
+  }
 }
 
 function renderCombatBrowseArea() {
@@ -1998,14 +2014,20 @@ function renderCombatBrowseArea() {
   // Same "expected" grouping treatment as Fishing/Gathering's own pick
   // grids (a bordered/tinted container, not a per-button color channel -
   // see CLAUDE.md "Gathering" for why that channel got freed up) rather
-  // than inventing a new visual language just for Combat.
+  // than inventing a new visual language just for Combat. Each box's own
+  // buttons sit inside .combat-tap-rows, capped to ~2 rows with an internal
+  // scroll (see that class's own comment in style.css) - a long monster
+  // list was pushing the kill log with already-logged kills further down,
+  // risking the user not noticing what they'd already killed.
   const matching = allNames.filter(matchesLevel).sort((a, b) => a.localeCompare(b));
   const rest = allNames.filter(n => !matchesLevel(n)).sort((a, b) => a.localeCompare(b));
   let html = '';
   if (matching.length > 0) {
-    html += `<div class="fish-pick-expected-box"><div class="fish-pick-expected-label">Matches your level</div>${matching.map(renderBtn).join('')}</div>`;
+    html += `<div class="fish-pick-expected-box"><div class="fish-pick-expected-label">Matches your level</div><div class="combat-tap-rows">${matching.map(renderBtn).join('')}</div></div>`;
   }
-  html += rest.map(renderBtn).join('');
+  if (rest.length > 0) {
+    html += `<div class="combat-tap-rows" style="margin-top:8px;">${rest.map(renderBtn).join('')}</div>`;
+  }
   monstersEl.innerHTML = html;
   monstersEl.querySelectorAll('[data-monster]').forEach(btn => btn.addEventListener('click', () => logBareKill(btn.dataset.monster)));
 }
