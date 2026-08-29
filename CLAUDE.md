@@ -888,16 +888,26 @@ User's own consolidated ask, built in one pass (see backlog — none of this nee
 all buildable off patterns/data already in the codebase):
 
 - **Start-flow, mirrors Fishing/Gathering's own pre-start chains**: `combatSession = {zone,
-  level, camp}` (new session-level object, alongside the existing per-tab ones). Reachable
-  ONLY via `TAB_START_ENTRY.combat = openCombatZoneModal` (the top "Start new session"
-  button when no session is running — see "Starting a session"), chain is zone (optional,
-  checklist dropdown) → level (`#combat-level-modal`, "Before you start") → camp (optional,
-  `wikiData.camps` filtered by the picked zone; explicit "Not at a camp" skip when the list
-  is non-empty, plain "No known camps in `<zone>` yet" text + skip when it's empty) →
-  `finishCombatStart(camp)` auto-starts the session (reuses `startNewSession()`). Simpler
-  than Gathering's equivalent chain in one respect: Combat's start-flow is only ever reached
-  from the one top button (no session already running), so there's no "join an
-  already-running session from another tab" branch to handle.
+  level, camp}` (new session-level object, alongside the existing per-tab ones). Reachable via
+  `TAB_START_ENTRY.combat = openCombatZoneModal` (the top "Start new session" button when no
+  session is running — see "Starting a session"), chain is zone (optional, checklist
+  dropdown) → level (`#combat-level-modal`, "Before you start") → camp (optional, `wikiData.
+  camps` filtered by the picked zone; explicit "Not at a camp" skip when the list is
+  non-empty, plain "No known camps in `<zone>` yet" text + skip when it's empty) →
+  `finishCombatStart(camp)` auto-starts the session (reuses `startNewSession()`). Simpler than
+  Gathering's equivalent chain in one respect: Combat's start-flow is only ever reached with no
+  session already running, so there's no "join an already-running session from another tab"
+  branch to handle. **`#combat-start-btn` ("Start fighting!") added 2026-08-29** — the flow
+  above shipped initially reachable ONLY via the top masthead button, unlike Fishing/Gathering
+  which both have their own prominent in-tab "Start fishing!"/"Let's start gathering!" CTA.
+  User caught this in real use (opened the app, went straight to Combat, wasn't prompted to
+  start a session the way Fishing/Gathering prompt) — functionally the start-flow was
+  complete, just far less discoverable than the other tabs. Fixed by adding a matching CTA
+  button + short explainer to Combat's own landing view (`#combat-no-session-msg` in
+  `index.html`, positioned above "Browse a zone", same relative spot Fishing's own CTA
+  occupies), wired directly to `openCombatZoneModal` — no duplicate profile check, matching
+  how `fish-start-btn`/`gather-start-btn` don't have one either (`startNewSession()` at the
+  end of the chain already checks and toasts if a profile is missing).
 - **`camps.json` fetch** (`src/WikiData.cs`, `WikiService.FetchWikiDataAsync`) — its own
   isolated try/catch, deliberately NOT sharing the main monsters/items/nodes/crafting/maps
   try block, same soft-fail-to-empty-list pattern as `GetSharedFishRarityAsync` — camps.json

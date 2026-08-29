@@ -129,14 +129,20 @@
   </div>
 
   <div class="panel-body" id="panel-combat">
-    <div class="detail" style="text-align:left; max-width:440px; margin:0 auto 20px;">
+    <div class="detail" id="combat-no-session-msg" style="text-align:center; padding: 48px 20px 24px;">
+      <p style="font-size:13px; color:var(--text-secondary); max-width:38ch; margin:0 auto 20px;">
+        Pick your zone, current level, and camp (if you're at one) - the session starts as
+        soon as you're through, and you're ready to log kills.
+      </p>
+      <button class="primary-btn" id="combat-start-btn" style="max-width:240px; margin:0 auto;">Start fighting!</button>
+    </div>
+    <div class="detail" style="text-align:left; max-width:440px; margin:24px auto 20px;">
       <label>Browse a zone <span style="color:var(--text-muted); font-weight:400;">(no session needed)</span></label>
       <div id="combat-landing-zone-picker"></div>
       <div id="combat-landing-level-range"></div>
       <div id="combat-landing-named"></div>
       <div id="combat-landing-regular"></div>
     </div>
-    <p class="landing-info-empty" id="combat-no-session-msg">Start a session (top bar) to begin logging kills.</p>
     <div class="layout" id="combat-session-layout" style="display:none;">
       <div style="grid-column:1/-1; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
         <div id="combat-level-box" style="flex:1; min-width:220px;"></div>

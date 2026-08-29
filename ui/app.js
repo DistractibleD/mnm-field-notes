@@ -356,6 +356,17 @@ document.getElementById('combat-camp-modal-go').addEventListener('click', () => 
 });
 document.getElementById('combat-camp-modal-skip').addEventListener('click', () => finishCombatStart(null));
 
+// In-tab entry point (2026-08-29) - matches Fishing/Gathering's own
+// prominent "Start fishing!"/"Let's start gathering!" buttons. Until this,
+// Combat's start-flow was reachable ONLY via the top masthead "Start new
+// session" button (see TAB_START_ENTRY) - functionally complete but far
+// less discoverable than the other tabs, since nothing in the tab itself
+// prompted a user who just clicked into Combat to actually start one. No
+// duplicate profile check here, same as fish-start-btn/gather-start-btn
+// don't have one either - startNewSession() (at the end of the modal
+// chain) already checks and toasts if it's missing.
+document.getElementById('combat-start-btn').addEventListener('click', openCombatZoneModal);
+
 function renderCombatLandingInfo() {
   const pickerEl = document.getElementById('combat-landing-zone-picker');
   if (!pickerEl) return;
