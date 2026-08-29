@@ -767,9 +767,11 @@ no equivalent - left silently empty when a search matches none, per the reasonin
   budgets) via internal scroll, not truncation - user's own reasoning: a long list was pushing
   the kill log (with already-logged kills) further down, risking a user not noticing what
   they'd already killed.
-- **"+ Add loot" made more visible** - was blending in as a plain secondary button; now uses
-  a new orange `.btn-orange` class (reusing the app's existing `#ff8c00`, not inventing a new
-  color), per the user's own suggestion.
+- **"+ Con/Loot" made more visible** - was blending in next to the "Edit" button on each
+  kill-log row; now uses a new `.mini-btn.btn-orange` combo (reusing the app's existing
+  `#ff8c00`, not inventing a new color), per the user's own suggestion. (First attempt
+  applied this to "+ Add loot" inside the modal instead - a misread of the original request,
+  corrected same day once the user pointed at the actual button.)
 
 Full mechanism for all three in `CLAUDE.md` "Combat: tap-first workflow" → "Follow-up polish."
 Verified in the browser preview: empty-state fallback appears/disappears correctly and adds

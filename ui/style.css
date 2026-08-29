@@ -223,17 +223,17 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 }
 .secondary-btn:hover { color: var(--text-primary); border-color: var(--accent); }
 
-/* Orange action button (2026-08-29) - "+ Add loot" was easy to miss as a
-   plain .secondary-btn next to everything else in the "+ Con/Loot" modal
-   (user's own report). Reuses the same #ff8c00 orange .under-construction
-   already uses elsewhere in the app rather than inventing a new color -
-   distinct from .primary-btn's gold accent, so it reads as its own
-   call-to-action, not a second "the" primary action. */
-.btn-orange {
-  background: #ff8c00; color: #1a1200; border: none; border-radius: 7px;
-  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.btn-orange:hover { background: #ffa733; }
+/* Orange action button (2026-08-29) - "+ Con/Loot" (the kill-log row
+   button that OPENS the con/coin/loot/faction modal) was easy to miss next
+   to the plain "Edit" button beside it (user's own report - originally
+   misapplied to "+ Add loot" INSIDE that modal instead, corrected same
+   day once the user pointed at the actual button in a screenshot). Reuses
+   the same #ff8c00 orange .under-construction already uses elsewhere in
+   the app rather than inventing a new color. Combined with .mini-btn
+   (not a standalone size) since its neighbor "Edit" is a .mini-btn too -
+   only the color needs to differ, not the footprint. */
+.mini-btn.btn-orange { background: #ff8c00; color: #1a1200; border-color: #ff8c00; }
+.mini-btn.btn-orange:hover { background: #ffa733; border-color: #ffa733; color: #1a1200; }
 
 .log { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 .log-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; }

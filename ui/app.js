@@ -2232,7 +2232,7 @@ function renderCombatKillLog() {
       : `<span class="con-pill" style="background:var(--bg-raised); color:var(--text-muted);">No con yet</span>`;
     const when = new Date(e.loggedAt).toLocaleTimeString();
     const editBtn = e.id ? `<button class="mini-btn" data-edit-id="${escapeHtml(e.id)}">Edit</button>` : '';
-    const conLootBtn = e.id ? `<button class="mini-btn" data-conloot-id="${escapeHtml(e.id)}">+ Con/Loot</button>` : '';
+    const conLootBtn = e.id ? `<button class="mini-btn btn-orange" data-conloot-id="${escapeHtml(e.id)}">+ Con/Loot</button>` : '';
     const renameBtn = !knownNames.includes(e.target.toLowerCase())
       ? `<span class="roster-item-edit" style="position:static;" data-name="${escapeHtml(e.target)}" title="Rename ${escapeHtml(e.target)}">&#9998;</span>` : '';
     return `<div class="log-row"><span><b>${escapeHtml(e.target)}</b>${renameBtn}&nbsp;${conPill}&nbsp;${fmtCoin(e.coin)}${e.items.length ? ' &middot; ' + e.items.map(escapeHtml).join(', ') : ''}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span>${editBtn}${conLootBtn}</span></div>`;

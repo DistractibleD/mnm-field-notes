@@ -1178,12 +1178,15 @@ correctly resets `roster`/`combatCustomMonsters` and returns to the pre-start sc
   used to leave behind. Wired to the same `addCustomMonsterFromSearch()` the existing "+"
   button already uses — no new add-monster logic, just a second, more discoverable entry
   point into it.
-- **"+ Add loot" made more visible** — was a plain `.secondary-btn`, easy to miss next to
-  everything else in the "+ Con/Loot" modal (user's own report). New `.btn-orange` class
+- **"+ Con/Loot" made more visible** — was a plain `.mini-btn` blending in next to its
+  neighbor "Edit" button on each kill-log row. **First attempt targeted the wrong button** —
+  applied to `#conloot-open-loot-btn` ("+ Add loot", INSIDE the modal this button opens)
+  instead, based on a misreading of the original request; corrected same day once the user
+  pointed at the actual button in a screenshot. New `.mini-btn.btn-orange` combo class
   (`#ff8c00`, the same orange `.under-construction` already uses elsewhere in the app —
-  reused, not invented) applied to `#conloot-open-loot-btn` only; distinct from
-  `.primary-btn`'s gold accent so it reads as its own call-to-action rather than a second
-  "the" primary action.
+  reused, not invented) — color-only override paired with `.mini-btn`'s existing sizing
+  (not a standalone size) since "Edit" right next to it is a `.mini-btn` too, only the color
+  needed to differ. `#conloot-open-loot-btn` reverted back to plain `.secondary-btn`.
 
 ## Coin-drop entry (2026-08-29, backlog #25)
 
