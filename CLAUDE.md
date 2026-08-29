@@ -984,7 +984,14 @@ all buildable off patterns/data already in the codebase):
   **per already-logged kill of that monster** (not just one — unlike Fishing/Gathering's
   zone-edit, a Combat roster entry can have many kills, all needing the same patch). Existing
   per-kill edit (✎ on each kill-log row, `openCombatEditModal`) now also edits `con` through
-  the same button-grid component as the main form.
+  the same button-grid component as the main form. **Zone suggestions added (2026-08-29)** —
+  both `#f-zone` (main form) and `#combat-edit-zone` (edit modal) were plain free-text inputs
+  with no autocomplete at all, unlike every other free-text zone field in the app (Log a
+  camp's own zone field, Fishing/Gathering's landing pickers) — user specifically flagged this
+  against the edit modal, correcting a zone typo with no suggestions to lean on. Fixed with one
+  shared `#combat-zone-list` datalist (`index.html`), populated once from `wikiData.zones` in
+  the `wikiData` message handler (same spot/pattern as `#mob-list`, since `wikiData.zones`
+  never changes after that message arrives), referenced by both inputs' `list=` attribute.
 - **"+ Add loot" modal** (`#loot-modal`, `openLootModal()`/`renderLootGrid()`) — mirrors
   Gathering's material-modal pattern exactly: tap-to-increment pending counts
   (`lootPendingCounts`, `+N` badge), a "Not listed? Type its name…" + "+ Add" custom-item

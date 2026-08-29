@@ -154,6 +154,7 @@
         <div class="roster-add">
           <input id="new-mob" placeholder="Add monster&hellip;" list="mob-list" autocomplete="off" />
           <datalist id="mob-list"></datalist>
+          <datalist id="combat-zone-list"></datalist>
           <button class="mini-btn" id="add-mob">+</button>
         </div>
         <div id="roster-list"><div class="roster-empty">No monsters yet &mdash; add one above.</div></div>
@@ -311,7 +312,7 @@
     <p>Fix a typo or misclick &mdash; this only updates entries in the session that's still
       running. Items and faction changes aren't editable here; log a corrected kill instead if those were wrong.</p>
     <div class="field-grid">
-      <div><label>Zone</label><input id="combat-edit-zone" /></div>
+      <div><label>Zone</label><input id="combat-edit-zone" list="combat-zone-list" autocomplete="off" /></div>
       <div><label>Your level</label><input type="number" id="combat-edit-level" min="0" /></div>
       <div><label>Named?</label><select id="combat-edit-named"><option>No</option><option>Yes</option></select></div>
     </div>

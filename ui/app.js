@@ -1671,6 +1671,14 @@ onHostMessage((msg) => {
     wikiData.pageUrl = msg.pageUrl || '';
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
+    // Shared by f-zone (main kill-log form) and combat-edit-zone (edit-kill
+    // modal) - both were plain free-text inputs with no suggestions at all,
+    // unlike every other free-text zone field in the app (Log a camp's own
+    // camp-zone, Fishing/Gathering's landing pickers) - reported directly
+    // by the user against the edit modal specifically (2026-08-29).
+    // Populated once here, same pattern as mob-list above, since
+    // wikiData.zones doesn't change after this message arrives.
+    document.getElementById('combat-zone-list').innerHTML = wikiData.zones.map(z => `<option value="${escapeHtml(z)}"></option>`).join('');
     refreshDishList();
     renderMapsPanel();
     // Fishing/Gathering's landing screens build their zone picker's options
@@ -1942,7 +1950,7 @@ function renderDetail() {
   el.innerHTML = `
     <div class="detail-head"><h2>${escapeHtml(activeTarget)}</h2></div>
     <div class="field-grid">
-      <div><label>Zone</label><input id="f-zone" placeholder="e.g. Vale of Zintar" value="${escapeHtml(combatSession.zone || '')}" /></div>
+      <div><label>Zone</label><input id="f-zone" list="combat-zone-list" autocomplete="off" placeholder="e.g. Vale of Zintar" value="${escapeHtml(combatSession.zone || '')}" /></div>
       <div><label>Named?</label><select id="f-named"><option>No</option><option>Yes</option></select></div>
     </div>
     <div class="con-coin-row">
