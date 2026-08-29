@@ -291,6 +291,7 @@ internal static class WebMessageRouter
             { "factions", wikiData.Factions },
             { "zones", wikiData.Zones },
             { "maps", wikiData.Maps },
+            { "camps", wikiData.Camps },
             { "pageUrl", wikiData.PageUrl },
             { "error", wikiData.Error },
         });

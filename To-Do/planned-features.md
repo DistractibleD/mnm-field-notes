@@ -547,3 +547,24 @@ Not yet scoped - real architectural decision, needs its own pass before building
   not as a thing you close before going back to logging. Keep this framing in mind when #14
   gets picked up too, not just when this item does - the two are more connected than their
   separate numbering suggests.
+
+## 25. Coin-drop entry: colored currency icons + grid (2026-08-29)
+
+User's own words: "In the downloads folder there is a folder called mnm field-notes files, in
+there i added a picture of the inventory's currency overview. Can you crop out or recreate
+simlar colored circles to represent what currency gets dropped, add a grid with number inputs
+so the users can add coin drop to the loot." Reference image:
+`C:\Users\danie\Downloads\mnm field-notes files\{3D8D7F79-2970-4C16-BA42-F4B42635C278}.png` -
+the game's own in-game "Currency" inventory row, showing 4 round coin icons (platinum =
+blue-gray, gold = yellow/gold, silver = light gray, copper = orange/copper) each paired with a
+count.
+
+Today's coin entry (Combat's `#f-plat`/`#f-gold`/`#f-silver`/`#f-copper`, plain labeled number
+inputs in a `.field-grid`, see `renderDetail()` in `ui/app.js`) is plain text labels, no icons.
+Ask is to reuse the game's own coin-icon visual language (crop from the reference screenshot,
+or recreate similarly-colored circles rather than shipping the exact game asset) next to each
+number input, laid out as a small grid - same spirit as the Con button grid's small/compact
+styling. Not yet scoped: whether this replaces the existing 4 plain inputs in place, or is a
+new shared component reusable anywhere coin gets entered (this app also has coin fields
+elsewhere worth checking, e.g. Gathering/Crafting/Cooking if/when they grow one). Needs a
+design pass on the icons themselves (crop vs. recreate) before building.

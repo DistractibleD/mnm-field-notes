@@ -326,7 +326,10 @@ Gathering/Fishing are NOT this pattern — see their own sections below.
 
 - **Combat**: monster, zone, con+level, coin (total off corpse), items, named y/n,
   `factionChanges` (2 checklist dropdowns pos/neg, from `monsters.json` `factionEffects`,
-  60+ entries). Logged as `[{faction,effect}]` — same shape as the wiki's own.
+  60+ entries). Logged as `[{faction,effect}]` — same shape as the wiki's own. Session-level
+  zone/level/camp collected via its own start-flow, con is a button grid, items are added via
+  a tap-grid modal, roster entries are renameable — see "Combat: start-flow, con grid, level
+  counter, loot picker, roster edit" for the full mechanism.
 - **Crafting**: tradeskill, recipe, skill, difficultyColor, components. Still a stub
   (`#panel-craft`) for everything except Cooking (own tab, see below).
 
@@ -870,6 +873,71 @@ way it already reads a session export today, and makes the new-camp-vs-update-ex
 call by hand — matches this app's own "Guild data trust model" and wiki-claude's own
 explicit recommendation (every other submission channel that repo has already works this
 way; nothing auto-merges into curated data sight-unseen).
+
+## Combat: start-flow, con grid, level counter, loot picker, roster edit (2026-08-29)
+
+User's own consolidated ask, built in one pass (see backlog — none of this needed deferring,
+all buildable off patterns/data already in the codebase):
+
+- **Start-flow, mirrors Fishing/Gathering's own pre-start chains**: `combatSession = {zone,
+  level, camp}` (new session-level object, alongside the existing per-tab ones). Reachable
+  ONLY via `TAB_START_ENTRY.combat = openCombatZoneModal` (the top "Start new session"
+  button when no session is running — see "Starting a session"), chain is zone (optional,
+  checklist dropdown) → level (`#combat-level-modal`, "Before you start") → camp (optional,
+  `wikiData.camps` filtered by the picked zone; explicit "Not at a camp" skip when the list
+  is non-empty, plain "No known camps in `<zone>` yet" text + skip when it's empty) →
+  `finishCombatStart(camp)` auto-starts the session (reuses `startNewSession()`). Simpler
+  than Gathering's equivalent chain in one respect: Combat's start-flow is only ever reached
+  from the one top button (no session already running), so there's no "join an
+  already-running session from another tab" branch to handle.
+- **`camps.json` fetch** (`src/WikiData.cs`, `WikiService.FetchWikiDataAsync`) — its own
+  isolated try/catch, deliberately NOT sharing the main monsters/items/nodes/crafting/maps
+  try block, same soft-fail-to-empty-list pattern as `GetSharedFishRarityAsync` — camps.json
+  may not be deployed to the published site yet (see "Cross-session agreement with
+  wiki-claude"), and a missing/failed fetch here must never break the rest of `wikiData`.
+  Forwarded to the client as `wikiData.camps`.
+- **Con button grid** — replaces the old `<select>`. `CON_LEVELS` (array) + `CON_CLASS`
+  (name→CSS-class map, `ui/app.js`) are the one source of truth now; `conButtonGridHTML(id
+  Prefix, selected)` renders the 7 small pill buttons (`.con-btn-grid`/`.con-btn`, `ui/
+  style.css`), `setupConButtonGrid(idPrefix, initial)` wires clicks and returns `{getValue,
+  setValue}`. Used in both the main kill-log form and the edit-kill modal (`combatEditConCtrl`)
+  — one shared implementation, not two. **Found and fixed a real pre-existing bug while
+  building this**: `renderKillLog()`'s old con-pill class computation (`'con-' +
+  e.con.toLowerCase().replace(' ','')`) produced `"con-lightblue"`/`"con-darkblue"` for the
+  "Light Blue"/"Dark Blue" con values, but the actual CSS classes are `"con-lblue"`/
+  `"con-dblue"` — those two cons were silently rendering with zero color, unnoticed until
+  now. Fixed by routing the kill-log pill through the same `CON_CLASS` lookup.
+- **Level counter** (`#combat-level-box`, `renderCombatLevelBox()`/`bindCombatLevelEvents()`)
+  — session-level `+`/`-`/type-in box mirroring Fishing/Gathering's skill counters, replacing
+  the old per-kill level field. Explicit ask: the user updates this as they level, so `con`
+  stays meaningful relative to a level that's actually current. Shown only while a session is
+  running (`updateCombatSessionVisibility()`).
+- **Faction pickers relabeled** "Add faction" / "Lose faction" (`checklistDropdownHTML`,
+  unchanged mechanism — see "Checklist dropdown") — was already a 2-dropdown pos/neg pattern,
+  just relabeled to read as an action rather than a bare noun.
+- **Roster entries fully editable**: `.roster-item-edit` (✎, `renderRoster()`) opens
+  `#combat-rename-modal` (`openRosterRenameModal`) — validates non-empty + no name collision
+  with a different roster entry, moves the roster `Map` entry, patches `activeTarget` if the
+  renamed monster was the active one, and sends one `editEntry`/`{patch:{target:newName}}`
+  **per already-logged kill of that monster** (not just one — unlike Fishing/Gathering's
+  zone-edit, a Combat roster entry can have many kills, all needing the same patch). Existing
+  per-kill edit (✎ on each kill-log row, `openCombatEditModal`) now also edits `con` through
+  the same button-grid component as the main form.
+- **"+ Add loot" modal** (`#loot-modal`, `openLootModal()`/`renderLootGrid()`) — mirrors
+  Gathering's material-modal pattern exactly: tap-to-increment pending counts
+  (`lootPendingCounts`, `+N` badge), a "Not listed? Type its name…" + "+ Add" custom-item
+  fallback (`lootCustomItems`), "Done" flattens the pending counts into repeated pushes onto
+  the EXISTING `pendingItems` array (the chip display/removal via `renderChips()` was
+  untouched — this only changed how items get ADDED to that array, not how they're stored or
+  shown). Grid source = `findMonster(activeTarget).drops` ∪ already-picked names, "new"-badge
+  logic shared with Fishing/Gathering's own grids.
+
+Verified end-to-end in the browser preview (mock host): full start-flow (zone → level → camp,
+including the zone-filtered camp list and the empty-camp-list text path), con grid click
+→active-state in both the main form and edit modal, roster rename correctly patching every
+logged kill's `target` (confirmed via the actual outgoing `editEntry` payloads, not just the
+UI), and a full kill log/edit round-trip confirming the `logEntry`/`editEntry` payloads carry
+the right `con`/`playerLevel`/`zone`/`items` fields.
 
 ## Maps tab (2026-08-28, backlog #13) — pan/zoom viewer, ported from the wiki
 

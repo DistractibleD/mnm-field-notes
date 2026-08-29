@@ -74,6 +74,10 @@ function mockHostRespond(msg) {
           { name: 'Shaded Dunes (Numbered)', image: mockMapSvg('Shaded Dunes (Numbered)', '#a72'), thumbnail: null },
           { name: 'Sungreet Strand', image: mockMapSvg('Sungreet Strand', '#39c'), thumbnail: null },
         ],
+        camps: [
+          { name: 'Corrupted Ashira Camp', zone: 'Shaded Dunes', area: 'Sunken Ruins', monsters: ['Onis the Elder', 'a corrupted outrider'], minLevel: 10, maxLevel: 14, raid: false },
+          { name: 'Ridgeback Warband', zone: 'Vale of Zintar', area: '', monsters: [], minLevel: null, maxLevel: null, raid: true },
+        ],
         pageUrl: 'https://distractibled.github.io/DistractibleD-MonstersAndMemories-Wiki/',
       });
       deliverFromHost({ type: 'profiles', profiles: mockProfiles.profiles, lastUsed: mockProfiles.lastUsed });
@@ -182,7 +186,7 @@ window.addEventListener('unhandledrejection', e => {
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [], maps: [], pageUrl: '' };
+const wikiData = { monsters: [], items: [], nodes: [], recipes: [], factions: [], zones: [], maps: [], camps: [], pageUrl: '' };
 
 const session = {
   id: null,
@@ -195,13 +199,23 @@ const session = {
 const roster = new Map();
 let activeTarget = null;
 
+// Session-level Combat state (2026-08-29) - zone/level/camp collected once
+// via the start-flow (openCombatZoneModal etc., matching Fishing/Gathering's
+// own pre-start prompt pattern) rather than re-typed per kill. level is a
+// persistent +/- counter (like Fishing/Gathering's own skill counters) that
+// auto-fills into every kill logged from here on - the user is expected to
+// bump it as they level so con stays meaningful, same reasoning Fishing's
+// skill counter already documents.
+const combatSession = { zone: '', level: null, camp: null };
+
 // ---------------------------------------------------------------------------
 // Combat landing info (2026-08-27) - browsable without a session: pick a
 // zone, see how many named monsters the wiki knows about there, expand for
 // a compact list with their drops/sub-area (data-tip, same pattern used
 // elsewhere). Own state, not tied to roster/session - this is browsing, not
-// logging (Combat's roster has no zone concept of its own; zone is only
-// ever entered per-kill in the detail form).
+// logging - this landing zone picker is deliberately separate from
+// combatSession.zone (2026-08-29's start-flow), same split Fishing/
+// Gathering's own landing pickers already have from their real session zone).
 // ---------------------------------------------------------------------------
 let combatLandingZone = '';
 let combatNamedListExpanded = false;
@@ -215,7 +229,132 @@ function updateCombatSessionVisibility() {
   const running = !!session.id;
   document.getElementById('combat-no-session-msg').style.display = running ? 'none' : '';
   document.getElementById('combat-session-layout').style.display = running ? '' : 'none';
+  if (running) { renderCombatLevelBox(); renderCombatCampIndicator(); }
 }
+
+// Session-level "your level" counter (2026-08-29) - same +/- and
+// manual-entry pattern as Fishing/Gathering's own skill counters, and the
+// same "mutate the one input in place, never rebuild wholesale" care (a
+// rebuild mid-keystroke would steal focus). Feeds combatSession.level, which
+// auto-fills into every kill logged from here on (see renderDetail) -
+// nagging the user to keep it current is the whole point, since con only
+// means anything relative to a level that's actually up to date.
+function renderCombatLevelBox() {
+  const box = document.getElementById('combat-level-box');
+  if (!box) return;
+  box.outerHTML = `
+    <div id="combat-level-box" style="background: var(--bg-raised); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 14px;">
+      <label style="margin:0 0 8px;">Your level &mdash; bump this (or type it) the moment you level up</label>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="mini-btn" id="combat-level-minus">-</button>
+        <input type="number" id="combat-level-input" min="0" value="${combatSession.level != null ? combatSession.level : ''}"
+          style="width:64px; text-align:center; font-family:Consolas,monospace; font-size:16px; font-weight:600; padding:6px 4px;" />
+        <button class="mini-btn" id="combat-level-plus">+</button>
+      </div>
+    </div>
+  `;
+  bindCombatLevelEvents();
+}
+function bindCombatLevelEvents() {
+  const input = document.getElementById('combat-level-input');
+  document.getElementById('combat-level-minus').addEventListener('click', () => {
+    combatSession.level = Math.max(0, (combatSession.level || 0) - 1);
+    input.value = combatSession.level;
+  });
+  document.getElementById('combat-level-plus').addEventListener('click', () => {
+    combatSession.level = (combatSession.level || 0) + 1;
+    input.value = combatSession.level;
+  });
+  input.addEventListener('input', () => {
+    const v = parseInt(input.value, 10);
+    combatSession.level = isNaN(v) ? null : Math.max(0, v);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Combat start-flow (2026-08-29) - zone -> level -> camp (optional),
+// matching Fishing/Gathering's own pre-start prompt chain and auto-starting
+// the session at the end. Reached only via TAB_START_ENTRY (the top
+// "Start new session" button), which is only ever consulted when no session
+// is already running - unlike Gathering's own skill-modal-go handler,
+// there's no "join an already-running session from this tab's own landing
+// screen" case to handle here, since Combat has no such landing button.
+// ---------------------------------------------------------------------------
+let combatZoneModalCtrl = null;
+let combatCampModalCtrl = null;
+
+function openCombatZoneModal() {
+  document.getElementById('combat-zone-modal-picker').innerHTML = checklistDropdownHTML(
+    'combat-zone-modal', combatSession.zone ? combatSession.zone : 'Select zone', wikiData.zones,
+    { multi: false, selected: combatSession.zone ? [combatSession.zone] : [] }
+  );
+  combatZoneModalCtrl = setupChecklistDropdown('combat-zone-modal', { multi: false });
+  document.getElementById('combat-zone-modal').classList.add('open');
+}
+document.getElementById('combat-zone-modal-go').addEventListener('click', () => {
+  // Zone is optional, same reasoning as Fishing/Gathering's own zone modals.
+  combatSession.zone = combatZoneModalCtrl ? combatZoneModalCtrl.getValue() : '';
+  document.getElementById('combat-zone-modal').classList.remove('open');
+  openCombatLevelModal();
+});
+
+function openCombatLevelModal() {
+  document.getElementById('combat-level-modal-input').value = combatSession.level != null ? combatSession.level : '';
+  document.getElementById('combat-level-modal-err').style.display = 'none';
+  document.getElementById('combat-level-modal').classList.add('open');
+  document.getElementById('combat-level-modal-input').focus();
+}
+document.getElementById('combat-level-modal-go').addEventListener('click', () => {
+  const input = document.getElementById('combat-level-modal-input');
+  const v = parseInt(input.value, 10);
+  if (input.value.trim() && (isNaN(v) || v < 0)) {
+    document.getElementById('combat-level-modal-err').textContent = 'Enter a valid level number';
+    document.getElementById('combat-level-modal-err').style.display = 'block';
+    return;
+  }
+  combatSession.level = isNaN(v) ? null : v;
+  document.getElementById('combat-level-modal').classList.remove('open');
+  openCombatCampModal();
+});
+document.getElementById('combat-level-modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('combat-level-modal-go').click(); });
+
+// Camp step is genuinely optional (not just "skippable like zone/level can
+// be left blank") - camps.json may have nothing for this zone yet, or the
+// player just isn't at a known camp, so a plain "Not at a camp" button sits
+// alongside the picker rather than trying to force a pick either way.
+function openCombatCampModal() {
+  const zone = combatSession.zone;
+  const inZone = zone ? wikiData.camps.filter(c => c.zone === zone) : wikiData.camps;
+  const picker = document.getElementById('combat-camp-modal-picker');
+  const body = document.getElementById('combat-camp-modal-body');
+  if (inZone.length === 0) {
+    body.textContent = zone
+      ? `No known camps in ${zone} yet.`
+      : 'Pick one if you\'re at a spot the wiki already knows about, or skip this.';
+    picker.innerHTML = '';
+    combatCampModalCtrl = null;
+  } else {
+    body.textContent = 'Pick one if you\'re at a spot the wiki already knows about, or skip this.';
+    picker.innerHTML = checklistDropdownHTML('combat-camp-modal', 'Select camp', inZone.map(c => c.name), { multi: false });
+    combatCampModalCtrl = setupChecklistDropdown('combat-camp-modal', { multi: false });
+  }
+  document.getElementById('combat-camp-modal').classList.add('open');
+}
+function finishCombatStart(camp) {
+  combatSession.camp = camp || null;
+  document.getElementById('combat-camp-modal').classList.remove('open');
+  renderCombatCampIndicator();
+  if (!session.id) startNewSession();
+}
+function renderCombatCampIndicator() {
+  const el = document.getElementById('combat-camp-indicator');
+  if (!el) return;
+  el.textContent = combatSession.camp ? 'At ' + combatSession.camp : '';
+}
+document.getElementById('combat-camp-modal-go').addEventListener('click', () => {
+  finishCombatStart(combatCampModalCtrl ? combatCampModalCtrl.getValue() : null);
+});
+document.getElementById('combat-camp-modal-skip').addEventListener('click', () => finishCombatStart(null));
 
 function renderCombatLandingInfo() {
   const pickerEl = document.getElementById('combat-landing-zone-picker');
@@ -385,6 +524,45 @@ function renderCombatRegularInfo() {
       sendToHost({ type: 'openUrl', url: wikiData.pageUrl + '#monsters-regular/' + encodeURIComponent(combatLandingZone) });
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Con button grid (2026-08-29) - shared between the main kill-log form and
+// the edit-kill modal, small colored buttons instead of a <select>. One
+// source of truth for the con->CSS-class mapping - fixes a real pre-existing
+// bug where the kill-log's own con-pill built its class as
+// 'con-' + con.toLowerCase().replace(' ','') ("Light Blue" -> "con-lightblue"),
+// which never matched the real "con-lblue"/"con-dblue" classes actually
+// defined in style.css, so Light Blue/Dark Blue kills silently rendered with
+// no color at all. CON_CLASS is now the only place this mapping lives.
+// ---------------------------------------------------------------------------
+const CON_LEVELS = ['Trivial', 'Green', 'Light Blue', 'Dark Blue', 'White', 'Yellow', 'Red'];
+const CON_CLASS = {
+  'Trivial': 'con-trivial', 'Green': 'con-green', 'Light Blue': 'con-lblue',
+  'Dark Blue': 'con-dblue', 'White': 'con-white', 'Yellow': 'con-yellow', 'Red': 'con-red',
+};
+function conButtonGridHTML(idPrefix, selected) {
+  return `<div class="con-btn-grid" id="${idPrefix}-grid">${CON_LEVELS.map(c =>
+    `<button type="button" class="con-btn ${CON_CLASS[c]}${c === selected ? ' active' : ''}" data-con="${escapeHtml(c)}">${escapeHtml(c)}</button>`
+  ).join('')}</div>`;
+}
+// Returns { getValue, setValue } - setValue also used to re-sync the grid
+// when opening the edit modal with an existing entry's con.
+function setupConButtonGrid(idPrefix, initial) {
+  const grid = document.getElementById(`${idPrefix}-grid`);
+  let current = initial;
+  function applyActive() {
+    grid.querySelectorAll('.con-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.con === current));
+  }
+  grid.querySelectorAll('.con-btn').forEach(btn => btn.addEventListener('click', () => {
+    current = btn.dataset.con;
+    applyActive();
+  }));
+  applyActive();
+  return {
+    getValue: () => current,
+    setValue: v => { current = v; applyActive(); },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1294,7 +1472,7 @@ const btnSession = document.getElementById('btn-session-action');
 // pattern Fishing/Gathering's own pre-start screens already use. Tabs
 // without one yet fall back to startNewSession() directly below. Extend
 // this as more tabs get their own prompt flow.
-const TAB_START_ENTRY = { fishing: openFishSkillModal, gathering: openGatherZoneModal };
+const TAB_START_ENTRY = { fishing: openFishSkillModal, gathering: openGatherZoneModal, combat: openCombatZoneModal };
 
 function setSessionButtonState(running) {
   btnSession.disabled = false;
@@ -1432,6 +1610,7 @@ onHostMessage((msg) => {
     wikiData.factions = msg.factions || [];
     wikiData.zones = msg.zones || [];
     wikiData.maps = msg.maps || [];
+    wikiData.camps = msg.camps || [];
     wikiData.pageUrl = msg.pageUrl || '';
     const mobList = document.getElementById('mob-list');
     mobList.innerHTML = wikiData.monsters.map(m => `<option value="${escapeHtml(m.name)}"></option>`).join('');
@@ -1609,12 +1788,13 @@ function renderRoster() {
     div.className = 'roster-item' + (name === activeTarget ? ' selected' : '');
     div.innerHTML = `
       <span class="roster-item-remove" data-name="${escapeHtml(name)}" title="Remove ${escapeHtml(name)} from this session">&times;</span>
+      <span class="roster-item-edit" data-name="${escapeHtml(name)}" title="Rename ${escapeHtml(name)}">&#9998;</span>
       <div class="name">${escapeHtml(name)}</div>
       <div class="meta">${data.entries.length} kill${data.entries.length === 1 ? '' : 's'} &middot; ${fmtCoin(coin)}</div>
       <div class="quickadd"><button class="mini-btn quick-kill" data-name="${escapeHtml(name)}">+1 kill</button></div>
     `;
     div.addEventListener('click', (e) => {
-      if (e.target.classList.contains('quick-kill') || e.target.classList.contains('roster-item-remove')) return;
+      if (e.target.classList.contains('quick-kill') || e.target.classList.contains('roster-item-remove') || e.target.classList.contains('roster-item-edit')) return;
       activeTarget = name;
       renderRoster();
       renderDetail();
@@ -1629,16 +1809,70 @@ function renderRoster() {
     renderDetail();
     updateStats();
   }));
+  el.querySelectorAll('.roster-item-edit').forEach(x => x.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openRosterRenameModal(x.dataset.name);
+  }));
   el.querySelectorAll('.quick-kill').forEach(btn => btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    logKill(btn.dataset.name, { con: 'Dark Blue', playerLevel: null, coin: { platinum: 0, gold: 0, silver: 0, copper: 0 }, items: [], named: false, factionChanges: [] });
+    logKill(btn.dataset.name, { id: genId(), con: 'Dark Blue', playerLevel: combatSession.level, coin: { platinum: 0, gold: 0, silver: 0, copper: 0 }, items: [], named: false, factionChanges: [] });
   }));
 }
+
+// Roster entries are fully renameable (2026-08-29) - fixes a typo/misclick
+// without having to delete and re-add (which would lose that monster's
+// already-logged kills entirely). Renaming has to patch every one of this
+// monster's own already-logged entries' `target` field too, one editEntry
+// per entry - same "the grouping field has to move with the correction"
+// reasoning Fishing/Gathering's own zone/node-type edits already document,
+// just potentially N entries here instead of always exactly one.
+let renamingRosterTarget = null;
+function openRosterRenameModal(name) {
+  renamingRosterTarget = name;
+  document.getElementById('combat-rename-input').value = name;
+  document.getElementById('combat-rename-err').style.display = 'none';
+  document.getElementById('combat-rename-modal').classList.add('open');
+}
+document.getElementById('combat-rename-cancel').addEventListener('click', () => {
+  document.getElementById('combat-rename-modal').classList.remove('open');
+  renamingRosterTarget = null;
+});
+document.getElementById('combat-rename-save').addEventListener('click', () => {
+  const newName = document.getElementById('combat-rename-input').value.trim();
+  const err = document.getElementById('combat-rename-err');
+  const oldName = renamingRosterTarget;
+  if (!newName) {
+    err.textContent = 'Name can\'t be empty';
+    err.style.display = 'block';
+    return;
+  }
+  if (newName !== oldName && roster.has(newName)) {
+    err.textContent = 'Already a monster with that name in this session';
+    err.style.display = 'block';
+    return;
+  }
+  if (newName !== oldName) {
+    const data = roster.get(oldName);
+    roster.delete(oldName);
+    roster.set(newName, data);
+    if (activeTarget === oldName) activeTarget = newName;
+    data.entries.forEach(e => {
+      if (!e.id) return;
+      sendToHost({ type: 'editEntry', sessionId: session.id, entryId: e.id, patch: { target: newName } });
+    });
+  }
+  document.getElementById('combat-rename-modal').classList.remove('open');
+  renamingRosterTarget = null;
+  renderRoster();
+  renderDetail();
+});
 
 // ---------------------------------------------------------------------------
 // Detail panel
 // ---------------------------------------------------------------------------
 let pendingItems = [];
+
+let combatConCtrl = null;
 
 function renderDetail() {
   const el = document.getElementById('detail-panel');
@@ -1651,17 +1885,12 @@ function renderDetail() {
   el.innerHTML = `
     <div class="detail-head"><h2>${escapeHtml(activeTarget)}</h2></div>
     <div class="field-grid">
-      <div><label>Zone</label><input id="f-zone" placeholder="e.g. Vale of Zintar" /></div>
-      <div><label>Con</label>
-        <select id="f-con">
-          <option>Trivial</option><option>Green</option><option>Light Blue</option>
-          <option selected>Dark Blue</option><option>White</option><option>Yellow</option><option>Red</option>
-        </select>
-      </div>
-      <div><label>Your level</label><input id="f-level" type="number" min="0" /></div>
+      <div><label>Zone</label><input id="f-zone" placeholder="e.g. Vale of Zintar" value="${escapeHtml(combatSession.zone || '')}" /></div>
       <div><label>Named?</label><select id="f-named"><option>No</option><option>Yes</option></select></div>
     </div>
-    <label>Coin drop (total off the corpse)</label>
+    <label>Con <span style="color:var(--text-muted); font-weight:400;">(relative to your level above)</span></label>
+    ${conButtonGridHTML('f-con', 'Dark Blue')}
+    <label style="margin-top:10px;">Coin drop (total off the corpse)</label>
     <div class="field-grid">
       <input id="f-plat" type="number" placeholder="platinum" min="0" />
       <input id="f-gold" type="number" placeholder="gold" min="0" />
@@ -1670,15 +1899,12 @@ function renderDetail() {
     </div>
     <label>Faction change (optional)</label>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
-      ${checklistDropdownHTML('f-faction-pos', 'Went up', wikiData.factions, { tip: 'Factions this kill improved your standing with, if any.' })}
-      ${checklistDropdownHTML('f-faction-neg', 'Went down', wikiData.factions, { tip: 'Factions this kill worsened your standing with, if any.' })}
+      ${checklistDropdownHTML('f-faction-pos', 'Add faction', wikiData.factions, { tip: 'Factions this kill improved your standing with, if any.' })}
+      ${checklistDropdownHTML('f-faction-neg', 'Lose faction', wikiData.factions, { tip: 'Factions this kill worsened your standing with, if any.' })}
     </div>
     <label>Items looted</label>
-    <div style="display:flex; gap:8px;">
-      <input id="f-item" list="item-list" placeholder="Search item name&hellip;" autocomplete="off" />
-      <datalist id="item-list">${wikiData.items.map(i => `<option value="${escapeHtml(i.name)}"></option>`).join('')}</datalist>
-      <button class="mini-btn" id="add-item-btn" style="padding:0 14px;">Add</button>
-    </div>
+    <button type="button" class="secondary-btn" id="open-loot-btn" style="margin:0 0 6px;">+ Add loot</button>
+    <datalist id="item-list">${wikiData.items.map(i => `<option value="${escapeHtml(i.name)}"></option>`).join('')}</datalist>
     <div class="chips" id="item-chips"></div>
     <div class="err" id="detail-err"></div>
     <button class="primary-btn" id="log-kill-btn">Log encounter</button>
@@ -1687,16 +1913,10 @@ function renderDetail() {
       <div id="kill-log"></div>
     </div>
   `;
+  combatConCtrl = setupConButtonGrid('f-con', 'Dark Blue');
   const factionPos = setupChecklistDropdown('f-faction-pos');
   const factionNeg = setupChecklistDropdown('f-faction-neg');
-  document.getElementById('add-item-btn').addEventListener('click', () => {
-    const input = document.getElementById('f-item');
-    const v = input.value.trim();
-    if (!v) return;
-    pendingItems.push(v);
-    input.value = '';
-    renderChips();
-  });
+  document.getElementById('open-loot-btn').addEventListener('click', () => openLootModal());
   document.getElementById('log-kill-btn').addEventListener('click', () => {
     const err = document.getElementById('detail-err');
     const zone = document.getElementById('f-zone').value.trim();
@@ -1706,11 +1926,12 @@ function renderDetail() {
       return;
     }
     err.style.display = 'none';
+    combatSession.zone = zone;
     const entry = {
       id: genId(),
       zone,
-      con: document.getElementById('f-con').value,
-      playerLevel: document.getElementById('f-level').value ? Number(document.getElementById('f-level').value) : null,
+      con: combatConCtrl.getValue(),
+      playerLevel: combatSession.level,
       named: document.getElementById('f-named').value === 'Yes',
       coin: {
         platinum: Number(document.getElementById('f-plat').value) || 0,
@@ -1729,6 +1950,64 @@ function renderDetail() {
   renderChips();
   renderKillLog();
 }
+
+// "Add loot" (2026-08-29) - replaces the old plain text-input-plus-Add with
+// a tap grid of expected loot (this monster's own wiki `drops`, same
+// "expected" sourcing as Fishing/Gathering's own pick grids) plus a custom-
+// add fallback, mirroring Gathering's material modal exactly (tap to bump a
+// pending count, "Done" commits). Still writes into the same pendingItems
+// array/renderChips() the rest of this form already uses - only how items
+// get ADDED changed, not how they're displayed/removed afterward.
+let lootPendingCounts = {};
+let lootCustomItems = [];
+
+function renderLootGrid() {
+  const monster = findMonster(activeTarget);
+  const expected = monster && monster.drops ? monster.drops : [];
+  const all = [...new Set([...expected, ...lootCustomItems])];
+  const grid = document.getElementById('loot-grid');
+  grid.innerHTML = all.map(name => {
+    const known = !!findItem(name);
+    const count = lootPendingCounts[name] || 0;
+    const classes = ['fish-pick-btn'];
+    if (!known) classes.push('new');
+    if (count) classes.push('picked');
+    const badge = count ? `<span class="fish-pick-count pending">+${count}</span>` : '';
+    const newBadge = !known ? '<span class="fish-pick-new-badge">new</span>' : '';
+    return `<button type="button" class="${classes.join(' ')}" data-item="${escapeHtml(name)}">${escapeHtml(name)}${badge}${newBadge}</button>`;
+  }).join('');
+  grid.querySelectorAll('[data-item]').forEach(btn => btn.addEventListener('click', () => {
+    const name = btn.dataset.item;
+    lootPendingCounts[name] = (lootPendingCounts[name] || 0) + 1;
+    renderLootGrid();
+  }));
+}
+function openLootModal() {
+  lootPendingCounts = {};
+  lootCustomItems = [];
+  document.getElementById('loot-new-item').value = '';
+  renderLootGrid();
+  document.getElementById('loot-modal').classList.add('open');
+}
+document.getElementById('loot-cancel').addEventListener('click', () => {
+  document.getElementById('loot-modal').classList.remove('open');
+});
+document.getElementById('loot-add-btn').addEventListener('click', () => {
+  const input = document.getElementById('loot-new-item');
+  const name = input.value.trim();
+  if (!name) return;
+  if (!lootCustomItems.includes(name)) lootCustomItems.push(name);
+  lootPendingCounts[name] = (lootPendingCounts[name] || 0) + 1;
+  input.value = '';
+  renderLootGrid();
+});
+document.getElementById('loot-done').addEventListener('click', () => {
+  Object.keys(lootPendingCounts).forEach(name => {
+    for (let i = 0; i < lootPendingCounts[name]; i++) pendingItems.push(name);
+  });
+  document.getElementById('loot-modal').classList.remove('open');
+  renderChips();
+});
 
 function renderChips() {
   const el = document.getElementById('item-chips');
@@ -1752,7 +2031,7 @@ function renderKillLog() {
     return;
   }
   el.innerHTML = data.entries.slice().reverse().map(e => {
-    const conClass = 'con-' + e.con.toLowerCase().replace(' ', '');
+    const conClass = CON_CLASS[e.con] || '';
     const when = new Date(e.loggedAt).toLocaleTimeString();
     const editBtn = e.id ? `<button class="mini-btn" data-edit-id="${escapeHtml(e.id)}">Edit</button>` : '';
     return `<div class="log-row"><span><span class="con-pill ${conClass}">${e.con}</span>&nbsp;${fmtCoin(e.coin)}${e.items.length ? ' &middot; ' + e.items.map(escapeHtml).join(', ') : ''}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span>${editBtn}</span></div>`;
@@ -1769,6 +2048,7 @@ function renderKillLog() {
 // those modals lets you re-author their own list-shaped fields either; log
 // a corrected kill instead if those were wrong.
 let editingCombatEntryId = null;
+let combatEditConCtrl = null;
 
 function openCombatEditModal(id) {
   const data = roster.get(activeTarget);
@@ -1776,7 +2056,8 @@ function openCombatEditModal(id) {
   if (!entry) return;
   editingCombatEntryId = id;
   document.getElementById('combat-edit-zone').value = entry.zone || '';
-  document.getElementById('combat-edit-con').value = entry.con || 'Dark Blue';
+  document.getElementById('combat-edit-con-wrap').innerHTML = conButtonGridHTML('combat-edit-con', entry.con || 'Dark Blue');
+  combatEditConCtrl = setupConButtonGrid('combat-edit-con', entry.con || 'Dark Blue');
   document.getElementById('combat-edit-level').value = entry.playerLevel != null ? entry.playerLevel : '';
   document.getElementById('combat-edit-named').value = entry.named ? 'Yes' : 'No';
   const coin = entry.coin || {};
@@ -1807,7 +2088,7 @@ document.getElementById('combat-edit-save').addEventListener('click', () => {
   const levelRaw = document.getElementById('combat-edit-level').value;
   const patch = {
     zone: zoneVal,
-    con: document.getElementById('combat-edit-con').value,
+    con: combatEditConCtrl.getValue(),
     playerLevel: levelRaw ? Number(levelRaw) : null,
     named: document.getElementById('combat-edit-named').value === 'Yes',
     coin: {

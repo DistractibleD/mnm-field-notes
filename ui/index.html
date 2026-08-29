@@ -138,11 +138,13 @@
     </div>
     <p class="landing-info-empty" id="combat-no-session-msg">Start a session (top bar) to begin logging kills.</p>
     <div class="layout" id="combat-session-layout" style="display:none;">
-      <div style="grid-column:1/-1; display:flex; justify-content:flex-end;">
+      <div style="grid-column:1/-1; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+        <div id="combat-level-box" style="flex:1; min-width:220px;"></div>
         <button class="secondary-btn" id="log-camp-btn" data-tip="Log a spot where a group of monsters spawns to fight - not a fishing spot or gathering node.">+ Log a camp</button>
       </div>
       <div class="roster">
         <div class="roster-title">This session</div>
+        <div id="combat-camp-indicator" style="font-size:11.5px; color:var(--text-muted); margin:-4px 0 8px;"></div>
         <div class="roster-add">
           <input id="new-mob" placeholder="Add monster&hellip;" list="mob-list" autocomplete="off" />
           <datalist id="mob-list"></datalist>
@@ -232,6 +234,71 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="loot-modal">
+  <div class="modal-box">
+    <h2>Items looted</h2>
+    <p>Tap each item you looted &mdash; tap again for extra copies.</p>
+    <div class="fish-pick-grid" id="loot-grid"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <input id="loot-new-item" list="item-list" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
+      <button class="mini-btn" id="loot-add-btn" style="padding:0 14px;">+ Add</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="loot-done" style="margin:0;">Done</button>
+      <button class="secondary-btn" id="loot-cancel" style="margin:0;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="combat-zone-modal">
+  <div class="modal-box">
+    <h2>Where are you fighting?</h2>
+    <p>Pick the zone you're in &mdash; you can change it any time from the Zone field once you're logging kills.</p>
+    <div id="combat-zone-modal-picker"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="combat-zone-modal-go" style="margin:0;">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="combat-level-modal">
+  <div class="modal-box">
+    <h2>Before you start</h2>
+    <p>What's your current level? You can adjust it any time once you're fighting &mdash; keeping this current is what makes con info correct.</p>
+    <input type="number" id="combat-level-modal-input" min="0" placeholder="Your level" />
+    <div class="err" id="combat-level-modal-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="combat-level-modal-go" style="margin:0;">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="combat-camp-modal">
+  <div class="modal-box">
+    <h2>At a known camp?</h2>
+    <p id="combat-camp-modal-body">Pick one if you're at a spot the wiki already knows about &mdash; or skip this if not.</p>
+    <div id="combat-camp-modal-picker"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="combat-camp-modal-go" style="margin:0;">Start fighting!</button>
+      <button class="secondary-btn" id="combat-camp-modal-skip" style="margin:0;">Not at a camp</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="combat-rename-modal">
+  <div class="modal-box">
+    <h2>Rename monster</h2>
+    <p>Fixes a typo without losing this monster's already-logged kills.</p>
+    <label>Monster name</label>
+    <input id="combat-rename-input" />
+    <div class="err" id="combat-rename-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="combat-rename-save" style="margin:0;">Save</button>
+      <button class="secondary-btn" id="combat-rename-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="combat-edit-modal">
   <div class="modal-box">
     <h2>Edit kill</h2>
@@ -239,16 +306,12 @@
       running. Items and faction changes aren't editable here; log a corrected kill instead if those were wrong.</p>
     <div class="field-grid">
       <div><label>Zone</label><input id="combat-edit-zone" /></div>
-      <div><label>Con</label>
-        <select id="combat-edit-con">
-          <option>Trivial</option><option>Green</option><option>Light Blue</option>
-          <option>Dark Blue</option><option>White</option><option>Yellow</option><option>Red</option>
-        </select>
-      </div>
       <div><label>Your level</label><input type="number" id="combat-edit-level" min="0" /></div>
       <div><label>Named?</label><select id="combat-edit-named"><option>No</option><option>Yes</option></select></div>
     </div>
-    <label>Coin drop</label>
+    <label>Con</label>
+    <div id="combat-edit-con-wrap"></div>
+    <label style="margin-top:10px;">Coin drop</label>
     <div class="field-grid">
       <input id="combat-edit-plat" type="number" placeholder="platinum" min="0" />
       <input id="combat-edit-gold" type="number" placeholder="gold" min="0" />

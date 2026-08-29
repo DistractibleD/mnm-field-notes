@@ -135,13 +135,19 @@ html, body {
 }
 .roster-item:hover { background: var(--bg-raised-hover); }
 .roster-item.selected { border-color: var(--accent); background: var(--accent-soft); }
-.roster-item .name { font-size: 13.5px; font-weight: 500; padding-right: 16px; }
+.roster-item .name { font-size: 13.5px; font-weight: 500; padding-right: 36px; }
 .roster-item-remove {
   position: absolute; top: 6px; right: 8px; width: 16px; height: 16px; line-height: 15px;
   text-align: center; border-radius: 50%; font-size: 13px; font-weight: 600;
   color: var(--danger); cursor: pointer;
 }
 .roster-item-remove:hover { background: var(--danger-soft); }
+.roster-item-edit {
+  position: absolute; top: 6px; right: 28px; width: 16px; height: 16px; line-height: 16px;
+  text-align: center; border-radius: 50%; font-size: 11px;
+  color: var(--text-muted); cursor: pointer;
+}
+.roster-item-edit:hover { background: var(--bg-surface); color: var(--accent); }
 .roster-item .meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; font-family: Consolas, monospace; }
 .roster-item .quickadd { display: flex; justify-content: flex-end; margin-top: 6px; }
 .roster-empty { color: var(--text-muted); font-size: 12.5px; padding: 8px 4px; }
@@ -231,6 +237,20 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .con-white { background: #F0EEE6; color: #4A4638; }
 .con-yellow { background: #FBEFC2; color: #7A5E0A; }
 .con-red { background: #FADADA; color: #8C2323; }
+
+/* Con button grid (2026-08-29) - replaces the plain <select>, small colored
+   buttons using the exact same con-* classes as the log-row pills above, so
+   picking a con and seeing it logged look identical. .con-btn is unstyled
+   background/color on its own (transparent by default) - the con-* class
+   supplies that, same as it always has for the pill; this just adds sizing/
+   selection-state on top via a shared class instead of one-off inline styles. */
+.con-btn-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+.con-btn {
+  font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+  border: 2px solid transparent; cursor: pointer; opacity: 0.55;
+}
+.con-btn:hover { opacity: 0.85; }
+.con-btn.active { opacity: 1; border-color: var(--text-primary); }
 
 .stub { color: var(--text-secondary); font-size: 14px; line-height: 1.7; max-width: 60ch; padding: 2rem 0; }
 .stub b { color: var(--text-primary); font-weight: 600; }

@@ -23,6 +23,7 @@ internal static class WikiService
         public List<string> Factions = new List<string>();
         public List<string> Zones = new List<string>();
         public List<object> Maps = new List<object>();
+        public List<object> Camps = new List<object>();
         public string PageUrl = Config.WikiBaseUrl;
         public string Error;
     }
@@ -131,6 +132,38 @@ internal static class WikiService
         {
             result.Error = ex.Message;
         }
+
+        // Fetched separately, own try/catch - camps.json is a brand-new file
+        // (2026-08-29, see CLAUDE.md "Cross-session agreement with
+        // wiki-claude") that may not be deployed to the published site yet.
+        // A missing/failed fetch here must never break the rest of wikiData
+        // (monsters/items/etc. above already succeeded by this point) - same
+        // soft-fail-to-empty pattern as GetSharedFishRarityAsync.
+        try
+        {
+            var camps = await GetJsonArrayAsync(Config.WikiBaseUrl + "camps.json");
+            result.Camps = camps.Select(c =>
+            {
+                var d = AsMap(c);
+                return (object)new Dictionary<string, object>
+                {
+                    { "name", d.GetValueOrDefault("name") },
+                    { "zone", d.GetValueOrDefault("zone") },
+                    { "area", d.GetValueOrDefault("area") },
+                    { "monsters", AsList(d.GetValueOrDefault("monsters")) },
+                    { "minLevel", d.GetValueOrDefault("minLevel") },
+                    { "maxLevel", d.GetValueOrDefault("maxLevel") },
+                    { "raid", ToBool(d.GetValueOrDefault("raid")) },
+                };
+            }).ToList();
+        }
+        catch
+        {
+            // Leave result.Camps as the default empty list - not a real
+            // error worth surfacing (see the toast this app already shows
+            // for result.Error elsewhere), just "no camps yet."
+        }
+
         return result;
     }
 
