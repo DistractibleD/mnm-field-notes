@@ -228,6 +228,13 @@ let combatRegularListExpanded = false;
 function updateCombatSessionVisibility() {
   const running = !!session.id;
   document.getElementById('combat-no-session-msg').style.display = running ? 'none' : '';
+  // Browse-a-zone landing block is pre-start-only, same as Fishing/Gathering's own
+  // zone-browse sections (which vanish because renderFishingPanel()/renderGatheringPanel()
+  // swap to a whole different template once active) - Combat's version is a separate static
+  // div rather than a swapped template, so it needs its own explicit toggle here alongside
+  // the CTA above. Missed originally (2026-08-29) - stayed visible through an active session
+  // until the user caught it, unlike every other tab.
+  document.getElementById('combat-browse-zone').style.display = running ? 'none' : '';
   document.getElementById('combat-session-layout').style.display = running ? '' : 'none';
   if (running) { renderCombatLevelBox(); renderCombatCampIndicator(); }
 }

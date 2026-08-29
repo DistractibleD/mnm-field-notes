@@ -228,15 +228,21 @@ for Gathering) — keep this wording consistent if more tabs get a landing secti
   session state), so everything below was new UI, not a repurposed existing one. **Two things
   changed since (2026-08-29, see "Combat: start-flow, con grid, level counter, loot picker,
   roster edit")**: Combat now DOES have its own pre-start CTA (`#combat-start-btn`, "Start
-  fighting!"), and — separately — the whole "Browse a zone" landing block described below is
-  now HIDDEN (`display:none` on its wrapper `<div>` in `index.html`, right below the new CTA)
-  per the user's own call: "browse a zone is now out of place, hide it - i am not sure we will
-  need it but for now just hide it." Same treatment as hiding the Lookup tab (backlog #12) —
-  code/JS wiring (`renderCombatLandingInfo()` and everything below) is untouched and still
-  runs, just not shown, so it's trivially reversible if wanted back. Everything below this note
-  describes that now-hidden mechanism, kept accurate in case it comes back.
-  `combat-landing-zone` is its own state (`combatLandingZone`, unrelated to the per-kill zone
-  field in the roster detail form).
+  fighting!"), and the "Browse a zone" landing block described below is now correctly
+  pre-start-only, `#combat-browse-zone` toggled by `updateCombatSessionVisibility()` right
+  alongside the CTA (`running ? 'none' : ''`, same as `#combat-no-session-msg`) — matching how
+  Fishing/Gathering's own zone-browse sections disappear once a session starts (for them it's
+  implicit, since `renderFishingPanel()`/`renderGatheringPanel()` swap to a whole different
+  template once active; Combat's version is a separate static div, so it needed its own
+  explicit toggle). **First attempt at this got it wrong** — initially just unconditionally
+  `display:none`d the block outright (user's report at the time: "browse a zone is now out of
+  place, hide it"), before the user caught that this wasn't actually the ask: every other tab
+  already hides its own zone-browse section once a session starts, and Combat's had simply
+  never done that (stayed visible through an active session, unlike every other tab) - THAT
+  was what read as "out of place," not the section's existence. Corrected to the session-state
+  toggle described above, matching the other tabs' actual behavior instead of removing the
+  section outright. `combat-landing-zone` is its own state (`combatLandingZone`, unrelated to
+  the per-kill zone field in the roster detail form).
   Shows "N named monsters known here" (`wikiData.monsters` filtered `named && locations`
   matches) collapsed by default, expands to a compact list with `data-tip` showing wiki
   `areas`/`drops` per monster — same tooltip pattern used everywhere else, not a new one.
