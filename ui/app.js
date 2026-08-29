@@ -2024,6 +2024,16 @@ function renderLootGrid() {
   const expected = monster && monster.drops ? monster.drops : [];
   const all = [...new Set([...expected, ...lootCustomItems])];
   const grid = document.getElementById('loot-grid');
+  // A monster with no wiki drops (or no wiki entry at all - e.g. a custom
+  // roster name) left this grid completely empty with no message, jumping
+  // straight from the modal's own instructions to the search input below -
+  // easy to mistake for "the button did nothing" on a quick glance (real
+  // user report, 2026-08-29). Same empty-state pattern as the landing
+  // info's own `.landing-info-empty` elsewhere in the app.
+  if (all.length === 0) {
+    grid.innerHTML = '<p class="landing-info-empty">No known drops for this monster yet - type its name below to add one.</p>';
+    return;
+  }
   grid.innerHTML = all.map(name => {
     const known = !!findItem(name);
     const count = lootPendingCounts[name] || 0;

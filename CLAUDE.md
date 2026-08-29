@@ -992,7 +992,16 @@ all buildable off patterns/data already in the codebase):
   the EXISTING `pendingItems` array (the chip display/removal via `renderChips()` was
   untouched — this only changed how items get ADDED to that array, not how they're stored or
   shown). Grid source = `findMonster(activeTarget).drops` ∪ already-picked names, "new"-badge
-  logic shared with Fishing/Gathering's own grids.
+  logic shared with Fishing/Gathering's own grids. **Empty-state message added (2026-08-29)**
+  — a monster with no wiki `drops` (or no wiki entry at all, e.g. a custom roster name) left
+  `#loot-grid` completely blank, jumping straight from the modal's own instructions to the
+  search input below with nothing in between — real user report was "the add loot button does
+  nothing," which turned out to be this: the modal WAS opening correctly, it just looked
+  broken/empty on a quick glance for exactly the kind of monster most likely to get tested
+  early (a fresh custom-typed roster name with no wiki match yet). Fixed with a
+  `.landing-info-empty` message ("No known drops for this monster yet - type its name below to
+  add one"), same empty-state class already used elsewhere in the app, when `renderLootGrid()`
+  finds zero items to show.
 
 Verified end-to-end in the browser preview (mock host): full start-flow (zone → level → camp,
 including the zone-filtered camp list and the empty-camp-list text path), con grid click
