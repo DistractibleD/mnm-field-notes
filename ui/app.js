@@ -565,6 +565,31 @@ function setupConButtonGrid(idPrefix, initial) {
   };
 }
 
+// Compact coin-drop entry: a small colored circle (radial-gradient per
+// currency, see .coin-icon in style.css - recreated rather than cropped
+// from an in-game screenshot, per the user's own call, so it matches the
+// rest of the app's hand-authored look) next to a narrow number input,
+// replacing the old full-width labeled-placeholder inputs which took up
+// far more vertical room than the values being entered warranted. IDs are
+// `${idPrefix}-plat`/`-gold`/`-silver`/`-copper` - unchanged from before
+// this component existed, so no read/write call site elsewhere needed to
+// change, only the markup generation. Combat-only (the only tab that logs
+// coin - see CLAUDE.md "Coin-drop entry"), not a cross-tab component.
+const COIN_TYPES = [
+  { key: 'plat', field: 'platinum', label: 'Platinum', cls: 'coin-plat' },
+  { key: 'gold', field: 'gold', label: 'Gold', cls: 'coin-gold' },
+  { key: 'silver', field: 'silver', label: 'Silver', cls: 'coin-silver' },
+  { key: 'copper', field: 'copper', label: 'Copper', cls: 'coin-copper' },
+];
+function coinDropGridHTML(idPrefix, coin) {
+  coin = coin || {};
+  return `<div class="coin-drop-grid">${COIN_TYPES.map(c => `
+    <div class="coin-drop-item" data-tip="${c.label}">
+      <span class="coin-icon ${c.cls}"></span>
+      <input id="${idPrefix}-${c.key}" type="number" min="0" value="${coin[c.field] || ''}" />
+    </div>`).join('')}</div>`;
+}
+
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
@@ -1891,12 +1916,7 @@ function renderDetail() {
     <label>Con <span style="color:var(--text-muted); font-weight:400;">(relative to your level above)</span></label>
     ${conButtonGridHTML('f-con', 'Dark Blue')}
     <label style="margin-top:10px;">Coin drop (total off the corpse)</label>
-    <div class="field-grid">
-      <input id="f-plat" type="number" placeholder="platinum" min="0" />
-      <input id="f-gold" type="number" placeholder="gold" min="0" />
-      <input id="f-silver" type="number" placeholder="silver" min="0" />
-      <input id="f-copper" type="number" placeholder="copper" min="0" />
-    </div>
+    ${coinDropGridHTML('f', {})}
     <label>Faction change (optional)</label>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
       ${checklistDropdownHTML('f-faction-pos', 'Add faction', wikiData.factions, { tip: 'Factions this kill improved your standing with, if any.' })}
@@ -2060,11 +2080,7 @@ function openCombatEditModal(id) {
   combatEditConCtrl = setupConButtonGrid('combat-edit-con', entry.con || 'Dark Blue');
   document.getElementById('combat-edit-level').value = entry.playerLevel != null ? entry.playerLevel : '';
   document.getElementById('combat-edit-named').value = entry.named ? 'Yes' : 'No';
-  const coin = entry.coin || {};
-  document.getElementById('combat-edit-plat').value = coin.platinum || '';
-  document.getElementById('combat-edit-gold').value = coin.gold || '';
-  document.getElementById('combat-edit-silver').value = coin.silver || '';
-  document.getElementById('combat-edit-copper').value = coin.copper || '';
+  document.getElementById('combat-edit-coin-wrap').innerHTML = coinDropGridHTML('combat-edit', entry.coin || {});
   document.getElementById('combat-edit-err').style.display = 'none';
   document.getElementById('combat-edit-modal').classList.add('open');
 }

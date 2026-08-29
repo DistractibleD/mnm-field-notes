@@ -548,7 +548,7 @@ Not yet scoped - real architectural decision, needs its own pass before building
   gets picked up too, not just when this item does - the two are more connected than their
   separate numbering suggests.
 
-## 25. Coin-drop entry: colored currency icons + grid (2026-08-29)
+## 25. ~~Coin-drop entry: colored currency icons + grid~~ — done (2026-08-29)
 
 User's own words: "In the downloads folder there is a folder called mnm field-notes files, in
 there i added a picture of the inventory's currency overview. Can you crop out or recreate
@@ -561,10 +561,29 @@ count.
 
 Today's coin entry (Combat's `#f-plat`/`#f-gold`/`#f-silver`/`#f-copper`, plain labeled number
 inputs in a `.field-grid`, see `renderDetail()` in `ui/app.js`) is plain text labels, no icons.
-Ask is to reuse the game's own coin-icon visual language (crop from the reference screenshot,
-or recreate similarly-colored circles rather than shipping the exact game asset) next to each
-number input, laid out as a small grid - same spirit as the Con button grid's small/compact
-styling. Not yet scoped: whether this replaces the existing 4 plain inputs in place, or is a
-new shared component reusable anywhere coin gets entered (this app also has coin fields
-elsewhere worth checking, e.g. Gathering/Crafting/Cooking if/when they grow one). Needs a
-design pass on the icons themselves (crop vs. recreate) before building.
+Ask is to reuse the game's own coin-icon visual language next to each number input, laid out
+as a small grid - same spirit as the Con button grid's small/compact styling.
+
+**Decided (2026-08-29): recreate, don't crop.** User's own call - a cropped screenshot asset
+would look visually inconsistent against the rest of the app's own hand-authored look (flat
+CSS/SVG throughout, no photographic/screenshot-sourced imagery anywhere else in the UI - see
+"Visual style" in `CLAUDE.md`), whereas 4 small CSS/SVG circles, each with a radial-gradient
+matching the reference screenshot's own platinum(blue-gray)/gold(yellow)/silver(light gray)/
+copper(orange) coloring, reads as an intentional in-app element rather than a pasted-in photo -
+same reasoning `app.ico`'s own hand-authored (not photo-sourced) artwork already follows
+elsewhere in this project. A radial gradient (light highlight upper-left, darker toward the
+rim) is enough to read as "coin" without needing an actual raised-embossed icon or the real
+game asset.
+
+**Scope, settled and built**: replaces the existing 4 plain inputs in place, Combat-only - the
+user's own call: "only combat yields coin and only from humanoid monsters (usually) so the
+other tabs will not need any coin drop input." Also asked for the existing input to be made
+"smaller and more compact" - built as `coinDropGridHTML(idPrefix, coin)` (`ui/app.js`), a
+single flex row of 4 small `.coin-icon` circles (radial-gradient per currency) each paired
+with a narrow (56px) number input, replacing the old 2x2 `.field-grid` of full-width
+labeled-placeholder inputs. Reused in both the main kill-log form (`f-plat` etc, unchanged
+ids) and the edit-kill modal (`combat-edit-plat` etc) via the same shared IDs, so no read/
+write call site needed to change, only the markup. Full mechanism in `CLAUDE.md` "Coin-drop
+entry." Verified in the browser preview: renders compactly in both places (wraps to 2 rows in
+the narrower edit modal, as expected), tooltip names each currency, a real `logEntry` payload
+confirmed via the captured outgoing message that `coin.platinum` came through correctly.

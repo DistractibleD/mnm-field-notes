@@ -939,6 +939,44 @@ logged kill's `target` (confirmed via the actual outgoing `editEntry` payloads, 
 UI), and a full kill log/edit round-trip confirming the `logEntry`/`editEntry` payloads carry
 the right `con`/`playerLevel`/`zone`/`items` fields.
 
+## Coin-drop entry (2026-08-29, backlog #25)
+
+Combat's coin-drop fields (total plat/gold/silver/copper off a corpse) used to be 4 full-width
+`<input>`s (one per row in a `.field-grid`) with placeholder text (`"platinum"`, `"gold"`,
+etc.) as the only way to tell them apart — took up real vertical space for what's usually a
+1-2 digit number. User's own ask: make it more compact, and give each currency a colored icon
+like the game's own in-inventory Currency row (a reference screenshot was provided) instead of
+relying on placeholder text alone.
+
+**Recreated, not cropped** — user's own explicit call: a cropped screenshot asset would look
+visually inconsistent against the rest of the app's own hand-authored, flat CSS/SVG look (no
+photographic/screenshot-sourced imagery anywhere else in the UI, see "Visual style"), whereas
+small CSS circles with a radial-gradient reads as an intentional in-app element. `.coin-icon`
+(`ui/style.css`) is a 15px circle, `.coin-plat`/`.coin-gold`/`.coin-silver`/`.coin-copper` each
+apply a `radial-gradient(circle at 35% 30%, <light>, <mid> 55%, <dark> 100%)` (light highlight
+upper-left, darker toward the rim — enough to read as a coin without a real embossed asset),
+colors matched to the reference screenshot's own platinum(blue-gray)/gold(yellow)/
+silver(light gray)/copper(orange).
+
+**Combat-only, not a shared cross-tab component** — user's own words: "only combat yields
+coin and only from humanoid monsters (usually) so the other tabs will not need any coin drop
+input." No Gathering/Crafting/Cooking coin fields exist today or are planned.
+
+`coinDropGridHTML(idPrefix, coin)` (`ui/app.js`, right after the con button grid helpers,
+same file location/style) renders all 4 as one `.coin-drop-grid` flex row — icon + a narrow
+(56px) number input per currency, `data-tip` naming the currency on hover/focus (existing
+tooltip delegation, no extra wiring). IDs are `${idPrefix}-plat`/`-gold`/`-silver`/`-copper` —
+unchanged from the old inputs' own ids, so `logKill`'s entry-construction and
+`openCombatEditModal`'s load/`combat-edit-save`'s read were untouched, only the markup
+generation changed. Used in both the main kill-log form (`renderDetail()`, empty on open) and
+the edit-kill modal (`openCombatEditModal`, prefilled from `entry.coin`) via a `#combat-edit-
+coin-wrap` placeholder div in the static `index.html`, same pattern as `#combat-edit-con-wrap`.
+Wraps to 2 rows in the edit modal's narrower width — expected, not a bug, `flex-wrap: wrap`.
+
+Verified in the browser preview: renders compactly in both places, hover tooltip names each
+currency, and a real `logEntry` payload was captured confirming `coin.platinum` (and the rest)
+come through correctly with the new markup.
+
 ## Maps tab (2026-08-28, backlog #13) — pan/zoom viewer, ported from the wiki
 
 New top-level tab (`#panel-maps`, `renderMapsPanel()` in `app.js`). Grid of map cards

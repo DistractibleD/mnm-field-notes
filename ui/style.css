@@ -252,6 +252,25 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .con-btn:hover { opacity: 0.85; }
 .con-btn.active { opacity: 1; border-color: var(--text-primary); }
 
+/* Coin-drop entry (2026-08-29, backlog #25) - replaces 4 full-width labeled
+   number inputs (each on its own .field-grid row, "platinum"/"gold"/etc as
+   placeholder text) with a compact single row: a small recreated coin icon
+   (radial-gradient, NOT a cropped in-game screenshot - the user's own call,
+   for consistency with this app's hand-authored look, see "Coin-drop entry"
+   in CLAUDE.md) identifies the currency by color, so the input itself only
+   needs to be wide enough for a short number, not a full word. */
+.coin-drop-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.coin-drop-item { display: flex; align-items: center; gap: 5px; }
+.coin-drop-item input { width: 56px; padding: 6px 6px; text-align: center; }
+.coin-icon {
+  display: inline-block; width: 15px; height: 15px; border-radius: 50%; flex: none;
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.45), inset 0 1px 1px rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.3);
+}
+.coin-plat   { background: radial-gradient(circle at 35% 30%, #e4ecf1, #93a8b3 55%, #4c5c64 100%); }
+.coin-gold   { background: radial-gradient(circle at 35% 30%, #fce9a0, #d6a92a 55%, #8a6508 100%); }
+.coin-silver { background: radial-gradient(circle at 35% 30%, #f6f6f6, #bcbcbc 55%, #707070 100%); }
+.coin-copper { background: radial-gradient(circle at 35% 30%, #f3b988, #c06a30 55%, #793c15 100%); }
+
 .stub { color: var(--text-secondary); font-size: 14px; line-height: 1.7; max-width: 60ch; padding: 2rem 0; }
 .stub b { color: var(--text-primary); font-weight: 600; }
 
