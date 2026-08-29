@@ -559,10 +559,24 @@ const CON_CLASS = {
   'Trivial': 'con-trivial', 'Green': 'con-green', 'Light Blue': 'con-lblue',
   'Dark Blue': 'con-dblue', 'White': 'con-white', 'Yellow': 'con-yellow', 'Red': 'con-red',
 };
+// Trivial rendered apart from the other 6 (2026-08-29, backlog #26,
+// user's own layout ask: "con grid 3x2 (with trivial on the side)") -
+// Trivial isn't part of the game's own con scale (see the Con colors
+// comment in style.css), so setting it visually apart from the 6 "real"
+// con tiers reinforces that distinction, not just a space-filling choice.
+// setupConButtonGrid's querySelectorAll('.con-btn') still finds every
+// button (both the standalone one and the 6 in the sub-grid) since they're
+// all descendants of the same #${idPrefix}-grid container regardless of
+// the nesting added here.
 function conButtonGridHTML(idPrefix, selected) {
-  return `<div class="con-btn-grid" id="${idPrefix}-grid">${CON_LEVELS.map(c =>
-    `<button type="button" class="con-btn ${CON_CLASS[c]}${c === selected ? ' active' : ''}" data-con="${escapeHtml(c)}">${escapeHtml(c)}</button>`
-  ).join('')}</div>`;
+  const btn = c => `<button type="button" class="con-btn ${CON_CLASS[c]}${c === selected ? ' active' : ''}" data-con="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+  const [trivial, ...rest] = CON_LEVELS;
+  return `
+    <div class="con-btn-grid" id="${idPrefix}-grid">
+      ${btn(trivial)}
+      <div class="con-btn-3x2">${rest.map(btn).join('')}</div>
+    </div>
+  `;
 }
 // Returns { getValue, setValue } - setValue also used to re-sync the grid
 // when opening the edit modal with an existing entry's con.
@@ -1931,10 +1945,16 @@ function renderDetail() {
       <div><label>Zone</label><input id="f-zone" placeholder="e.g. Vale of Zintar" value="${escapeHtml(combatSession.zone || '')}" /></div>
       <div><label>Named?</label><select id="f-named"><option>No</option><option>Yes</option></select></div>
     </div>
-    <label>Con <span style="color:var(--text-muted); font-weight:400;">(relative to your level above)</span></label>
-    ${conButtonGridHTML('f-con', 'Dark Blue')}
-    <label style="margin-top:10px;">Coin drop (total off the corpse)</label>
-    ${coinDropGridHTML('f', {})}
+    <div class="con-coin-row">
+      <div class="con-coin-col">
+        <label>Con <span style="color:var(--text-muted); font-weight:400;">(relative to your level above)</span></label>
+        ${conButtonGridHTML('f-con', 'Dark Blue')}
+      </div>
+      <div class="con-coin-col">
+        <label>Coin drop (total off the corpse)</label>
+        ${coinDropGridHTML('f', {})}
+      </div>
+    </div>
     <label>Faction change (optional)</label>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
       ${checklistDropdownHTML('f-faction-pos', 'Add faction', wikiData.factions, { tip: 'Factions this kill improved your standing with, if any.' })}

@@ -1001,6 +1001,24 @@ logged kill's `target` (confirmed via the actual outgoing `editEntry` payloads, 
 UI), and a full kill log/edit round-trip confirming the `logEntry`/`editEntry` payloads carry
 the right `con`/`playerLevel`/`zone`/`items` fields.
 
+**Con grid + coin grid layout, side by side (2026-08-29, backlog #26)** — user's own ask:
+"coin grid to be on one side and the con grid to be on the other side... coin grid 2x2 and
+the con grid 3x2 (with trivial on the side)." Both grids used to be plain `flex-wrap` rows,
+wrapping to however many-per-row the container width happened to allow (not an intentional
+layout). Now real CSS grid: `conButtonGridHTML` renders Trivial as a standalone button plus a
+nested `.con-btn-3x2` (`grid-template-columns: repeat(3, auto)`) for the other 6 — Trivial set
+apart reinforces that it isn't part of the game's own con scale (see the Con colors comment in
+`style.css`), not just a space-filling choice. `coinDropGridHTML`'s `.coin-drop-grid` is now
+`grid-template-columns: repeat(2, auto)` — `COIN_TYPES`' existing order (plat, gold, silver,
+copper) already gives the right 2x2 without any markup change. Both sections wrapped in a new
+shared `.con-coin-row`/`.con-coin-col` (flex, `flex-wrap: wrap`, each column `flex: 1 1 220px`)
+in both the main kill-log form (`renderDetail()`) and the edit-kill modal's static markup —
+sits side by side when there's room, wraps to stacked rows on its own once the container gets
+too narrow, which resolves the backlog note's "does side-by-side still work in the narrower
+edit modal" question by making it self-adjusting rather than a fixed per-context answer.
+Verified in the browser preview at both a wide (1400px) and the narrow default (~460px)
+viewport, and in the edit-kill modal specifically — all three read correctly.
+
 ## Coin-drop entry (2026-08-29, backlog #25)
 
 Combat's coin-drop fields (total plat/gold/silver/copper off a corpse) used to be 4 full-width

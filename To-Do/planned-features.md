@@ -588,7 +588,7 @@ entry." Verified in the browser preview: renders compactly in both places (wraps
 the narrower edit modal, as expected), tooltip names each currency, a real `logEntry` payload
 confirmed via the captured outgoing message that `coin.platinum` came through correctly.
 
-## 26. Combat kill form: con grid + coin grid side by side (2026-08-29)
+## 26. ~~Combat kill form: con grid + coin grid side by side~~ — done (2026-08-29)
 
 User's own words: "I want the coin grid to be on one side and the con grid to be on the other
 side. Make the coin grid 2x2 and the con grid 3x2 (with trivial on the side)." Today both are
@@ -603,9 +603,13 @@ row, White/Yellow/Red on the next, going by the order `CON_LEVELS` already uses 
 with Trivial - the 7th, and the one tier this app added that isn't part of the game's own con
 palette (see "Colors themselves updated" under "Combat: start-flow, con grid..." in
 `CLAUDE.md`) - set apart on its own ("on the side") rather than folded into the 3x2 grid, coin
-as a clean 2x2 (Platinum/Gold on one row, Silver/Copper on the next). Needs a real CSS grid (`grid-template-columns`) rather than
-the current `flex-wrap` approach for both `.con-btn-grid` and `.coin-drop-grid` to get
-deterministic rows instead of wrap-dependent ones. Also needs to work in the narrower
-edit-kill modal (`#combat-edit-modal`), which reuses both `conButtonGridHTML`/
-`coinDropGridHTML` - check whether side-by-side still reads OK there or should stack under a
-narrower modal width.
+as a clean 2x2 (Platinum/Gold on one row, Silver/Copper on the next).
+
+Built as scoped: real CSS grid (`grid-template-columns`) for both `.con-btn-3x2` and
+`.coin-drop-grid` instead of `flex-wrap`, wrapped in a shared `.con-coin-row`/`.con-coin-col`
+that sits side by side with room and wraps to stacked rows on its own once too narrow -
+resolves the "does side-by-side still work in the edit modal" question by making it
+self-adjusting rather than picking one fixed answer. Full mechanism in `CLAUDE.md` "Combat:
+start-flow, con grid, level counter, loot picker, roster edit." Verified in the browser
+preview at a wide (1400px) and the narrow default (~460px) viewport, and in the edit-kill
+modal specifically.

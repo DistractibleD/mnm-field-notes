@@ -257,13 +257,29 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
    background/color on its own (transparent by default) - the con-* class
    supplies that, same as it always has for the pill; this just adds sizing/
    selection-state on top via a shared class instead of one-off inline styles. */
-.con-btn-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+/* Trivial set apart from a deterministic 3x2 grid of the other 6
+   (2026-08-29, backlog #26) - flex-wrap's old wrapping was width-dependent,
+   not an intentional layout (6-then-1 purely by accident of available
+   space). grid-template-columns gives real, fixed rows regardless of
+   container width. */
+.con-btn-grid { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.con-btn-3x2 { display: grid; grid-template-columns: repeat(3, auto); gap: 4px; }
 .con-btn {
   font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
   border: 2px solid transparent; cursor: pointer; opacity: 0.55;
 }
 .con-btn:hover { opacity: 0.85; }
 .con-btn.active { opacity: 1; border-color: var(--text-primary); }
+
+/* Con grid + coin grid side by side (2026-08-29, backlog #26) - wraps to
+   stacked rows on its own once the container gets too narrow (the edit-kill
+   modal) rather than needing a separate narrower-modal layout - each column
+   just needs ~220px, so this self-resolves the "does side-by-side still
+   read OK in the modal" open question from the backlog note instead of
+   picking one fixed answer. */
+.con-coin-row { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-bottom: 10px; }
+.con-coin-col { flex: 1 1 220px; }
+.con-coin-col label { margin-top: 0; }
 /* Trivial/Green dashed-border differentiator (added 2026-08-29) REMOVED
    (also 2026-08-29, same day) - it existed only because Trivial and Green
    briefly shared one hex under the now-dropped crafting-palette theory,
@@ -278,8 +294,11 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
    (radial-gradient, NOT a cropped in-game screenshot - the user's own call,
    for consistency with this app's hand-authored look, see "Coin-drop entry"
    in CLAUDE.md) identifies the currency by color, so the input itself only
-   needs to be wide enough for a short number, not a full word. */
-.coin-drop-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+   needs to be wide enough for a short number, not a full word. Laid out as
+   a real 2x2 grid (2026-08-29, backlog #26), not flex-wrap - COIN_TYPES'
+   own order (plat, gold, silver, copper) already gives plat/gold on row 1,
+   silver/copper on row 2, no markup change needed for this. */
+.coin-drop-grid { display: grid; grid-template-columns: repeat(2, auto); gap: 8px 14px; margin-bottom: 10px; }
 .coin-drop-item { display: flex; align-items: center; gap: 5px; }
 .coin-drop-item input { width: 56px; padding: 6px 6px; text-align: center; }
 .coin-icon {

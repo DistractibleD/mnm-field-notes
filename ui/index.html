@@ -315,10 +315,16 @@
       <div><label>Your level</label><input type="number" id="combat-edit-level" min="0" /></div>
       <div><label>Named?</label><select id="combat-edit-named"><option>No</option><option>Yes</option></select></div>
     </div>
-    <label>Con</label>
-    <div id="combat-edit-con-wrap"></div>
-    <label style="margin-top:10px;">Coin drop</label>
-    <div id="combat-edit-coin-wrap"></div>
+    <div class="con-coin-row">
+      <div class="con-coin-col">
+        <label>Con</label>
+        <div id="combat-edit-con-wrap"></div>
+      </div>
+      <div class="con-coin-col">
+        <label>Coin drop</label>
+        <div id="combat-edit-coin-wrap"></div>
+      </div>
+    </div>
     <div class="err" id="combat-edit-err"></div>
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="primary-btn" id="combat-edit-save" style="margin:0;">Save</button>
