@@ -587,3 +587,25 @@ write call site needed to change, only the markup. Full mechanism in `CLAUDE.md`
 entry." Verified in the browser preview: renders compactly in both places (wraps to 2 rows in
 the narrower edit modal, as expected), tooltip names each currency, a real `logEntry` payload
 confirmed via the captured outgoing message that `coin.platinum` came through correctly.
+
+## 26. Combat kill form: con grid + coin grid side by side (2026-08-29)
+
+User's own words: "I want the coin grid to be on one side and the con grid to be on the other
+side. Make the coin grid 2x2 and the con grid 3x2 (with trivial on the side)." Today both are
+full-width stacked blocks in `renderDetail()` (`ui/app.js`) - `conButtonGridHTML` renders all
+7 con buttons as one `flex-wrap` row (currently wraps to 2 uneven rows, 6 then 1, purely as a
+side effect of available width, not an intentional layout), and `coinDropGridHTML` renders all
+4 currencies as one `flex-wrap` row underneath it (see "Coin-drop entry" above and #25).
+
+Ask is a real layout change, not just a wrap tweak: con and coin side by side (two columns),
+con explicitly arranged 3x2 for the 6 "real" con colors (Green/Light Blue/Dark Blue on one
+row, White/Yellow/Red on the next, going by the order `CON_LEVELS` already uses minus Trivial)
+with Trivial - the 7th, and the one tier this app added that isn't part of the game's own con
+palette (see "Colors themselves updated" under "Combat: start-flow, con grid..." in
+`CLAUDE.md`) - set apart on its own ("on the side") rather than folded into the 3x2 grid, coin
+as a clean 2x2 (Platinum/Gold on one row, Silver/Copper on the next). Needs a real CSS grid (`grid-template-columns`) rather than
+the current `flex-wrap` approach for both `.con-btn-grid` and `.coin-drop-grid` to get
+deterministic rows instead of wrap-dependent ones. Also needs to work in the narrower
+edit-kill modal (`#combat-edit-modal`), which reuses both `conButtonGridHTML`/
+`coinDropGridHTML` - check whether side-by-side still reads OK there or should stack under a
+narrower modal width.

@@ -268,6 +268,18 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 }
 .con-btn:hover { opacity: 0.85; }
 .con-btn.active { opacity: 1; border-color: var(--text-primary); }
+/* Trivial and Green share one hex (#45FC00, see the Con colors comment
+   above) - real, confirmed, not a bug in the color mapping. But it left
+   the two grid buttons visually identical apart from their tiny text
+   label, reported as a real mix-up-at-a-glance risk (2026-08-29, flagged
+   via wiki-claude on the user's behalf). Trivial isn't itself a real con
+   tier with a confirmed color of its own - it's this app's own addition
+   that happens to share Green's real value by design choice - so it's the
+   one free to carry an extra visual cue without touching the confirmed
+   hex: a dashed border (solid again once picked, matching every other
+   con-btn's active state) sets it apart from Green at a glance. */
+.con-btn.con-trivial { border-style: dashed; border-color: rgba(255,255,255,0.4); }
+.con-btn.con-trivial.active { border-style: solid; }
 
 /* Coin-drop entry (2026-08-29, backlog #25) - replaces 4 full-width labeled
    number inputs (each on its own .field-grid row, "platinum"/"gold"/etc as

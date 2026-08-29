@@ -959,7 +959,23 @@ all buildable off patterns/data already in the codebase):
   stays reserved for Crafting's own difficulty UI whenever that tab gets built for real, still
   not used for anything con-related. Backgrounds are the real saturated hex as given, not
   lightened — text color picked per swatch for contrast (dark text on the light swatches,
-  white text on Dark Blue/Red).
+  white text on Dark Blue/Red). **Trivial/Green mix-up fixed (2026-08-29)** — sharing one hex
+  is correct (confirmed, not a bug), but it left the two `.con-btn`s visually identical apart
+  from their small text label, flagged as a real risk of picking the wrong one at a glance
+  (reported via wiki-claude). Trivial isn't itself a real con tier with a confirmed color —
+  it's this app's own addition that happens to share Green's real value by design choice — so
+  it's the one free to carry an extra visual cue without touching the confirmed hex:
+  `.con-btn.con-trivial` gets a dashed border (solid again once picked, `.con-btn.con-trivial.
+  active`, matching every other con-btn's active look) rather than any change to the fill
+  color itself. Scoped to the interactive grid only, not the static `.con-pill` (kill-log rows
+  aren't a pick-the-right-one-fast situation the way the grid is).
+  **Palette status: provisional, under active re-check (2026-08-29)** — the Trivial/Green
+  collision above prompted the user to independently verify the real con hex values directly,
+  rather than relying on the crafting-palette reuse as final; wiki-claude has marked its own
+  copy "under active re-check" too. Don't treat the 6 hex values above as settled — real
+  numbers may still land. Already swap-friendly by construction: every hex lives in exactly
+  6 CSS rules (`.con-trivial`/`.con-green`/etc. right below), nothing inlined per-button, so an
+  update is a one-place edit here, not a UI rework.
 - **Level counter** (`#combat-level-box`, `renderCombatLevelBox()`/`bindCombatLevelEvents()`)
   — session-level `+`/`-`/type-in box mirroring Fishing/Gathering's skill counters, replacing
   the old per-kill level field. Explicit ask: the user updates this as they level, so `con`
