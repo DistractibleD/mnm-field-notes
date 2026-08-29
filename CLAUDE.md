@@ -536,13 +536,20 @@ Lookup tab = read-only wiki search, independent of session logging.
 
 ### Data model — 3 stores, don't collapse
 
-1. **All-time log** — append-only, ONE exception: still-running-session Fishing/Gathering
-   entries are editable via a client-generated `id` (`genId()`) + `editEntry` →
-   `Edit-AllTimeLogEntry` rewrites that JSONL line in place. Scoped to the active session only
+1. **All-time log** — append-only, ONE exception: still-running-session Fishing/Gathering/
+   Combat entries are editable via a client-generated `id` (`genId()`) + `editEntry` →
+   `AllTimeLog.EditEntry` rewrites that JSONL line in place. Scoped to the active session only
    (export already written once ended). Editing the grouping field (`zone` for Fishing,
    node-type `target` for Gathering) must also patch `target` (the export's grouping field)
-   or the corrected entry stays under the old header. Combat/Crafting have no edit UI yet —
-   mechanism is generic, just needs UI.
+   or the corrected entry stays under the old header — Combat has no such grouping field to
+   worry about (kills aren't re-grouped by zone the way Harvesting/Fishing are). Combat's edit
+   modal (2026-08-29, `openCombatEditModal` in `app.js`) is deliberately scoped to the
+   "simple" fields only (zone/con/level/named/coin), matching Fishing/Gathering's own edit
+   modals — items and faction changes aren't re-editable, log a corrected kill instead if
+   those were wrong. Kill entries logged before this shipped (or from an in-progress session
+   that started on an older build) have no `id` and simply show no Edit button, rather than
+   erroring. Crafting still has no edit UI — mechanism is generic, just needs UI, same as
+   Combat did until now.
 2. **Per-session export** — 1 txt file/session, wiki-relevant fields only (no
    elapsed-time/click-count metrics).
 3. **Live session state** — in-memory, becomes #1+#2 at session end.

@@ -232,6 +232,37 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="combat-edit-modal">
+  <div class="modal-box">
+    <h2>Edit kill</h2>
+    <p>Fix a typo or misclick &mdash; this only updates entries in the session that's still
+      running. Items and faction changes aren't editable here; log a corrected kill instead if those were wrong.</p>
+    <div class="field-grid">
+      <div><label>Zone</label><input id="combat-edit-zone" /></div>
+      <div><label>Con</label>
+        <select id="combat-edit-con">
+          <option>Trivial</option><option>Green</option><option>Light Blue</option>
+          <option>Dark Blue</option><option>White</option><option>Yellow</option><option>Red</option>
+        </select>
+      </div>
+      <div><label>Your level</label><input type="number" id="combat-edit-level" min="0" /></div>
+      <div><label>Named?</label><select id="combat-edit-named"><option>No</option><option>Yes</option></select></div>
+    </div>
+    <label>Coin drop</label>
+    <div class="field-grid">
+      <input id="combat-edit-plat" type="number" placeholder="platinum" min="0" />
+      <input id="combat-edit-gold" type="number" placeholder="gold" min="0" />
+      <input id="combat-edit-silver" type="number" placeholder="silver" min="0" />
+      <input id="combat-edit-copper" type="number" placeholder="copper" min="0" />
+    </div>
+    <div class="err" id="combat-edit-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="combat-edit-save" style="margin:0;">Save</button>
+      <button class="secondary-btn" id="combat-edit-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="fish-edit-modal">
   <div class="modal-box">
     <h2>Edit entry</h2>

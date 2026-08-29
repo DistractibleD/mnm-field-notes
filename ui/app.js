@@ -1707,6 +1707,7 @@ function renderDetail() {
     }
     err.style.display = 'none';
     const entry = {
+      id: genId(),
       zone,
       con: document.getElementById('f-con').value,
       playerLevel: document.getElementById('f-level').value ? Number(document.getElementById('f-level').value) : null,
@@ -1753,9 +1754,76 @@ function renderKillLog() {
   el.innerHTML = data.entries.slice().reverse().map(e => {
     const conClass = 'con-' + e.con.toLowerCase().replace(' ', '');
     const when = new Date(e.loggedAt).toLocaleTimeString();
-    return `<div class="log-row"><span><span class="con-pill ${conClass}">${e.con}</span>&nbsp;${fmtCoin(e.coin)}${e.items.length ? ' &middot; ' + e.items.map(escapeHtml).join(', ') : ''}</span><span class="when">${when}</span></div>`;
+    const editBtn = e.id ? `<button class="mini-btn" data-edit-id="${escapeHtml(e.id)}">Edit</button>` : '';
+    return `<div class="log-row"><span><span class="con-pill ${conClass}">${e.con}</span>&nbsp;${fmtCoin(e.coin)}${e.items.length ? ' &middot; ' + e.items.map(escapeHtml).join(', ') : ''}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span>${editBtn}</span></div>`;
   }).join('');
+  el.querySelectorAll('[data-edit-id]').forEach(btn => btn.addEventListener('click', () => openCombatEditModal(btn.dataset.editId)));
 }
+
+// Combat kill entries didn't get a client-generated id until this feature
+// was added (2026-08-29) - older logged entries (or ones from a session
+// that started before this shipped) just don't show an Edit button, see the
+// e.id check in renderKillLog above. Scoped to the "simple" fields
+// (zone/con/level/named/coin), same as Fishing/Gathering's own edit modals -
+// items/faction changes aren't re-editable here, matching how neither of
+// those modals lets you re-author their own list-shaped fields either; log
+// a corrected kill instead if those were wrong.
+let editingCombatEntryId = null;
+
+function openCombatEditModal(id) {
+  const data = roster.get(activeTarget);
+  const entry = data ? data.entries.find(e => e.id === id) : null;
+  if (!entry) return;
+  editingCombatEntryId = id;
+  document.getElementById('combat-edit-zone').value = entry.zone || '';
+  document.getElementById('combat-edit-con').value = entry.con || 'Dark Blue';
+  document.getElementById('combat-edit-level').value = entry.playerLevel != null ? entry.playerLevel : '';
+  document.getElementById('combat-edit-named').value = entry.named ? 'Yes' : 'No';
+  const coin = entry.coin || {};
+  document.getElementById('combat-edit-plat').value = coin.platinum || '';
+  document.getElementById('combat-edit-gold').value = coin.gold || '';
+  document.getElementById('combat-edit-silver').value = coin.silver || '';
+  document.getElementById('combat-edit-copper').value = coin.copper || '';
+  document.getElementById('combat-edit-err').style.display = 'none';
+  document.getElementById('combat-edit-modal').classList.add('open');
+}
+
+document.getElementById('combat-edit-cancel').addEventListener('click', () => {
+  document.getElementById('combat-edit-modal').classList.remove('open');
+  editingCombatEntryId = null;
+});
+
+document.getElementById('combat-edit-save').addEventListener('click', () => {
+  const data = roster.get(activeTarget);
+  const entry = data ? data.entries.find(e => e.id === editingCombatEntryId) : null;
+  if (!entry) { document.getElementById('combat-edit-modal').classList.remove('open'); return; }
+  const zoneVal = document.getElementById('combat-edit-zone').value.trim();
+  if (!zoneVal) {
+    const err = document.getElementById('combat-edit-err');
+    err.textContent = 'Zone is required';
+    err.style.display = 'block';
+    return;
+  }
+  const levelRaw = document.getElementById('combat-edit-level').value;
+  const patch = {
+    zone: zoneVal,
+    con: document.getElementById('combat-edit-con').value,
+    playerLevel: levelRaw ? Number(levelRaw) : null,
+    named: document.getElementById('combat-edit-named').value === 'Yes',
+    coin: {
+      platinum: Number(document.getElementById('combat-edit-plat').value) || 0,
+      gold: Number(document.getElementById('combat-edit-gold').value) || 0,
+      silver: Number(document.getElementById('combat-edit-silver').value) || 0,
+      copper: Number(document.getElementById('combat-edit-copper').value) || 0,
+    },
+  };
+  Object.assign(entry, patch);
+  sendToHost({ type: 'editEntry', sessionId: session.id, entryId: editingCombatEntryId, patch });
+  document.getElementById('combat-edit-modal').classList.remove('open');
+  editingCombatEntryId = null;
+  renderKillLog();
+  updateStats();
+});
 
 function logKill(target, entry) {
   if (!roster.has(target)) roster.set(target, { entries: [] });
