@@ -143,25 +143,28 @@
       <div id="combat-landing-named"></div>
       <div id="combat-landing-regular"></div>
     </div>
-    <div class="layout" id="combat-session-layout" style="display:none;">
-      <div style="grid-column:1/-1; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+    <div id="combat-session-layout" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
         <div id="combat-level-box" style="flex:1; min-width:220px;"></div>
         <button class="secondary-btn" id="log-camp-btn" data-tip="Log a spot where a group of monsters spawns to fight - not a fishing spot or gathering node.">+ Log a camp</button>
       </div>
-      <div class="roster">
-        <div class="roster-title">This session</div>
-        <div id="combat-camp-indicator" style="font-size:11.5px; color:var(--text-muted); margin:-4px 0 8px;"></div>
-        <div class="roster-add">
-          <input id="new-mob" placeholder="Add monster&hellip;" list="mob-list" autocomplete="off" />
+      <div id="combat-camp-indicator" style="font-size:11.5px; color:var(--text-muted); margin:-10px 0 10px;"></div>
+
+      <div class="detail" style="margin-bottom:16px;">
+        <label>Search monsters &amp; camps <span style="color:var(--text-muted); font-weight:400;">(or type a new monster and tap +)</span></label>
+        <div style="display:flex; gap:6px; margin-bottom:12px;">
+          <input id="combat-search" placeholder="Search or add a monster&hellip;" list="mob-list" autocomplete="off" style="flex:1;" />
           <datalist id="mob-list"></datalist>
           <datalist id="combat-zone-list"></datalist>
-          <button class="mini-btn" id="add-mob">+</button>
+          <button class="mini-btn" id="combat-search-add">+</button>
         </div>
-        <div id="roster-list"><div class="roster-empty">No monsters yet &mdash; add one above.</div></div>
+        <div id="combat-camps-area"></div>
+        <div id="combat-monsters-area"></div>
       </div>
 
-      <div class="detail" id="detail-panel">
-        <div class="detail-empty">Add a monster to the roster, then select it to start logging kills.</div>
+      <div class="detail">
+        <div class="log-title">Kills logged this session</div>
+        <div id="combat-kill-log"><div class="roster-empty">No kills logged yet.</div></div>
       </div>
     </div>
   </div>
@@ -248,6 +251,7 @@
     <div class="fish-pick-grid" id="loot-grid"></div>
     <div style="display:flex; gap:8px; margin-top:10px;">
       <input id="loot-new-item" list="item-list" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
+      <datalist id="item-list"></datalist>
       <button class="mini-btn" id="loot-add-btn" style="padding:0 14px;">+ Add</button>
     </div>
     <div style="display:flex; gap:8px; margin-top:14px;">
@@ -330,6 +334,38 @@
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="primary-btn" id="combat-edit-save" style="margin:0;">Save</button>
       <button class="secondary-btn" id="combat-edit-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="combat-conloot-modal">
+  <div class="modal-box">
+    <h2>Add con &amp; loot</h2>
+    <p id="conloot-subtitle" style="color:var(--text-secondary); margin-top:-4px;"></p>
+    <label>Named?</label>
+    <select id="conloot-named" style="margin-bottom:10px;"><option>No</option><option>Yes</option></select>
+    <div class="con-coin-row">
+      <div class="con-coin-col">
+        <label>Con</label>
+        <div id="conloot-con-wrap"></div>
+      </div>
+      <div class="con-coin-col">
+        <label>Coin drop</label>
+        <div id="conloot-coin-wrap"></div>
+      </div>
+    </div>
+    <label>Faction change (optional)</label>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <div id="conloot-faction-pos-wrap"></div>
+      <div id="conloot-faction-neg-wrap"></div>
+    </div>
+    <label>Items looted</label>
+    <button type="button" class="secondary-btn" id="conloot-open-loot-btn" style="margin:0 0 6px;">+ Add loot</button>
+    <div class="chips" id="conloot-item-chips"></div>
+    <div class="err" id="conloot-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="conloot-save" style="margin:0;">OK</button>
+      <button class="secondary-btn" id="conloot-cancel">Cancel</button>
     </div>
   </div>
 </div>

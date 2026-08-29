@@ -52,6 +52,15 @@ internal static class WikiService
                     { "locations", AsList(d.GetValueOrDefault("maps")) },
                     { "areas", AsList(d.GetValueOrDefault("areas")) },
                     { "drops", flatDrops },
+                    // Raw [{playerLevel, con}, ...] - forwarded as-is, not
+                    // flattened like drops above. Lets the client estimate a
+                    // monster's own level locally (backlog #27) using the
+                    // same algorithm the wiki's own script.js computes at
+                    // render time - the wiki never stores the DERIVED number
+                    // itself (confirmed directly with wiki-claude), only
+                    // these raw observations, so this is the only way to get
+                    // at it without running the wiki's own JS.
+                    { "conObservations", AsList(d.GetValueOrDefault("conObservations")) },
                 };
             }).ToList();
 

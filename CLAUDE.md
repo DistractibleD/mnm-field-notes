@@ -335,17 +335,20 @@ and once at init):
 
 ### Session types and fields
 
-Combat/Crafting = roster + active-detail pattern (sidebar of things encountered this session;
-click → active; quick-entry fields apply to it). Multi = mixes them in one roster. Mirrors
-the wiki's `conObservations` model (same species, multiple kills, each own con/level).
-Gathering/Fishing are NOT this pattern — see their own sections below.
+Crafting = roster + active-detail pattern (sidebar of things encountered this session; click →
+active; quick-entry fields apply to it). Multi = mixes roster+active-detail (Crafting-style)
+and tap-first (Combat-style) in one roster. **Combat itself is NO LONGER this pattern as of
+2026-08-29** (see "Combat: tap-first workflow" below) — it moved to Fishing/Gathering's own
+tap-first model instead, so this framing now only really describes Crafting.
 
 - **Combat**: monster, zone, con+level, coin (total off corpse), items, named y/n,
   `factionChanges` (2 checklist dropdowns pos/neg, from `monsters.json` `factionEffects`,
   60+ entries). Logged as `[{faction,effect}]` — same shape as the wiki's own. Session-level
-  zone/level/camp collected via its own start-flow, con is a button grid, items are added via
-  a tap-grid modal, roster entries are renameable — see "Combat: start-flow, con grid, level
-  counter, loot picker, roster edit" for the full mechanism.
+  zone/level/camp collected via its own start-flow, con is a button grid. **Tap-first as of
+  2026-08-29** — see "Combat: tap-first workflow" for the current mechanism; "Combat:
+  start-flow, con grid, level counter, loot picker, roster edit" below covers what's still
+  accurate (start-flow, con grid, coin grid, level counter) plus historical context for what
+  changed.
 - **Crafting**: tradeskill, recipe, skill, difficultyColor, components. Still a stub
   (`#panel-craft`) for everything except Cooking (own tab, see below). When this gets built
   for real, `difficultyColor` should use the wiki's own real crafting-difficulty hex palette
@@ -905,6 +908,15 @@ way; nothing auto-merges into curated data sight-unseen).
 
 ## Combat: start-flow, con grid, level counter, loot picker, roster edit (2026-08-29)
 
+**Partially superseded (2026-08-29, same day) by "Combat: tap-first workflow" below** — the
+roster/detail-panel/"Log encounter" pieces this section describes (the bullets on roster
+edit and the old pre-log form) no longer exist; Combat moved to a tap-first model instead.
+Still accurate and unchanged: the start-flow (zone→level→camp), the con button grid component
+(`conButtonGridHTML`/`setupConButtonGrid`, including the Trivial/Green color history), the
+coin grid, and the level counter — all of these got REUSED as-is inside the new workflow, not
+rebuilt. Kept below for that still-relevant detail and for the historical trail; read
+"Combat: tap-first workflow" first for the current architecture.
+
 User's own consolidated ask, built in one pass (see backlog — none of this needed deferring,
 all buildable off patterns/data already in the codebase):
 
@@ -1034,6 +1046,116 @@ too narrow, which resolves the backlog note's "does side-by-side still work in t
 edit modal" question by making it self-adjusting rather than a fixed per-context answer.
 Verified in the browser preview at both a wide (1400px) and the narrow default (~460px)
 viewport, and in the edit-kill modal specifically — all three read correctly.
+
+## Combat: tap-first workflow (2026-08-29, backlog #27)
+
+Real interaction-model rebuild, not a tweak — replaces the roster+active-detail pattern
+described in "Combat: start-flow, con grid, level counter, loot picker, roster edit" above
+(add a monster, select it, fill a whole con/coin/faction/loot form, THEN click "Log encounter")
+with Fishing/Gathering's own tap-first model: monsters/camps for the current zone are always
+browsable once a session's running, tapping a monster logs an immediate BARE kill (`con: null`,
+zero coin, no items/faction), and con/coin/loot/faction get attached POST-HOC via a
+"+ Con/Loot" button per row in a new session-wide kill log. User's own framing for why:
+"I think this will be a better workflow - and give the user less clutter on the screen." Full
+original ask + Claude's assessment (the one real blocker: monster-level filtering has no wiki
+field, only conObservations to estimate from — see below) is preserved in `To-Do/
+planned-features.md` #27, not repeated here.
+
+`roster` (`Map<name, {entries}>`) is UNCHANGED as the underlying data store — every kill still
+lives there, keyed by monster name, exactly as before. Only how entries get created and how
+the UI renders them changed. There is no more `activeTarget`/"selected monster" concept at
+all — removed outright, not deprecated, since nothing needs it once there's no single-monster
+detail panel to scope to.
+
+- **Monster-level estimate** (`estimateMonsterLevel(observations)`, `ui/app.js`, near
+  `findMonster`) — a local reimplementation of the WIKI's own con-derived level estimate
+  (see "Colors themselves updated" under the old Combat section above for the con-color
+  research that led here) since the wiki computes this purely in its own `script.js` at
+  render time and never stores the derived number (confirmed directly with wiki-claude) — only
+  the raw `conObservations` are real, fetchable JSON. Algorithm given by wiki-claude,
+  replicated exactly so this app's number matches the wiki's rather than diverging: White =
+  an exact level; below White = an upper bound; above White = a lower bound; combine into a
+  confirmed range, a midpoint estimate, or a one-sided estimate depending what's available;
+  no observations = no estimate. `formatLevelEstimate()` renders it as `"Lvl X-Y"` (confirmed)
+  or `"~Lvl X"` (estimate). **`WikiData.cs` now forwards each monster's raw `conObservations`
+  array as-is** (new field, alongside the existing `drops`/`locations`/etc.) — this is the one
+  C# change this feature needed; everything else is `ui/`-only.
+- **Camps area** (`#combat-camps-area`, part of `renderCombatBrowseArea()`) — camps in
+  `combatSession.zone`, sorted with real level-matches first (`camp.minLevel`/`maxLevel` are
+  genuine `camps.json` fields, not an estimate — unlike monsters). Tapping a camp toggles it
+  as `combatSession.camp` (same field the start-flow's own camp picker already sets) and
+  updates the existing `renderCombatCampIndicator()` — purely a browsing/reference aid, NOT a
+  tap-to-log target the way monsters are; logging a camp discovery is still the separate,
+  one-time "+ Log a camp" action (see "Combat: log a camp"), unrelated to this browsing area.
+- **Monsters tap-grid** (`#combat-monsters-area`) — `wikiData.monsters` filtered to the
+  current zone (same lenient `locationMatchesZone` every other zone-scoped grid in the app
+  uses) ∪ custom-added/already-tapped names, grouped into a `fish-pick-expected-box` "Matches
+  your level" box when `estimateMonsterLevel` overlaps `combatSession.level` (±1) — same
+  bordered-container treatment as Fishing/Gathering's own "expected" grouping, not a new
+  per-button color channel (see "Gathering" above for why that channel was freed up
+  specifically to avoid this). Each button shows a `×N` kill-count badge once tapped, a "new"
+  badge if not in the wiki, and the level estimate inline when one exists, with a tooltip
+  ("Estimated from logged con checks - not a wiki fact.") so the number is never mistaken for
+  a wiki-confirmed value.
+- **Search field** (`#combat-search`, repurposed from the old `#new-mob` roster-add input) —
+  filters both areas via the same `.filtered-out` class-toggle pattern Combat's own landing
+  search / the checklist dropdown already use (NOT a full re-render on every keystroke, which
+  would steal focus — same reasoning documented elsewhere in this file). Typing a name not
+  already known and tapping "+" (`addCustomMonsterFromSearch`) adds it as a custom tap target,
+  same fallback pattern as Fishing's `customFish`/Gathering's custom node types.
+- **Tap-to-log** (`logBareKill(name)`) — one tap, one bare `logEntry` (`con: null`, zeroed
+  coin, empty items/factionChanges), immediately. `logKill()` (unchanged signature) still owns
+  writing to `roster` + `sendToHost`.
+- **Session-wide kill log** (`#combat-kill-log`, `renderCombatKillLog()`) — every kill across
+  every monster this session, newest first, replacing the old per-monster `#kill-log` that
+  only ever showed the single selected monster's own kills (mirrors Fishing's own combined
+  `renderFishLog()`). Each row: monster name, con pill (or a muted "No con yet" placeholder
+  when still bare), coin, items, an "Edit" button (unchanged simple zone/level/named/coin
+  correction, now looked up via the new `findKillEntry(id)` helper — searches every monster's
+  entries for a matching id, replacing the old `roster.get(activeTarget)` lookup that no
+  longer makes sense without a selected monster), and the new "+ Con/Loot" button. A monster
+  not in `wikiData.monsters` also gets a small rename icon inline (reusing the existing
+  `openRosterRenameModal` unchanged) — this replaces the old roster-list's own rename icon,
+  which no longer has a list to live on.
+- **"+ Con/Loot" modal** (`#combat-conloot-modal`, `openConLootModal(id)`) — the post-hoc
+  counterpart to tap-to-log: con grid, coin grid, faction +/- pickers, and an items-looted
+  chip list + "+ Add loot" button, i.e. everything the OLD pre-log form used to collect up
+  front, now collected after the fact and applied as one combined `editEntry` patch. Reuses
+  `conButtonGridHTML`/`coinDropGridHTML`/`checklistDropdownHTML` exactly as the old form did —
+  only when/how they're wired up changed, not the components themselves.
+  - **`openLootModal`/`renderLootGrid` signature changed** — used to read the global
+    `activeTarget`/`pendingItems`; now takes explicit `(targetMonster, existingItems, onDone)`
+    params, since there's no single "selected monster" to read from anymore and the loot
+    picker can be opened from a specific kill's own Con/Loot modal for any monster. Still the
+    same visual mechanism (tap-to-increment `+N` badges, custom-add fallback) — Gathering's
+    material-modal pattern, unchanged.
+  - **Real bug hit and fixed while building this**: `#loot-modal` opened from WITHIN
+    `#combat-conloot-modal` (a modal-on-modal case that never existed before this feature —
+    the old loot modal only ever opened from the plain detail panel, never from inside another
+    `.modal-overlay`) was functionally opening correctly (`classList.contains('open')`
+    verified true) but rendering INVISIBLE — both modals share the same base z-index, and
+    `#loot-modal`'s markup happens to come earlier in `index.html` than
+    `#combat-conloot-modal`'s, so the later one painted on top and fully hid it. Fixed with
+    `#loot-modal { z-index: 110; }` in `style.css` — safe unconditionally since this nested
+    case is `#loot-modal`'s only caller today.
+- **`#item-list` datalist** (the loot modal's own custom-item autocomplete) used to be
+  regenerated inline inside the old detail form's own template on every render; now static in
+  `index.html` and populated once in the `wikiData` message handler, same pattern as
+  `#mob-list`/`#combat-zone-list`.
+
+Verified end-to-end in the browser preview (mock host, `conObservations` seeded on 3 mock
+monsters to exercise all three estimate shapes — confirmed range, midpoint estimate, and no
+data): zone+level selected at session start correctly surfaces "Corrupted Ashira Camp
+(Lvl 10-14)" and groups "Onis the Elder (~Lvl 12)" into the level-match box; tapping the camp
+sets `combatSession.camp` and updates the indicator; tapping the monster logs a bare kill
+(confirmed via the real outgoing `logEntry` payload) and the button gets a `×1` badge; a
+second tap correctly increments to `×2` and adds a second kill-log row; "+ Con/Loot" →
+picking Yellow con + 3g + "Onis's Signet" via the (now-visible-on-top) loot picker → OK
+produced the exact expected `editEntry` patch (`con`, `coin`, `items`, `factionChanges` all
+correct); a custom-typed monster ("Sandy Beast") appears as a plain (non-boxed, no estimate)
+tap target, logs correctly, and its rename icon in the kill log successfully renamed it
+everywhere (tap-grid button AND kill-log row) via the reused rename modal; ending the session
+correctly resets `roster`/`combatCustomMonsters` and returns to the pre-start screen.
 
 ## Coin-drop entry (2026-08-29, backlog #25)
 

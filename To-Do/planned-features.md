@@ -613,3 +613,119 @@ self-adjusting rather than picking one fixed answer. Full mechanism in `CLAUDE.m
 start-flow, con grid, level counter, loot picker, roster edit." Verified in the browser
 preview at a wide (1400px) and the narrow default (~460px) viewport, and in the edit-kill
 modal specifically.
+
+## 27. ~~Combat: restructure to Fishing's tap-first workflow~~ — done (2026-08-29)
+
+User's own words: "I want to restructure the combat window some. Like with fishing, once the
+user selects a zone, first populate the area with camps in that zone that match that player's
+level. Then under camps have a area with monsters that match that players level. Above all
+the camps and monsters have a search field for monsters and camps so the player can choose
+themselves. Like with fish the player can click a mob they have killed. This mob that has
+been clicked stays up top (like fishing) with number killed. At the bottom we also do like
+fishing, we list the registered kills. In this list on each registered kill, add a button,
+add con+loot. When the user pushes this button they can select con color, coin drop, add loot
+to a list and faction + and -. When the user clicks ok this data is attached to that kill." -
+explicit ask, not yet built.
+
+A real interaction-model inversion, not a tweak: today's Combat is roster+active-detail (add a
+monster to the roster, select it, fill in a whole con/coin/faction/loot form, THEN click "Log
+encounter" - one form submission per kill). The new model is tap-first like Fishing's own
+fish-pick grid (`renderFishPickGrid()`/one-tap logging in `ui/app.js`) - click a monster you
+just killed, it logs an immediate bare-bones kill entry and the monster's own button "sticks"
+near the top with a running kill count, matching Fishing's own "clicked fish stays visible
+with `×N` count" pattern. Con/coin/loot/faction become a SEPARATE, POST-HOC step: a
+"+ add con+loot" button per row in the kill list (bottom of the panel, mirroring Fishing's own
+kill/catch log) opens one combined modal (con button grid + coin grid + loot picker + faction
++/- pickers, essentially everything the current pre-log form already has, just triggered
+after the fact instead of before) that patches the already-logged entry via the existing
+`editEntry` mechanism rather than requiring it all up front.
+
+Claude's assessment when this was proposed: strong idea, directly matches the "minimum taps"
+design philosophy Fishing/Gathering already follow (see CLAUDE.md), and reduces on-screen
+clutter during actual play - genuinely less friction than filling a form before every single
+kill. One real blocker to flag before building: **camps have a confirmed `minLevel`/
+`maxLevel` field (real wiki data, `camps.json`) so camp-level-matching is straightforward, but
+NO monster in the wiki has a numeric level field at all** (checked earlier this session -
+0/660, see "Colors themselves updated"/Combat landing info's own level-range feature) - "the
+monsters in this area matching player's level" can't come from wiki data directly. Buildable
+anyway via the SAME empirical-estimate approach Combat's zone level-range feature already uses
+(`Get-CombatZoneLevelRange`/`combatLevelRangeBaseline`, guessing from this app's own logged
+`playerLevel`+`con` history, `MIN_LEVEL_RANGE_KILLS`-gated) - just needs framing as an
+estimate, not a wiki fact, same caveat already established for that existing feature. Camp
+level-filtering can use the real `minLevel`/`maxLevel` fields directly, no estimate needed
+there.
+
+**Update from wiki-claude (2026-08-29)**, relevant to the monster-level blocker above: the
+wiki already estimates a monster's own level from its `conObservations` (been live a while),
+and just extended the same aggregation to a zone's Monsters page ("Estimated level range
+here: ~X-Y") and to a Camp with no explicit `minLevel`/`maxLevel` (falls back to the same
+estimate from its own monster roster). Computed fresh at render time from whatever
+`conObservations` exist on the wiki - "nothing stored, nothing for the app to send
+differently," and gets less sparse automatically once this app's own con submissions add up.
+**Resolved (2026-08-29), asked wiki-claude directly**: purely computed in the wiki's own
+`script.js` at render time - nothing written into `monsters.json`/`camps.json`. Deliberate,
+consistent pattern across the whole wiki (same for a recipe's estimated skill requirement,
+average coin drops, etc.) - raw observations get stored, derived numbers never do. So this app
+can't fetch a pre-computed estimate as published today.
+
+What IS real, fetchable JSON data: `monsters.json` has each monster's own `conObservations`
+array (`[{playerLevel, con}, ...]`); `camps.json`'s `monsters` field is just a plain name
+array, no level data of its own. Wiki-claude gave the exact algorithm to replicate the wiki's
+own estimate locally, if this app wants to match it rather than diverge:
+1. `CON_ORDER` low→high: Trivial, Green, Light Blue, Dark Blue, White, Yellow, Red.
+2. Per observation: White = an exact level. Below White = an upper bound (min across those
+   observations). Above White = a lower bound (max across those observations).
+3. Any exact (White) observations → confirmed "min-max" range, or "~min" if only one repeated
+   value (still an estimate, not proof that's the only level).
+4. Else, both a lower and upper bound exist → midpoint: `round((lower+1 + upper-1) / 2)`,
+   shown as "~mid".
+5. Else, only one bound exists → "~bound+1" (lower-bound case) or "~bound-1" (upper-bound
+   case).
+6. No observations at all → no estimate (falls back to `monsters.json`'s old free-text
+   `levelRange` field, when present).
+7. For a zone/camp group: run 1-6 per monster in the group, take the widest min/max across
+   every monster that produced a number.
+
+Two real paths forward, not yet decided: (a) reimplement this algorithm locally against the
+real `conObservations` data - fully buildable now, no wiki changes needed, and matches the
+wiki's own number exactly since it's the same math; (b) ask wiki-claude to add a stored/
+precomputed field to the JSON instead - wiki-claude explicitly said they won't do this
+unprompted, since it's a real architecture change away from how every other derived value on
+the wiki works (raw-stored/computed-on-render is consistent site-wide), and they'd want the
+user's sign-off first, same as any other cross-repo design decision (see "Cross-session
+agreement with wiki-claude" in `CLAUDE.md`). (a) is the lower-friction default unless there's
+a reason to prefer (b).
+
+**Decided (2026-08-29): path (a).** User's own words: "As long as we send relevant data to
+the wiki through push requests i am happy to let you calculate the level on the fly as users
+add con data." The "send relevant data" half is already covered by existing plumbing, nothing
+new needed - Combat kills already log `con`+`playerLevel` per entry, and the existing
+session-export/submission pipeline (see "Session export submission" in `CLAUDE.md`) already
+carries that to the wiki as part of a normal export. When this item gets built: compute the
+level estimate client-side in `ui/app.js` against `monsters.json`'s real `conObservations`
+array, using wiki-claude's exact algorithm above - not a stored/precomputed wiki field.
+
+Scoping questions, resolved during the build:
+- Bare-bones tap-logged entry: `id`, `target`, `zone` (from `combatSession.zone`),
+  `playerLevel` (from `combatSession.level`), `con: null`, zeroed coin, empty items/
+  factionChanges - exactly the minimum, con/coin/items/faction all attached later.
+- Search-then-tap REPLACED the old roster `Add monster…` input entirely (repurposed the same
+  `#new-mob`→`#combat-search` element/id area) - it now filters the live camps/monsters areas
+  as you type (via `.filtered-out`, not a re-render) and a "+" still adds a totally new custom
+  name as a fallback, same as before.
+- Camps are a browsing/reference aid only, NOT a tap-to-log target - tapping one just sets
+  `combatSession.camp` (updates the existing indicator). "+ Log a camp" (a real camp
+  discovery submission) stays a fully separate, one-time session action, untouched by this.
+- `combatSession.camp`/the start-flow's own camp-picker step were both KEPT as-is, not made
+  redundant - the start-flow captures "where you started," the live browsing area is
+  "what's here / lets you correct or set it mid-session," complementary rather than
+  duplicated.
+
+Full mechanism, including the one real z-index bug hit and fixed while building the nested
+"+ Con/Loot" → "+ Add loot" modal-on-modal case, in `CLAUDE.md` "Combat: tap-first workflow."
+Verified end-to-end in the browser preview: zone/level-based camp and monster surfacing
+(including the level-estimate grouping box), tap-to-log with a real captured `logEntry`
+payload, count badges incrementing on repeat taps, the full Con/Loot → Add Loot round trip
+with a real captured `editEntry` payload confirming con/coin/items all patched correctly, a
+custom monster's rename propagating to both the tap-grid and the kill log, and a clean
+roster/state reset on session end.

@@ -45,10 +45,10 @@ function mockHostRespond(msg) {
       deliverFromHost({
         type: 'wikiData',
         monsters: [
-          { name: 'a corrupted outrider', named: false, locations: ['Night Harbor'], areas: [], drops: [] },
-          { name: 'a smuggler', named: false, locations: ['Night Harbor'], areas: [], drops: [] },
-          { name: 'Onis the Elder', named: true, locations: ['Shaded Dunes'], areas: ['Sunken Ruins'], drops: ["Onis's Signet", 'Elder Ashira Hide'] },
-          { name: 'Night Terror', named: true, locations: ['Night Harbor'], areas: ['Necropolis'], drops: ["Night Terror's Wing"] },
+          { name: 'a corrupted outrider', named: false, locations: ['Night Harbor'], areas: [], drops: [], conObservations: [{ playerLevel: 11, con: 'White' }, { playerLevel: 11, con: 'White' }] },
+          { name: 'a smuggler', named: false, locations: ['Night Harbor'], areas: [], drops: [], conObservations: [{ playerLevel: 9, con: 'Yellow' }, { playerLevel: 13, con: 'Light Blue' }] },
+          { name: 'Onis the Elder', named: true, locations: ['Shaded Dunes'], areas: ['Sunken Ruins'], drops: ["Onis's Signet", 'Elder Ashira Hide'], conObservations: [{ playerLevel: 10, con: 'Yellow' }, { playerLevel: 14, con: 'Light Blue' }, { playerLevel: 12, con: 'White' }] },
+          { name: 'Night Terror', named: true, locations: ['Night Harbor'], areas: ['Necropolis'], drops: ["Night Terror's Wing"], conObservations: [] },
         ],
         items: [{ name: 'Ashira War Tooth' }, { name: 'Corroded Bronze Chain Boots' }],
         nodes: [
@@ -197,7 +197,6 @@ const session = {
 
 // roster: Map of target name -> { entries: [ {con, playerLevel, coin, items, named, factionChanges, loggedAt} ] }
 const roster = new Map();
-let activeTarget = null;
 
 // Session-level Combat state (2026-08-29) - zone/level/camp collected once
 // via the start-flow (openCombatZoneModal etc., matching Fishing/Gathering's
@@ -236,7 +235,7 @@ function updateCombatSessionVisibility() {
   // until the user caught it, unlike every other tab.
   document.getElementById('combat-browse-zone').style.display = running ? 'none' : '';
   document.getElementById('combat-session-layout').style.display = running ? '' : 'none';
-  if (running) { renderCombatLevelBox(); renderCombatCampIndicator(); }
+  if (running) { renderCombatLevelBox(); renderCombatCampIndicator(); renderCombatBrowseArea(); renderCombatKillLog(); }
 }
 
 // Session-level "your level" counter (2026-08-29) - same +/- and
@@ -632,6 +631,55 @@ function findMonster(name) {
 function findItem(name) {
   const n = name.trim().toLowerCase();
   return wikiData.items.find(i => (i.name || '').toLowerCase() === n);
+}
+// The kill log is session-wide now (backlog #27), not scoped to one
+// selected roster monster - this replaces the old roster.get(activeTarget)
+// lookup pattern with a search across every monster's own entries.
+function findKillEntry(id) {
+  for (const [name, data] of roster) {
+    const e = data.entries.find(x => x.id === id);
+    if (e) return { target: name, entry: e };
+  }
+  return null;
+}
+
+// Local reimplementation of the wiki's own monster-level estimate
+// (backlog #27) - the wiki computes this purely in its own script.js at
+// render time and never stores the derived number (confirmed directly
+// with wiki-claude), only the raw conObservations this app already gets
+// from monsters.json. Algorithm given by wiki-claude, replicated exactly
+// so this app's number matches the wiki's own rather than diverging:
+// White = an exact level; below White = an upper bound (monster's real
+// level is under that playerLevel); above White = a lower bound. Returns
+// {min, max, exact} or null if there's nothing to go on.
+function estimateMonsterLevel(observations) {
+  if (!observations || observations.length === 0) return null;
+  const whiteIdx = CON_LEVELS.indexOf('White');
+  const exact = [];
+  let upperBound = null; // monster level < this
+  let lowerBound = null; // monster level > this
+  observations.forEach(o => {
+    const idx = CON_LEVELS.indexOf(o.con);
+    if (idx === -1) return;
+    if (idx === whiteIdx) exact.push(o.playerLevel);
+    else if (idx < whiteIdx) upperBound = upperBound == null ? o.playerLevel : Math.min(upperBound, o.playerLevel);
+    else lowerBound = lowerBound == null ? o.playerLevel : Math.max(lowerBound, o.playerLevel);
+  });
+  if (exact.length > 0) {
+    const min = Math.min(...exact), max = Math.max(...exact);
+    return min === max ? { min, max: min, exact: false } : { min, max, exact: true };
+  }
+  if (lowerBound != null && upperBound != null) {
+    const mid = Math.round(((lowerBound + 1) + (upperBound - 1)) / 2);
+    return { min: mid, max: mid, exact: false };
+  }
+  if (lowerBound != null) return { min: lowerBound + 1, max: lowerBound + 1, exact: false };
+  if (upperBound != null) return { min: upperBound - 1, max: upperBound - 1, exact: false };
+  return null;
+}
+function formatLevelEstimate(est) {
+  if (!est) return '';
+  return est.exact ? `Lvl ${est.min}-${est.max}` : `~Lvl ${est.min}`;
 }
 function fmtCoin(c) {
   const parts = [];
@@ -1556,9 +1604,9 @@ function startNewSession() {
   const activeTab = document.querySelector('.tab.active');
   session.type = TAB_SESSION_TYPE[activeTab.dataset.tab] || 'combat';
   roster.clear();
-  activeTarget = null;
-  renderRoster();
-  renderDetail();
+  combatCustomMonsters = [];
+  renderCombatBrowseArea();
+  renderCombatKillLog();
   updateStats();
 
   sendToHost({ type: 'startSession', sessionType: session.type, loggedBy: session.loggedBy });
@@ -1628,9 +1676,9 @@ onHostMessage((msg) => {
     profileSelect.disabled = false;
     document.getElementById('session-sub').textContent = 'No session running';
     roster.clear();
-    activeTarget = null;
-    renderRoster();
-    renderDetail();
+    combatCustomMonsters = [];
+    renderCombatBrowseArea();
+    renderCombatKillLog();
     gatheringSession.active = false;
     gatheringSession.tradeskill = '';
     gatheringSession.zone = '';
@@ -1679,6 +1727,11 @@ onHostMessage((msg) => {
     // Populated once here, same pattern as mob-list above, since
     // wikiData.zones doesn't change after this message arrives.
     document.getElementById('combat-zone-list').innerHTML = wikiData.zones.map(z => `<option value="${escapeHtml(z)}"></option>`).join('');
+    // Loot modal's own custom-item datalist - used to be regenerated inline
+    // inside the old per-monster detail form's own template on every
+    // render; now static in index.html (same reasoning as mob-list/
+    // combat-zone-list above), so it needs populating here instead.
+    document.getElementById('item-list').innerHTML = wikiData.items.map(i => `<option value="${escapeHtml(i.name)}"></option>`).join('');
     refreshDishList();
     renderMapsPanel();
     // Fishing/Gathering's landing screens build their zone picker's options
@@ -1823,74 +1876,182 @@ setInterval(() => {
 }, 1000);
 
 // ---------------------------------------------------------------------------
-// Roster
+// Combat tap-first workflow (2026-08-29, backlog #27) - replaced the old
+// roster+detail pattern (add a monster, select it, fill a whole con/coin/
+// faction/loot form, THEN log) with Fishing's own tap-first model: camps and
+// monsters for the current zone are always browsable once a session's
+// running, tapping a monster logs an immediate bare kill (con unset, zero
+// coin, no items/faction) and the button sticks with a running ×N count,
+// matching Fishing's own fish-pick-grid. Con/coin/loot/faction get attached
+// POST-HOC via a "+ Con/Loot" button per row in the session-wide kill log
+// below, patching the already-logged entry through the existing editEntry
+// mechanism instead of requiring it all up front. `roster` (Map<name,
+// {entries}>) is unchanged as the underlying data store - only how entries
+// get created and how the UI renders it changed.
 // ---------------------------------------------------------------------------
-document.getElementById('add-mob').addEventListener('click', addMobFromInput);
-document.getElementById('new-mob').addEventListener('keydown', (e) => { if (e.key === 'Enter') addMobFromInput(); });
+document.getElementById('combat-search-add').addEventListener('click', addCustomMonsterFromSearch);
+document.getElementById('combat-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') addCustomMonsterFromSearch(); });
+document.getElementById('combat-search').addEventListener('input', filterCombatBrowseArea);
 
-function addMobFromInput() {
-  const input = document.getElementById('new-mob');
+// A monster typed into the search box that isn't already known (wiki or
+// already-tapped this session) becomes a custom tap target, same fallback
+// pattern as Fishing's own customFish/Gathering's custom node types - not
+// logged yet, just added to the grid so the very next tap logs a kill for it.
+let combatCustomMonsters = [];
+
+function addCustomMonsterFromSearch() {
+  const input = document.getElementById('combat-search');
   const name = input.value.trim();
   if (!name) return;
   if (!session.id) { showToast('Start a session first'); return; }
-  if (!roster.has(name)) roster.set(name, { entries: [] });
-  activeTarget = name;
+  const known = wikiData.monsters.some(m => m.name.toLowerCase() === name.toLowerCase());
+  const already = roster.has(name) || combatCustomMonsters.some(n => n.toLowerCase() === name.toLowerCase());
+  if (!known && !already) combatCustomMonsters.push(name);
   input.value = '';
-  renderRoster();
-  renderDetail();
+  renderCombatBrowseArea();
 }
 
-function renderRoster() {
-  const el = document.getElementById('roster-list');
-  if (roster.size === 0) {
-    el.innerHTML = '<div class="roster-empty">No monsters yet &mdash; add one above.</div>';
+// Filters existing buttons via the same .filtered-out class the checklist
+// dropdown / Combat's own landing search already use, not a full re-render
+// on every keystroke - rebuilding innerHTML on 'input' would steal focus
+// out of the search box after every character typed.
+function filterCombatBrowseArea() {
+  const q = document.getElementById('combat-search').value.trim().toLowerCase();
+  document.querySelectorAll('#combat-camps-area [data-search], #combat-monsters-area [data-search]').forEach(item => {
+    item.classList.toggle('filtered-out', !(!q || item.dataset.search.includes(q)));
+  });
+}
+
+function renderCombatBrowseArea() {
+  const campsEl = document.getElementById('combat-camps-area');
+  const monstersEl = document.getElementById('combat-monsters-area');
+  if (!campsEl || !monstersEl) return;
+  const zone = combatSession.zone;
+  const level = combatSession.level;
+
+  // Camps in this zone, sorted with real-level-matching ones first - camps
+  // have a genuine minLevel/maxLevel field (camps.json), not an estimate,
+  // unlike individual monsters below. Tapping a camp sets it as the
+  // session's current camp (same combatSession.camp the start-flow's own
+  // camp picker sets) rather than logging anything itself - purely a
+  // browsing/reference aid, not a tap-to-log target the way monsters are.
+  const zoneCamps = wikiData.camps.filter(c => c.zone === zone);
+  const campMatches = c => level != null && c.minLevel != null && c.maxLevel != null && level >= c.minLevel && level <= c.maxLevel;
+  const sortedCamps = zoneCamps.slice().sort((a, b) => (campMatches(b) ? 1 : 0) - (campMatches(a) ? 1 : 0));
+  if (sortedCamps.length === 0) {
+    campsEl.innerHTML = '';
+  } else {
+    campsEl.innerHTML = `<div class="landing-info-box" style="margin-bottom:14px;"><div class="fish-pick-expected-label" style="margin-bottom:6px;">Camps here</div><div class="fish-pick-grid">` + sortedCamps.map(c => {
+      const active = combatSession.camp === c.name;
+      const range = (c.minLevel != null && c.maxLevel != null) ? `Lvl ${c.minLevel}-${c.maxLevel}` : '';
+      const tipParts = [];
+      if (c.area) tipParts.push(c.area);
+      if (c.monsters && c.monsters.length) tipParts.push('Monsters: ' + c.monsters.join(', '));
+      const tip = tipParts.length ? ` data-tip="${escapeHtml(tipParts.join(' — '))}"` : '';
+      const classes = ['fish-pick-btn'];
+      if (active) classes.push('picked');
+      return `<button type="button" class="${classes.join(' ')}" data-search="${escapeHtml(c.name.toLowerCase())}" data-camp="${escapeHtml(c.name)}"${tip}>${escapeHtml(c.name)}${range ? ` <span style="opacity:.65; font-weight:400;">(${range})</span>` : ''}</button>`;
+    }).join('') + `</div></div>`;
+    campsEl.querySelectorAll('[data-camp]').forEach(btn => btn.addEventListener('click', () => {
+      combatSession.camp = combatSession.camp === btn.dataset.camp ? null : btn.dataset.camp;
+      renderCombatCampIndicator();
+      renderCombatBrowseArea();
+    }));
+  }
+
+  // Monsters known in this zone (wiki locations match, same lenient
+  // locationMatchesZone every other zone-scoped grid in the app already
+  // uses) plus any custom-added/already-tapped-this-session names not in
+  // the wiki. Sorted with level-estimate matches first - see
+  // estimateMonsterLevel above; a monster with no conObservations yet just
+  // sorts alphabetically among the rest, no estimate shown.
+  const wikiMonstersHere = wikiData.monsters.filter(m => zone && (m.locations || []).some(loc => locationMatchesZone(loc, zone))).map(m => m.name);
+  const allNames = [...new Set([...wikiMonstersHere, ...combatCustomMonsters, ...roster.keys()])];
+  if (allNames.length === 0) {
+    monstersEl.innerHTML = zone
+      ? '<p class="landing-info-empty">No monsters known here yet - type one above and tap + to add it.</p>'
+      : '<p class="landing-info-empty">Pick a zone (top bar) to see monsters here.</p>';
     return;
   }
-  el.innerHTML = '';
-  for (const [name, data] of roster) {
-    const coin = sumCoin(data.entries);
-    const div = document.createElement('div');
-    div.className = 'roster-item' + (name === activeTarget ? ' selected' : '');
-    div.innerHTML = `
-      <span class="roster-item-remove" data-name="${escapeHtml(name)}" title="Remove ${escapeHtml(name)} from this session">&times;</span>
-      <span class="roster-item-edit" data-name="${escapeHtml(name)}" title="Rename ${escapeHtml(name)}">&#9998;</span>
-      <div class="name">${escapeHtml(name)}</div>
-      <div class="meta">${data.entries.length} kill${data.entries.length === 1 ? '' : 's'} &middot; ${fmtCoin(coin)}</div>
-      <div class="quickadd"><button class="mini-btn quick-kill" data-name="${escapeHtml(name)}">+1 kill</button></div>
-    `;
-    div.addEventListener('click', (e) => {
-      if (e.target.classList.contains('quick-kill') || e.target.classList.contains('roster-item-remove') || e.target.classList.contains('roster-item-edit')) return;
-      activeTarget = name;
-      renderRoster();
-      renderDetail();
-    });
-    el.appendChild(div);
+  const estimates = {};
+  allNames.forEach(name => {
+    const m = findMonster(name);
+    estimates[name] = m ? estimateMonsterLevel(m.conObservations) : null;
+  });
+  const matchesLevel = name => {
+    const est = estimates[name];
+    return !!(est && level != null && level >= est.min - 1 && level <= est.max + 1);
+  };
+  function renderBtn(name) {
+    const known = wikiMonstersHere.includes(name);
+    const count = roster.has(name) ? roster.get(name).entries.length : 0;
+    const est = estimates[name];
+    const classes = ['fish-pick-btn'];
+    if (!known) classes.push('new');
+    if (count) classes.push('picked');
+    const badge = count ? `<span class="fish-pick-count">&times;${count}</span>` : '';
+    const newBadge = !known ? '<span class="fish-pick-new-badge">new</span>' : '';
+    const levelTag = est ? ` <span style="opacity:.65; font-weight:400;">(${formatLevelEstimate(est)})</span>` : '';
+    const tip = est ? ` data-tip="Estimated from logged con checks - not a wiki fact."` : '';
+    return `<button type="button" class="${classes.join(' ')}" data-search="${escapeHtml(name.toLowerCase())}" data-monster="${escapeHtml(name)}"${tip}>${escapeHtml(name)}${levelTag}${badge}${newBadge}</button>`;
   }
-  el.querySelectorAll('.roster-item-remove').forEach(x => x.addEventListener('click', (e) => {
-    e.stopPropagation();
-    roster.delete(x.dataset.name);
-    if (activeTarget === x.dataset.name) activeTarget = null;
-    renderRoster();
-    renderDetail();
-    updateStats();
-  }));
-  el.querySelectorAll('.roster-item-edit').forEach(x => x.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openRosterRenameModal(x.dataset.name);
-  }));
-  el.querySelectorAll('.quick-kill').forEach(btn => btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    logKill(btn.dataset.name, { id: genId(), con: 'Dark Blue', playerLevel: combatSession.level, coin: { platinum: 0, gold: 0, silver: 0, copper: 0 }, items: [], named: false, factionChanges: [] });
-  }));
+  // Same "expected" grouping treatment as Fishing/Gathering's own pick
+  // grids (a bordered/tinted container, not a per-button color channel -
+  // see CLAUDE.md "Gathering" for why that channel got freed up) rather
+  // than inventing a new visual language just for Combat.
+  const matching = allNames.filter(matchesLevel).sort((a, b) => a.localeCompare(b));
+  const rest = allNames.filter(n => !matchesLevel(n)).sort((a, b) => a.localeCompare(b));
+  let html = '';
+  if (matching.length > 0) {
+    html += `<div class="fish-pick-expected-box"><div class="fish-pick-expected-label">Matches your level</div>${matching.map(renderBtn).join('')}</div>`;
+  }
+  html += rest.map(renderBtn).join('');
+  monstersEl.innerHTML = html;
+  monstersEl.querySelectorAll('[data-monster]').forEach(btn => btn.addEventListener('click', () => logBareKill(btn.dataset.monster)));
 }
 
-// Roster entries are fully renameable (2026-08-29) - fixes a typo/misclick
-// without having to delete and re-add (which would lose that monster's
-// already-logged kills entirely). Renaming has to patch every one of this
-// monster's own already-logged entries' `target` field too, one editEntry
-// per entry - same "the grouping field has to move with the correction"
-// reasoning Fishing/Gathering's own zone/node-type edits already document,
-// just potentially N entries here instead of always exactly one.
+// One tap = one bare kill entry, matching Fishing's own one-tap
+// logFishCatch - con/coin/items/factionChanges start empty/zeroed, attached
+// later via the "+ Con/Loot" button on the kill-log row below.
+function logBareKill(name) {
+  if (!session.id) { showToast('Start a session first'); return; }
+  logKill(name, {
+    id: genId(),
+    zone: combatSession.zone || '',
+    playerLevel: combatSession.level,
+    con: null,
+    named: false,
+    coin: { platinum: 0, gold: 0, silver: 0, copper: 0 },
+    items: [],
+    factionChanges: [],
+  });
+}
+
+function logKill(target, entry) {
+  if (!roster.has(target)) roster.set(target, { entries: [] });
+  entry.loggedAt = Date.now();
+  roster.get(target).entries.push(entry);
+
+  sendToHost({
+    type: 'logEntry',
+    sessionId: session.id,
+    sessionType: 'combat',
+    entry: Object.assign({ target }, entry),
+  });
+
+  renderCombatBrowseArea();
+  renderCombatKillLog();
+  updateStats();
+}
+
+// Renaming a custom (non-wiki) monster - fixes a typo/misclick without
+// having to lose that monster's already-logged kills. Has to patch every
+// one of this monster's own already-logged entries' `target` field too, one
+// editEntry per entry - same "the grouping field has to move with the
+// correction" reasoning Fishing/Gathering's own zone/node-type edits already
+// document, just potentially N entries here instead of always exactly one.
+// Triggered from a kill-log row (renderCombatKillLog below), not the tap
+// grid itself - a <button> can't nest another clickable element.
 let renamingRosterTarget = null;
 function openRosterRenameModal(name) {
   renamingRosterTarget = name;
@@ -1920,7 +2081,7 @@ document.getElementById('combat-rename-save').addEventListener('click', () => {
     const data = roster.get(oldName);
     roster.delete(oldName);
     roster.set(newName, data);
-    if (activeTarget === oldName) activeTarget = newName;
+    combatCustomMonsters = combatCustomMonsters.map(n => n === oldName ? newName : n);
     data.entries.forEach(e => {
       if (!e.id) return;
       sendToHost({ type: 'editEntry', sessionId: session.id, entryId: e.id, patch: { target: newName } });
@@ -1928,112 +2089,32 @@ document.getElementById('combat-rename-save').addEventListener('click', () => {
   }
   document.getElementById('combat-rename-modal').classList.remove('open');
   renamingRosterTarget = null;
-  renderRoster();
-  renderDetail();
+  renderCombatBrowseArea();
+  renderCombatKillLog();
 });
 
 // ---------------------------------------------------------------------------
-// Detail panel
+// "+ Add loot" - a tap grid of expected loot (the target monster's own wiki
+// `drops`, same "expected" sourcing as Fishing/Gathering's own pick grids)
+// plus a custom-add fallback, mirroring Gathering's material modal exactly
+// (tap to bump a pending count, "Done" commits). Opened from within the
+// "+ Con/Loot" modal below (openConLootModal) - takes the target monster
+// name and a callback explicitly now rather than reading the old global
+// activeTarget/pendingItems, since there's no more single "selected"
+// monster once logging is tap-first.
 // ---------------------------------------------------------------------------
-let pendingItems = [];
-
-let combatConCtrl = null;
-
-function renderDetail() {
-  const el = document.getElementById('detail-panel');
-  if (!activeTarget) {
-    el.innerHTML = '<div class="detail-empty">Add a monster to the roster, then select it to start logging kills.</div>';
-    return;
-  }
-  const data = roster.get(activeTarget);
-  pendingItems = [];
-  el.innerHTML = `
-    <div class="detail-head"><h2>${escapeHtml(activeTarget)}</h2></div>
-    <div class="field-grid">
-      <div><label>Zone</label><input id="f-zone" list="combat-zone-list" autocomplete="off" placeholder="e.g. Vale of Zintar" value="${escapeHtml(combatSession.zone || '')}" /></div>
-      <div><label>Named?</label><select id="f-named"><option>No</option><option>Yes</option></select></div>
-    </div>
-    <div class="con-coin-row">
-      <div class="con-coin-col">
-        <label>Con <span style="color:var(--text-muted); font-weight:400;">(relative to your level above)</span></label>
-        ${conButtonGridHTML('f-con', 'Dark Blue')}
-      </div>
-      <div class="con-coin-col">
-        <label>Coin drop (total off the corpse)</label>
-        ${coinDropGridHTML('f', {})}
-      </div>
-    </div>
-    <label>Faction change (optional)</label>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-      ${checklistDropdownHTML('f-faction-pos', 'Add faction', wikiData.factions, { tip: 'Factions this kill improved your standing with, if any.' })}
-      ${checklistDropdownHTML('f-faction-neg', 'Lose faction', wikiData.factions, { tip: 'Factions this kill worsened your standing with, if any.' })}
-    </div>
-    <label>Items looted</label>
-    <button type="button" class="secondary-btn" id="open-loot-btn" style="margin:0 0 6px;">+ Add loot</button>
-    <datalist id="item-list">${wikiData.items.map(i => `<option value="${escapeHtml(i.name)}"></option>`).join('')}</datalist>
-    <div class="chips" id="item-chips"></div>
-    <div class="err" id="detail-err"></div>
-    <button class="primary-btn" id="log-kill-btn">Log encounter</button>
-    <div class="log">
-      <div class="log-title">Kills logged &mdash; ${escapeHtml(activeTarget)}</div>
-      <div id="kill-log"></div>
-    </div>
-  `;
-  combatConCtrl = setupConButtonGrid('f-con', 'Dark Blue');
-  const factionPos = setupChecklistDropdown('f-faction-pos');
-  const factionNeg = setupChecklistDropdown('f-faction-neg');
-  document.getElementById('open-loot-btn').addEventListener('click', () => openLootModal());
-  document.getElementById('log-kill-btn').addEventListener('click', () => {
-    const err = document.getElementById('detail-err');
-    const zone = document.getElementById('f-zone').value.trim();
-    if (!zone) {
-      err.textContent = 'Enter a zone first';
-      err.style.display = 'block';
-      return;
-    }
-    err.style.display = 'none';
-    combatSession.zone = zone;
-    const entry = {
-      id: genId(),
-      zone,
-      con: combatConCtrl.getValue(),
-      playerLevel: combatSession.level,
-      named: document.getElementById('f-named').value === 'Yes',
-      coin: {
-        platinum: Number(document.getElementById('f-plat').value) || 0,
-        gold: Number(document.getElementById('f-gold').value) || 0,
-        silver: Number(document.getElementById('f-silver').value) || 0,
-        copper: Number(document.getElementById('f-copper').value) || 0,
-      },
-      items: pendingItems.slice(),
-      factionChanges: [
-        ...factionPos.getSelected().map(faction => ({ faction, effect: 'positive' })),
-        ...factionNeg.getSelected().map(faction => ({ faction, effect: 'negative' })),
-      ],
-    };
-    logKill(activeTarget, entry);
-  });
-  renderChips();
-  renderKillLog();
-}
-
-// "Add loot" (2026-08-29) - replaces the old plain text-input-plus-Add with
-// a tap grid of expected loot (this monster's own wiki `drops`, same
-// "expected" sourcing as Fishing/Gathering's own pick grids) plus a custom-
-// add fallback, mirroring Gathering's material modal exactly (tap to bump a
-// pending count, "Done" commits). Still writes into the same pendingItems
-// array/renderChips() the rest of this form already uses - only how items
-// get ADDED changed, not how they're displayed/removed afterward.
 let lootPendingCounts = {};
 let lootCustomItems = [];
+let lootTargetMonster = null;
+let lootOnDone = null;
 
 function renderLootGrid() {
-  const monster = findMonster(activeTarget);
+  const monster = findMonster(lootTargetMonster || '');
   const expected = monster && monster.drops ? monster.drops : [];
   const all = [...new Set([...expected, ...lootCustomItems])];
   const grid = document.getElementById('loot-grid');
   // A monster with no wiki drops (or no wiki entry at all - e.g. a custom
-  // roster name) left this grid completely empty with no message, jumping
+  // name) left this grid completely empty with no message, jumping
   // straight from the modal's own instructions to the search input below -
   // easy to mistake for "the button did nothing" on a quick glance (real
   // user report, 2026-08-29). Same empty-state pattern as the landing
@@ -2058,9 +2139,21 @@ function renderLootGrid() {
     renderLootGrid();
   }));
 }
-function openLootModal() {
+// targetMonster: whose wiki drops to show. existingItems: pre-seeds pending
+// counts so reopening the picker after adding more doesn't lose what's
+// already picked. onDone(items): called with the flattened item list when
+// "Done" is clicked - the caller owns what happens to them.
+function openLootModal(targetMonster, existingItems, onDone) {
+  lootTargetMonster = targetMonster;
+  lootOnDone = onDone;
   lootPendingCounts = {};
   lootCustomItems = [];
+  const monster = findMonster(targetMonster || '');
+  const expected = monster && monster.drops ? monster.drops : [];
+  (existingItems || []).forEach(name => {
+    lootPendingCounts[name] = (lootPendingCounts[name] || 0) + 1;
+    if (!expected.includes(name) && !lootCustomItems.includes(name)) lootCustomItems.push(name);
+  });
   document.getElementById('loot-new-item').value = '';
   renderLootGrid();
   document.getElementById('loot-modal').classList.add('open');
@@ -2078,58 +2171,68 @@ document.getElementById('loot-add-btn').addEventListener('click', () => {
   renderLootGrid();
 });
 document.getElementById('loot-done').addEventListener('click', () => {
+  const items = [];
   Object.keys(lootPendingCounts).forEach(name => {
-    for (let i = 0; i < lootPendingCounts[name]; i++) pendingItems.push(name);
+    for (let i = 0; i < lootPendingCounts[name]; i++) items.push(name);
   });
   document.getElementById('loot-modal').classList.remove('open');
-  renderChips();
+  if (lootOnDone) lootOnDone(items);
 });
 
-function renderChips() {
-  const el = document.getElementById('item-chips');
+// ---------------------------------------------------------------------------
+// Session-wide kill log (backlog #27) - every kill across every monster this
+// session, newest first, mirroring Fishing's own combined catch log
+// (renderFishLog) now that there's no more single "selected monster" detail
+// panel to scope a per-monster log to. Two actions per row: "Edit" (simple
+// zone/level/named/coin correction, unchanged mechanism, now looked up via
+// findKillEntry instead of roster.get(activeTarget)) and "+ Con/Loot" (new -
+// attaches con/coin/items/faction post-hoc). A custom (non-wiki) monster
+// also gets a small rename icon here, replacing the old roster-item-edit
+// icon that lived on the now-removed roster list.
+// ---------------------------------------------------------------------------
+function renderCombatKillLog() {
+  const el = document.getElementById('combat-kill-log');
   if (!el) return;
-  el.innerHTML = pendingItems.map((it, i) => {
-    const known = !!findItem(it);
-    return `<span class="chip${known ? '' : ' new'}">${escapeHtml(it)}${known ? '' : ' (new)'} <span class="x" data-i="${i}">&times;</span></span>`;
-  }).join('');
-  el.querySelectorAll('.x').forEach(x => x.addEventListener('click', () => {
-    pendingItems.splice(+x.dataset.i, 1);
-    renderChips();
-  }));
-}
-
-function renderKillLog() {
-  const el = document.getElementById('kill-log');
-  if (!el) return;
-  const data = roster.get(activeTarget);
-  if (!data || data.entries.length === 0) {
+  const all = [];
+  for (const [name, data] of roster) {
+    data.entries.forEach(e => all.push(Object.assign({ target: name }, e)));
+  }
+  if (all.length === 0) {
     el.innerHTML = '<div class="roster-empty">No kills logged yet.</div>';
     return;
   }
-  el.innerHTML = data.entries.slice().reverse().map(e => {
-    const conClass = CON_CLASS[e.con] || '';
+  all.sort((a, b) => b.loggedAt - a.loggedAt);
+  const knownNames = wikiData.monsters.map(m => m.name.toLowerCase());
+  el.innerHTML = all.map(e => {
+    const conClass = e.con ? (CON_CLASS[e.con] || '') : '';
+    const conPill = e.con
+      ? `<span class="con-pill ${conClass}">${escapeHtml(e.con)}</span>`
+      : `<span class="con-pill" style="background:var(--bg-raised); color:var(--text-muted);">No con yet</span>`;
     const when = new Date(e.loggedAt).toLocaleTimeString();
     const editBtn = e.id ? `<button class="mini-btn" data-edit-id="${escapeHtml(e.id)}">Edit</button>` : '';
-    return `<div class="log-row"><span><span class="con-pill ${conClass}">${e.con}</span>&nbsp;${fmtCoin(e.coin)}${e.items.length ? ' &middot; ' + e.items.map(escapeHtml).join(', ') : ''}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span>${editBtn}</span></div>`;
+    const conLootBtn = e.id ? `<button class="mini-btn" data-conloot-id="${escapeHtml(e.id)}">+ Con/Loot</button>` : '';
+    const renameBtn = !knownNames.includes(e.target.toLowerCase())
+      ? `<span class="roster-item-edit" style="position:static;" data-name="${escapeHtml(e.target)}" title="Rename ${escapeHtml(e.target)}">&#9998;</span>` : '';
+    return `<div class="log-row"><span><b>${escapeHtml(e.target)}</b>${renameBtn}&nbsp;${conPill}&nbsp;${fmtCoin(e.coin)}${e.items.length ? ' &middot; ' + e.items.map(escapeHtml).join(', ') : ''}</span><span style="display:flex; align-items:center; gap:8px;"><span class="when">${when}</span>${editBtn}${conLootBtn}</span></div>`;
   }).join('');
   el.querySelectorAll('[data-edit-id]').forEach(btn => btn.addEventListener('click', () => openCombatEditModal(btn.dataset.editId)));
+  el.querySelectorAll('[data-conloot-id]').forEach(btn => btn.addEventListener('click', () => openConLootModal(btn.dataset.conlootId)));
+  el.querySelectorAll('.roster-item-edit').forEach(x => x.addEventListener('click', () => openRosterRenameModal(x.dataset.name)));
 }
 
-// Combat kill entries didn't get a client-generated id until this feature
-// was added (2026-08-29) - older logged entries (or ones from a session
-// that started before this shipped) just don't show an Edit button, see the
-// e.id check in renderKillLog above. Scoped to the "simple" fields
-// (zone/con/level/named/coin), same as Fishing/Gathering's own edit modals -
-// items/faction changes aren't re-editable here, matching how neither of
-// those modals lets you re-author their own list-shaped fields either; log
-// a corrected kill instead if those were wrong.
+// Combat kill entries didn't get a client-generated id until the edit
+// feature was added (2026-08-29) - older logged entries (or ones from a
+// session that started before this shipped) just don't show Edit/Con-Loot
+// buttons, see the e.id check above. Scoped to the "simple" fields (zone/
+// con/level/named/coin) - items/faction changes aren't editable here, use
+// "+ Con/Loot" for those instead.
 let editingCombatEntryId = null;
 let combatEditConCtrl = null;
 
 function openCombatEditModal(id) {
-  const data = roster.get(activeTarget);
-  const entry = data ? data.entries.find(e => e.id === id) : null;
-  if (!entry) return;
+  const found = findKillEntry(id);
+  if (!found) return;
+  const entry = found.entry;
   editingCombatEntryId = id;
   document.getElementById('combat-edit-zone').value = entry.zone || '';
   document.getElementById('combat-edit-con-wrap').innerHTML = conButtonGridHTML('combat-edit-con', entry.con || 'Dark Blue');
@@ -2147,9 +2250,9 @@ document.getElementById('combat-edit-cancel').addEventListener('click', () => {
 });
 
 document.getElementById('combat-edit-save').addEventListener('click', () => {
-  const data = roster.get(activeTarget);
-  const entry = data ? data.entries.find(e => e.id === editingCombatEntryId) : null;
-  if (!entry) { document.getElementById('combat-edit-modal').classList.remove('open'); return; }
+  const found = findKillEntry(editingCombatEntryId);
+  if (!found) { document.getElementById('combat-edit-modal').classList.remove('open'); return; }
+  const entry = found.entry;
   const zoneVal = document.getElementById('combat-edit-zone').value.trim();
   if (!zoneVal) {
     const err = document.getElementById('combat-edit-err');
@@ -2174,26 +2277,100 @@ document.getElementById('combat-edit-save').addEventListener('click', () => {
   sendToHost({ type: 'editEntry', sessionId: session.id, entryId: editingCombatEntryId, patch });
   document.getElementById('combat-edit-modal').classList.remove('open');
   editingCombatEntryId = null;
-  renderKillLog();
+  renderCombatKillLog();
+  renderCombatBrowseArea();
   updateStats();
 });
 
-function logKill(target, entry) {
-  if (!roster.has(target)) roster.set(target, { entries: [] });
-  entry.loggedAt = Date.now();
-  roster.get(target).entries.push(entry);
+// ---------------------------------------------------------------------------
+// "+ Con/Loot" modal (2026-08-29, backlog #27) - the post-hoc counterpart to
+// tap-to-log: attaches con, coin, items, and faction changes to an
+// already-logged bare kill entry. Everything the old pre-log form used to
+// collect up front, just triggered after the fact via one combined patch
+// through the existing editEntry mechanism instead of requiring it before
+// the kill could be logged at all.
+// ---------------------------------------------------------------------------
+let conLootEntryId = null;
+let conLootTarget = null;
+let conLootConCtrl = null;
+let conLootFactionPos = null;
+let conLootFactionNeg = null;
+let conLootPendingItems = [];
 
-  sendToHost({
-    type: 'logEntry',
-    sessionId: session.id,
-    sessionType: 'combat',
-    entry: Object.assign({ target }, entry),
-  });
-
-  renderRoster();
-  if (target === activeTarget) renderDetail();
-  updateStats();
+function openConLootModal(id) {
+  const found = findKillEntry(id);
+  if (!found) return;
+  conLootEntryId = id;
+  conLootTarget = found.target;
+  const entry = found.entry;
+  conLootPendingItems = entry.items ? entry.items.slice() : [];
+  document.getElementById('conloot-subtitle').textContent = found.target;
+  document.getElementById('conloot-named').value = entry.named ? 'Yes' : 'No';
+  document.getElementById('conloot-con-wrap').innerHTML = conButtonGridHTML('conloot-con', entry.con || 'Dark Blue');
+  conLootConCtrl = setupConButtonGrid('conloot-con', entry.con || 'Dark Blue');
+  document.getElementById('conloot-coin-wrap').innerHTML = coinDropGridHTML('conloot', entry.coin || {});
+  const posSelected = (entry.factionChanges || []).filter(f => f.effect === 'positive').map(f => f.faction);
+  const negSelected = (entry.factionChanges || []).filter(f => f.effect === 'negative').map(f => f.faction);
+  document.getElementById('conloot-faction-pos-wrap').innerHTML = checklistDropdownHTML('conloot-faction-pos', 'Add faction', wikiData.factions, { selected: posSelected, tip: 'Factions this kill improved your standing with, if any.' });
+  document.getElementById('conloot-faction-neg-wrap').innerHTML = checklistDropdownHTML('conloot-faction-neg', 'Lose faction', wikiData.factions, { selected: negSelected, tip: 'Factions this kill worsened your standing with, if any.' });
+  conLootFactionPos = setupChecklistDropdown('conloot-faction-pos');
+  conLootFactionNeg = setupChecklistDropdown('conloot-faction-neg');
+  renderConLootChips();
+  document.getElementById('conloot-err').style.display = 'none';
+  document.getElementById('combat-conloot-modal').classList.add('open');
 }
+
+function renderConLootChips() {
+  const el = document.getElementById('conloot-item-chips');
+  if (!el) return;
+  el.innerHTML = conLootPendingItems.map((it, i) => {
+    const known = !!findItem(it);
+    return `<span class="chip${known ? '' : ' new'}">${escapeHtml(it)}${known ? '' : ' (new)'} <span class="x" data-i="${i}">&times;</span></span>`;
+  }).join('');
+  el.querySelectorAll('.x').forEach(x => x.addEventListener('click', () => {
+    conLootPendingItems.splice(+x.dataset.i, 1);
+    renderConLootChips();
+  }));
+}
+
+document.getElementById('conloot-open-loot-btn').addEventListener('click', () => {
+  openLootModal(conLootTarget, conLootPendingItems, (items) => {
+    conLootPendingItems = items;
+    renderConLootChips();
+  });
+});
+
+document.getElementById('conloot-cancel').addEventListener('click', () => {
+  document.getElementById('combat-conloot-modal').classList.remove('open');
+  conLootEntryId = null;
+});
+
+document.getElementById('conloot-save').addEventListener('click', () => {
+  const found = findKillEntry(conLootEntryId);
+  if (!found) { document.getElementById('combat-conloot-modal').classList.remove('open'); return; }
+  const entry = found.entry;
+  const patch = {
+    named: document.getElementById('conloot-named').value === 'Yes',
+    con: conLootConCtrl.getValue(),
+    coin: {
+      platinum: Number(document.getElementById('conloot-plat').value) || 0,
+      gold: Number(document.getElementById('conloot-gold').value) || 0,
+      silver: Number(document.getElementById('conloot-silver').value) || 0,
+      copper: Number(document.getElementById('conloot-copper').value) || 0,
+    },
+    items: conLootPendingItems.slice(),
+    factionChanges: [
+      ...conLootFactionPos.getSelected().map(faction => ({ faction, effect: 'positive' })),
+      ...conLootFactionNeg.getSelected().map(faction => ({ faction, effect: 'negative' })),
+    ],
+  };
+  Object.assign(entry, patch);
+  sendToHost({ type: 'editEntry', sessionId: session.id, entryId: conLootEntryId, patch });
+  document.getElementById('combat-conloot-modal').classList.remove('open');
+  conLootEntryId = null;
+  renderCombatKillLog();
+  updateStats();
+});
 
 // ---------------------------------------------------------------------------
 // Gathering (Mining / Lumberjacking / Herbalism - Foraging excluded for now,
@@ -3743,8 +3920,8 @@ document.getElementById('lookup-input').addEventListener('input', e => renderLoo
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
-renderRoster();
-renderDetail();
+renderCombatBrowseArea();
+renderCombatKillLog();
 renderCombatLandingInfo();
 renderFishingPanel();
 renderGatheringPanel();

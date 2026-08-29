@@ -400,6 +400,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   align-items: center; justify-content: center; z-index: 100;
 }
 .modal-overlay.open { display: flex; }
+/* #loot-modal can now open ON TOP of #combat-conloot-modal (2026-08-29,
+   backlog #27's "+ Con/Loot" flow) - both are plain .modal-overlay with the
+   same z-index, so which one paints on top depends on DOM order, and
+   loot-modal happens to come earlier in index.html than combat-conloot-modal.
+   Its only caller today is that nested case, so bumping it above the base
+   z-index unconditionally is safe. */
+#loot-modal { z-index: 110; }
 .modal-box {
   background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 10px;
   padding: 22px 24px; width: 320px; max-width: calc(100vw - 40px); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
