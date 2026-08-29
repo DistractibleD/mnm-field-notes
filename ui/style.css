@@ -229,26 +229,22 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .log-row:last-child { border-bottom: none; }
 .log-row .when { color: var(--text-muted); font-family: Consolas, monospace; font-size: 11.5px; }
 
-/* Con colors (2026-08-29) - matched to the wiki's own real hex values,
-   not the app's earlier guessed pastels. The wiki has no dedicated con
-   palette of its own (con tiers there only ever render as plain text,
-   confirmed directly with wiki-claude) - these are the wiki's crafting
-   recipe-difficulty colors instead (sampled from real crafting-window
-   screenshots), reused here on the user's own explicit go-ahead despite
-   the tier sets not lining up 1:1: crafting has 6 hex values covering 7
-   named tiers (Trivial+Green share one color) plus an Orange con doesn't
-   use; con keeps Trivial/Green as two distinct tiers and has no Orange.
-   Mapping, confirmed with the user: Trivial uses Green's own color (same
-   as crafting already treats them as one), Light Blue/Dark Blue/White/
-   Yellow/Red map straight across, Orange is unused here (reserved for
-   Crafting's own difficulty UI once that tab gets built - don't repurpose
-   it for anything con-related). Backgrounds are the real saturated hex as
-   given, NOT lightened/pastel-ized like the old guessed values were - text
-   color picked per swatch for contrast (dark text on the light swatches,
-   white text on Dark Blue/Red, the two too dark for dark text to read). */
+/* Con colors - FINAL, all 7 confirmed (2026-08-29). Trivial/Green are
+   pixel-sampled by the user from real in-game con chat-text screenshots
+   (their own distinct values - the earlier theory that they share one hex
+   with the wiki's crafting-difficulty palette turned out wrong for these
+   two specifically and was dropped). Light Blue/Dark Blue/White/Yellow/Red
+   went through a brief false alarm (a wiki-claude over-generalization
+   briefly called these unconfirmed too) but turned out correct all along -
+   the crafting table only collapses Trivial+Green into one shared row, it
+   doesn't collapse the other five, so those five really do map 1:1 to the
+   crafting-difficulty palette. Text color picked per swatch for contrast
+   (dark text on light swatches, white text on Dark Blue/Red/Green - Green
+   in particular is a fairly deep saturated color, not light enough for
+   dark text like the crafting-derived swatches are). */
 .con-pill { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; display: inline-block; }
-.con-trivial { background: #45FC00; color: #102b00; }
-.con-green { background: #45FC00; color: #102b00; }
+.con-trivial { background: #82FF6E; color: #0d3305; }
+.con-green { background: #009C00; color: #eafff0; }
 .con-lblue { background: #00FCDF; color: #003d35; }
 .con-dblue { background: #326EFF; color: #ffffff; }
 .con-white { background: #FFFFFF; color: #1a1a1a; }
@@ -268,18 +264,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 }
 .con-btn:hover { opacity: 0.85; }
 .con-btn.active { opacity: 1; border-color: var(--text-primary); }
-/* Trivial and Green share one hex (#45FC00, see the Con colors comment
-   above) - real, confirmed, not a bug in the color mapping. But it left
-   the two grid buttons visually identical apart from their tiny text
-   label, reported as a real mix-up-at-a-glance risk (2026-08-29, flagged
-   via wiki-claude on the user's behalf). Trivial isn't itself a real con
-   tier with a confirmed color of its own - it's this app's own addition
-   that happens to share Green's real value by design choice - so it's the
-   one free to carry an extra visual cue without touching the confirmed
-   hex: a dashed border (solid again once picked, matching every other
-   con-btn's active state) sets it apart from Green at a glance. */
-.con-btn.con-trivial { border-style: dashed; border-color: rgba(255,255,255,0.4); }
-.con-btn.con-trivial.active { border-style: solid; }
+/* Trivial/Green dashed-border differentiator (added 2026-08-29) REMOVED
+   (also 2026-08-29, same day) - it existed only because Trivial and Green
+   briefly shared one hex under the now-dropped crafting-palette theory,
+   making the two grid buttons visually identical apart from tiny text.
+   Now that both have their own distinct confirmed real colors (see the Con
+   colors comment above), the problem it solved no longer exists - removed
+   rather than left as dead special-casing for a non-issue. */
 
 /* Coin-drop entry (2026-08-29, backlog #25) - replaces 4 full-width labeled
    number inputs (each on its own .field-grid row, "platinum"/"gold"/etc as

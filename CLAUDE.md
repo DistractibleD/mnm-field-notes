@@ -352,13 +352,15 @@ Gathering/Fishing are NOT this pattern — see their own sections below.
   (confirmed directly with wiki-claude, 2026-08-29 — sampled there from real crafting-window
   screenshots, lives in that repo's own `CLAUDE.md`): Green/Trivial `#45FC00`, Light Blue
   `#00FCDF`, Dark Blue `#326EFF`, White `#FFFFFF`, Yellow `#FCE800`, Orange `#E35300`, Red
-  `#FF1C1C`. **Confirmed (2026-08-29) to be the SAME real palette Combat's con colors below
-  use** — con is just a 6-color subset (no Orange, and Trivial/Green genuinely share one
-  color in-game). Still don't reuse Combat's `CON_CLASS`/`.con-*` CSS classes directly for
-  this, though — Crafting has its own separate tier NAMES (includes Orange, merges
-  Trivial+Green into one labeled tier) even though the underlying hex values line up, so build
-  Crafting's own difficulty-badge classes/lookup off this palette instead of piggybacking on
-  Combat's con lookup.
+  `#FF1C1C`. **NOT the same palette as Combat's con colors below, despite an earlier theory
+  that they matched** — briefly believed to be one shared palette (con as crafting's 6-color
+  subset), but that theory turned out wrong specifically for Trivial/Green: con's real,
+  pixel-sampled values for those two (`#82FF6E`/`#009C00`) don't match this crafting palette's
+  shared `#45FC00` at all. The other 5 (Light Blue/Dark Blue/White/Yellow/Red) DO still
+  genuinely match 1:1 between the two systems — real coincidence confirmed both ways, not
+  assumed. Build Crafting's own difficulty-badge classes/lookup off THIS palette (the one
+  listed in this bullet) when the time comes — don't reuse Combat's `CON_CLASS`/`.con-*` CSS
+  classes, since con's Trivial/Green values are wrong for crafting's purposes.
 
 **Session-level export label** (`session.type` in `app.js`, export header/filename) derives
 from the active tab at click time (`TAB_SESSION_TYPE` map — fishing/gathering kept as
@@ -944,38 +946,29 @@ all buildable off patterns/data already in the codebase):
   "Light Blue"/"Dark Blue" con values, but the actual CSS classes are `"con-lblue"`/
   `"con-dblue"` — those two cons were silently rendering with zero color, unnoticed until
   now. Fixed by routing the kill-log pill through the same `CON_CLASS` lookup.
-  **Colors themselves updated (2026-08-29)** — the `.con-*` classes' actual hex values used to
-  be guessed pastels; asked wiki-claude for the wiki's real con colors first, and its own site
-  never renders con as anything but plain text, so there was nothing recorded there. The wiki
-  DOES have a real hex palette for crafting recipe difficulty (sampled from real crafting-window
-  screenshots — see the Crafting bullet under "Session types and fields" above for the full
-  list), initially reused for con on the user's own explicit go-ahead despite an apparent tier
-  mismatch (crafting merges Trivial+Green into one color and has an Orange con doesn't use) —
-  **then confirmed by the user as the actual real mapping, not just a reuse**: con and crafting
-  genuinely share the same palette in-game, Trivial and Green really do render identically
-  despite being two separately-named con tiers, and con simply has no Orange (a genuine subset
-  of crafting's palette, not an approximation). Final: Trivial = Green = `#45FC00`, Light Blue
-  `#00FCDF`, Dark Blue `#326EFF`, White `#FFFFFF`, Yellow `#FCE800`, Red `#FF1C1C` — Orange
-  stays reserved for Crafting's own difficulty UI whenever that tab gets built for real, still
-  not used for anything con-related. Backgrounds are the real saturated hex as given, not
-  lightened — text color picked per swatch for contrast (dark text on the light swatches,
-  white text on Dark Blue/Red). **Trivial/Green mix-up fixed (2026-08-29)** — sharing one hex
-  is correct (confirmed, not a bug), but it left the two `.con-btn`s visually identical apart
-  from their small text label, flagged as a real risk of picking the wrong one at a glance
-  (reported via wiki-claude). Trivial isn't itself a real con tier with a confirmed color —
-  it's this app's own addition that happens to share Green's real value by design choice — so
-  it's the one free to carry an extra visual cue without touching the confirmed hex:
-  `.con-btn.con-trivial` gets a dashed border (solid again once picked, `.con-btn.con-trivial.
-  active`, matching every other con-btn's active look) rather than any change to the fill
-  color itself. Scoped to the interactive grid only, not the static `.con-pill` (kill-log rows
-  aren't a pick-the-right-one-fast situation the way the grid is).
-  **Palette status: provisional, under active re-check (2026-08-29)** — the Trivial/Green
-  collision above prompted the user to independently verify the real con hex values directly,
-  rather than relying on the crafting-palette reuse as final; wiki-claude has marked its own
-  copy "under active re-check" too. Don't treat the 6 hex values above as settled — real
-  numbers may still land. Already swap-friendly by construction: every hex lives in exactly
-  6 CSS rules (`.con-trivial`/`.con-green`/etc. right below), nothing inlined per-button, so an
-  update is a one-place edit here, not a UI rework.
+  **Colors themselves updated, final as of 2026-08-29** — the `.con-*` classes' actual hex
+  values used to be guessed pastels. Real path to today's values, kept for context since it
+  involved two dead ends worth not repeating: (1) asked wiki-claude for the wiki's real con
+  colors — it has none, con only ever renders as plain text there; (2) tried reusing the
+  wiki's crafting recipe-difficulty palette instead (sampled from crafting-window screenshots
+  — see the Crafting bullet under "Session types and fields" above), on the theory that con
+  and crafting share one palette — this held for 5 of the 7 tiers but was WRONG for
+  Trivial/Green specifically (crafting collapses them into one shared color, con's two are
+  actually distinct); (3) real fix was pixel-sampling Trivial/Green directly from actual
+  in-game con chat-text screenshots. **Final, all 7 confirmed**: Trivial `#82FF6E`, Green
+  `#009C00` (both real-sampled, NOT from the crafting palette), Light Blue `#00FCDF`, Dark
+  Blue `#326EFF`, White `#FFFFFF`, Yellow `#FCE800`, Red `#FF1C1C` (these five really do match
+  the crafting palette 1:1 — the mismatch was Trivial/Green-specific, not systemic). Crafting's
+  own Orange stays unused for con (no matching tier). Text color per swatch for contrast (dark
+  text on light swatches, white text on Dark Blue/Red/Green — Green is a fairly deep color, not
+  light enough for dark text the way the crafting-derived swatches are). Swap-friendly by
+  construction if a value ever needs correcting again: every hex lives in exactly 6 CSS rules
+  (`.con-trivial`/`.con-green`/etc. right below), nothing inlined per-button.
+  **Trivial/Green dashed-border differentiator — added, then removed same day**: briefly
+  needed while Trivial/Green shared one hex under the wrong crafting-palette theory (two
+  `.con-btn`s were visually identical apart from tiny text, a real pick-the-wrong-one risk,
+  reported via wiki-claude) — removed once real sampling gave them genuinely distinct colors,
+  since the problem it solved no longer exists.
 - **Level counter** (`#combat-level-box`, `renderCombatLevelBox()`/`bindCombatLevelEvents()`)
   — session-level `+`/`-`/type-in box mirroring Fishing/Gathering's skill counters, replacing
   the old per-kill level field. Explicit ask: the user updates this as they level, so `con`
