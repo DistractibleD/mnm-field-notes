@@ -811,6 +811,87 @@ document.getElementById('screenshot-modal-submit').addEventListener('click', () 
 });
 
 // ---------------------------------------------------------------------------
+// Combat: log a camp (2026-08-29, backlog #5's Camp half) - a spot where a
+// group of monsters spawns to fight, NOT a fishing spot or gathering node
+// (those already have their own wiki data/pages - see the modal's own
+// explainer text). Deliberately rides the EXISTING session-export pipeline
+// rather than a new dedicated submission (user's own call, after wiki-claude
+// and this session had converged on a separate Worker field first) - a camp
+// is just a sessionType:'camp' logEntry, printed as its own section by
+// SessionExportWriter.WriteCampBlock (src/SessionExport.cs) the next time
+// this session's export gets written/submitted. No auto-parsing on the wiki
+// side either - confirmed directly with wiki-claude that a submitted export
+// always gets read and decided on by a human/Claude, same trust model as
+// every other submission this app makes, never auto-folded into camps.json.
+// ---------------------------------------------------------------------------
+let campCustomMonsters = [];
+let campMonstersCtrl = null;
+
+function renderCampMonstersPicker(selected) {
+  const known = wikiData.monsters.map(m => m.name);
+  const all = [...known, ...campCustomMonsters.filter(m => !known.includes(m))];
+  document.getElementById('camp-monsters-picker').innerHTML = checklistDropdownHTML(
+    'camp-monsters', 'Pick monsters', all, { selected: selected || [] }
+  );
+  campMonstersCtrl = setupChecklistDropdown('camp-monsters');
+}
+
+function openLogCampModal() {
+  document.getElementById('camp-name').value = '';
+  document.getElementById('camp-zone').value = '';
+  document.getElementById('camp-area').value = '';
+  document.getElementById('camp-min-level').value = '';
+  document.getElementById('camp-max-level').value = '';
+  document.getElementById('camp-raid').checked = false;
+  document.getElementById('camp-note').value = '';
+  document.getElementById('camp-monster-new').value = '';
+  document.getElementById('camp-modal-err').textContent = '';
+  document.getElementById('camp-zone-list').innerHTML = wikiData.zones.map(z => `<option value="${escapeHtml(z)}"></option>`).join('');
+  campCustomMonsters = [];
+  renderCampMonstersPicker([]);
+  document.getElementById('log-camp-modal').classList.add('open');
+}
+
+document.getElementById('log-camp-btn').addEventListener('click', openLogCampModal);
+document.getElementById('camp-modal-cancel').addEventListener('click', () => {
+  document.getElementById('log-camp-modal').classList.remove('open');
+});
+document.getElementById('camp-monster-add-btn').addEventListener('click', () => {
+  const input = document.getElementById('camp-monster-new');
+  const name = input.value.trim();
+  if (!name) return;
+  const selected = campMonstersCtrl ? campMonstersCtrl.getSelected() : [];
+  if (!campCustomMonsters.includes(name)) campCustomMonsters.push(name);
+  input.value = '';
+  renderCampMonstersPicker([...selected, name]);
+});
+document.getElementById('camp-modal-save').addEventListener('click', () => {
+  const name = document.getElementById('camp-name').value.trim();
+  const zone = document.getElementById('camp-zone').value.trim();
+  const errEl = document.getElementById('camp-modal-err');
+  if (!name || !zone) {
+    errEl.textContent = 'Camp name and zone are both required.';
+    return;
+  }
+  errEl.textContent = '';
+  const minLevelRaw = document.getElementById('camp-min-level').value;
+  const maxLevelRaw = document.getElementById('camp-max-level').value;
+  const entry = {
+    name,
+    zone,
+    area: document.getElementById('camp-area').value.trim(),
+    minLevel: minLevelRaw ? Number(minLevelRaw) : null,
+    maxLevel: maxLevelRaw ? Number(maxLevelRaw) : null,
+    raid: document.getElementById('camp-raid').checked,
+    monsters: campMonstersCtrl ? campMonstersCtrl.getSelected() : [],
+    note: document.getElementById('camp-note').value.trim(),
+  };
+  sendToHost({ type: 'logEntry', sessionId: session.id, sessionType: 'camp', entry });
+  document.getElementById('log-camp-modal').classList.remove('open');
+  showToast('Camp logged — it\'ll go out with this session\'s export.');
+});
+
+// ---------------------------------------------------------------------------
 // Maps tab (2026-08-28, backlog #13) - a pan/zoom map viewer, ported from
 // the wiki's own #map-viewer (that repo's script.js/style.css) rather than
 // built fresh, since this project's own CLAUDE.md explicitly calls that out

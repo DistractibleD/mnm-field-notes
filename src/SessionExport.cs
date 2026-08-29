@@ -39,6 +39,7 @@ internal static class SessionExportWriter
             var groupList = typeGroup.ToList();
             if (typeGroup.Key == "harvesting") WriteHarvestingBlock(sb, groupList);
             else if (typeGroup.Key == "crafting") WriteCraftingBlock(sb, groupList);
+            else if (typeGroup.Key == "camp") WriteCampBlock(sb, groupList);
             else WriteCombatBlock(sb, groupList);
         }
 
@@ -138,6 +139,43 @@ internal static class SessionExportWriter
                 string componentsPart = components.Count > 0 ? " | Components: " + string.Join(", ", components) : "";
                 sb.AppendLine("- " + skillPart + "Difficulty: " + GetString(e, "difficultyColor") + " | Result: " + outcome + componentsPart);
             }
+            sb.AppendLine("");
+        }
+    }
+
+    // Combat camps only (a spot where a group of monsters spawns to fight,
+    // NOT a fishing spot or gathering node - those already have their own
+    // data). One block per logged camp, not grouped by name the way
+    // kills/harvests are - a camp submission already captures its full
+    // monster list in one go, so there's nothing to accumulate across
+    // multiple entries the way repeated kills of the same mob would.
+    // Header deliberately has no "(...)" tradeskill-shaped suffix (unlike
+    // Combat/Harvesting's own "== Name (N kills) =="/"== Name (Tradeskill) =="
+    // headers) - confirmed with wiki-claude directly that its Fishing-rarity
+    // parser only ever acts on a "(<tradeskill>)" match, so this format was
+    // chosen to structurally not resemble one, on top of "Camp" never
+    // literally matching "Fishing" either way.
+    private static void WriteCampBlock(StringBuilder sb, List<Dictionary<string, object>> entries)
+    {
+        foreach (var e in entries)
+        {
+            sb.AppendLine("== " + GetString(e, "name") + " ==");
+            string areaPart = string.IsNullOrEmpty(GetString(e, "area")) ? "" : " | Area: " + GetString(e, "area");
+            sb.AppendLine("Zone: " + GetString(e, "zone") + areaPart);
+
+            object minLevel = e.GetValueOrDefault("minLevel");
+            object maxLevel = e.GetValueOrDefault("maxLevel");
+            if (minLevel != null || maxLevel != null)
+            {
+                sb.AppendLine("Level range: " + (minLevel ?? "?") + "-" + (maxLevel ?? "?"));
+            }
+            if (GetBool(e, "raid")) sb.AppendLine("Raid camp");
+
+            var monsters = GetStringList(e, "monsters");
+            sb.AppendLine("Monsters: " + (monsters.Count > 0 ? string.Join(", ", monsters) : "none listed"));
+
+            string note = GetString(e, "note");
+            if (!string.IsNullOrEmpty(note)) sb.AppendLine("Note: " + note);
             sb.AppendLine("");
         }
     }

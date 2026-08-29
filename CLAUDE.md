@@ -827,6 +827,43 @@ the same explicit confirm-first treatment" reasoning — a cross-repo channel be
 relax that, if anything it raises the bar, since now two sessions could each be wrong in a
 way that looks locally consistent.
 
+## Combat: log a camp (2026-08-29, backlog #5's Camp half)
+
+A camp = a spot where a group of monsters spawns to fight — Combat-only, explicitly NOT
+fishing spots or gathering nodes (those already have their own wiki data/pages, confirmed
+directly with wiki-claude and the user before scoping this). `#log-camp-btn` ("+ Log a camp",
+full-width row at the top of `#combat-session-layout`'s grid) opens `#log-camp-modal` —
+camp name, zone (free text + datalist from `wikiData.zones`), area (optional), min/max level
+(optional, independent numbers), a monsters checklist (known wiki monster names + a "+ Add"
+custom-name fallback, same pattern as Gathering's node/material grids), a raid checkbox, and
+an optional note.
+
+**Deliberately rides the EXISTING session-export pipeline — no new submission mechanism, no
+Worker changes.** This was a real design fork: this session and wiki-claude had already
+converged on a dedicated new `campSubmission` Worker field landing in its own
+`camp-submissions/` folder, before the user picked the simpler path instead ("my plan was to
+use session.txt for all the tabs in the app that gathers information") — see "Cross-session
+agreement with wiki-claude" above for the fuller back-and-forth. A camp is just a
+`sessionType:'camp'` `logEntry` like anything else this app logs; `AllTimeLog`/
+`WebMessageRouter.HandleLogEntry` needed zero changes (already fully generic, per "Data
+model"). `SessionExportWriter.WriteCampBlock` (new, `src/SessionExport.cs`) prints each
+logged camp as its own `== <name> ==` block when the session gets exported — deliberately no
+`(<tradeskill>)`-style parenthetical in the header (unlike Combat's own `== <mob> (N kills)
+==` or Harvesting's `== <target> (<tradeskill>) ==`), confirmed directly with wiki-claude that
+its Fishing-rarity parser only acts on that exact shape, so Camps structurally can't collide
+with it even though "Camp" would never literally match "Fishing" either way. Only prints
+fields that are actually filled in (no "Level range" line when both are empty, no "Note" line
+when blank, "Monsters: none listed" as the explicit empty state) — verified by running the
+real `SessionExportWriter.Write` against seeded test data and sharing the exact output with
+wiki-claude before any real submission could happen.
+
+**Still entirely manual on the receiving end, by design** — nothing here parses the export
+text or touches `camps.json`. Wiki-claude reads a submitted export's Camps section the same
+way it already reads a session export today, and makes the new-camp-vs-update-existing-camp
+call by hand — matches this app's own "Guild data trust model" and wiki-claude's own
+explicit recommendation (every other submission channel that repo has already works this
+way; nothing auto-merges into curated data sight-unseen).
+
 ## Maps tab (2026-08-28, backlog #13) — pan/zoom viewer, ported from the wiki
 
 New top-level tab (`#panel-maps`, `renderMapsPanel()` in `app.js`). Grid of map cards

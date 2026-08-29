@@ -94,7 +94,7 @@ Still open:
   distributed zip explaining what's inside and why, for guild members who aren't the project
   owner.
 
-## 5. "Add info" contribution tab (2026-08-27)
+## 5. "Add info" contribution tab — Camp half done (2026-08-29), Named Monster still open
 
 User's own framing: unlike the wiki (screenshots only), let users add STRUCTURED data
 straight from the app — dropdowns, not free text, so it's consistent/parseable. Explicitly
@@ -139,15 +139,27 @@ item's shape:
   incrementally same as monsters.json. Explicitly a SEPARATE dataset from the wiki's existing
   Leveling Suggestions page (its own informal community-spreadsheet camp names) — don't
   cross-reference the two.
-- **No submission mechanism exists yet, on either side, and this is now a real open
-  question** — session exports/screenshots always add exactly ONE NEW file
-  (`session-exports/*.txt`, `images/Inbox/*`); a camp submission would need to APPEND one
-  object to an EXISTING array (`camps.json`), which doesn't map onto that pattern cleanly.
-  Wiki-claude flagged this explicitly as needing a three-way conversation (this app's
-  session, wiki-claude, the user) before either side builds against an assumed mechanism —
-  don't design the app's own submission flow for Camp until that's actually settled.
-- Zone-level min/max/avg (separate from Camp's own `minLevel`/`maxLevel`) is still an open
-  fork per the original scoping above — nothing from wiki-claude's answer changes that part.
+- **Submission mechanism — settled, and done (2026-08-29)**: this session and wiki-claude
+  first converged on a dedicated new Worker field (`campSubmission`, its own
+  `camp-submissions/` folder) to avoid the "append to an existing shared array" race-condition
+  risk a direct `camps.json` write would have. The user then picked a simpler path instead:
+  "my plan was to use session.txt for all the tabs in the app that gathers information" — so
+  Camp rides the EXISTING session-export pipeline, no Worker changes at all. Built: "+ Log a
+  camp" in Combat (`#log-camp-modal`) logs a `sessionType:'camp'` entry like anything else
+  this app logs; `SessionExportWriter.WriteCampBlock` prints it as its own section in the
+  export text. Full mechanism in `CLAUDE.md` "Combat: log a camp." Verified: real UI flow in
+  the browser preview (validation, monster picker incl. custom-add, all fields), and the real
+  `SessionExportWriter.Write` run against seeded test data — the actual output was shared with
+  wiki-claude before any real submission could happen, confirming the header format (no
+  `(<tradeskill>)` parenthetical) can't collide with its Fishing-rarity parser.
+- Still entirely manual on the receiving end, deliberately — nothing auto-parses the Camps
+  section or touches `camps.json`; wiki-claude reads it and decides new-vs-existing-camp by
+  hand, same trust model as every other submission this app makes.
+- **Still open**: the Named Monster half of this item was never touched by any of the above —
+  still just the original rough shape (level, free-text location, drops with autocomplete +
+  an "add item" fallback for unmatched drops), needs its own design pass. Zone-level min/max/
+  avg (a different thing from Camp's own per-camp `minLevel`/`maxLevel`) is also still an open
+  fork per the original scoping above.
 
 ## 6. ~~Combat landing info: regular monsters + zone level range~~ — done (2026-08-27)
 
@@ -169,11 +181,14 @@ Two additions were scoped to Combat's existing "browse a zone" landing section (
 - Let the user narrow Combat's landing browse from "whole zone" down to one camp within it.
   **Was blocked on real camp data existing at all — that structural half is now resolved**:
   the wiki built a real `camps.json` (2026-08-29, see backlog #5's own update and `CLAUDE.md`
-  "Cross-session agreement with wiki-claude" for the full schema). **Still practically blocked
-  though** — `camps.json` starts completely empty (`[]`), so there's nothing to actually
-  select from yet; it fills in incrementally as camps get submitted, which itself depends on
-  #5's still-unsettled submission mechanism. Check `camps.json` has real entries before
-  building this selector, not just that the file/schema exists.
+  "Cross-session agreement with wiki-claude" for the full schema), and #5's Camp submission
+  path is now fully built and shipped too (see #5's own "Camp half done" update). **Still
+  practically blocked, one step removed from where it was** — `camps.json` starts completely
+  empty (`[]`), so there's nothing to actually select from yet. It fills in from here purely
+  through real usage: the user has to actually log camps in-game, export/submit those
+  sessions, and wiki-claude has to manually review and fold each one into `camps.json` — no
+  more design/build work is blocking this, just real calendar time and actual play sessions.
+  Check `camps.json` has real entries before building this selector.
 - A dedicated "add camp or named" entry point reachable from the Combat tab specifically —
   this is #5 above, not a new feature (user's own words: "we already talked about this new
   feature"), just confirms Combat should be one of its entry points once #5 is built.

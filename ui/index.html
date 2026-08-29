@@ -138,6 +138,9 @@
     </div>
     <p class="landing-info-empty" id="combat-no-session-msg">Start a session (top bar) to begin logging kills.</p>
     <div class="layout" id="combat-session-layout" style="display:none;">
+      <div style="grid-column:1/-1; display:flex; justify-content:flex-end;">
+        <button class="secondary-btn" id="log-camp-btn" data-tip="Log a spot where a group of monsters spawns to fight - not a fishing spot or gathering node.">+ Log a camp</button>
+      </div>
       <div class="roster">
         <div class="roster-title">This session</div>
         <div class="roster-add">
@@ -346,6 +349,38 @@
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="primary-btn" id="screenshot-modal-submit" style="margin:0;">Submit</button>
       <button class="secondary-btn" id="screenshot-modal-cancel" style="margin:0;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="log-camp-modal">
+  <div class="modal-box">
+    <h2>Log a camp</h2>
+    <p style="font-size:13px; color:var(--text-secondary);">A spot where a group of monsters spawns to fight
+      &mdash; not a fishing spot or gathering node, those already have their own data. Goes out with this
+      session's export; nothing is added to the wiki until it's reviewed.</p>
+    <div class="field-grid">
+      <div><label>Camp name</label><input id="camp-name" placeholder="e.g. Corrupted Ashira Camp" /></div>
+      <div><label>Zone</label><input id="camp-zone" list="camp-zone-list" placeholder="Which zone" /><datalist id="camp-zone-list"></datalist></div>
+      <div><label>Area <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label><input id="camp-area" placeholder="More specific spot" /></div>
+      <div><label>Min level <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label><input type="number" id="camp-min-level" min="0" /></div>
+      <div><label>Max level <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label><input type="number" id="camp-max-level" min="0" /></div>
+    </div>
+    <label>Monsters here</label>
+    <div id="camp-monsters-picker"></div>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <input id="camp-monster-new" placeholder="Not listed? Type its name&hellip;" autocomplete="off" />
+      <button class="mini-btn" id="camp-monster-add-btn" style="padding:0 14px;">+ Add</button>
+    </div>
+    <label style="margin-top:10px; display:flex; align-items:center; gap:6px;">
+      <input type="checkbox" id="camp-raid" style="width:auto;" /> Raid camp
+    </label>
+    <label style="margin-top:10px;">Note <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+    <textarea id="camp-note" rows="2" placeholder="Anything worth calling out?" style="width:100%; resize:vertical; font-family:inherit; font-size:13.5px; padding:8px 10px; border-radius:6px; background:var(--bg-raised); border:1px solid var(--border-strong); color:var(--text-primary);"></textarea>
+    <div class="err" id="camp-modal-err"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="primary-btn" id="camp-modal-save" style="margin:0;">Log it</button>
+      <button class="secondary-btn" id="camp-modal-cancel" style="margin:0;">Cancel</button>
     </div>
   </div>
 </div>
