@@ -729,3 +729,29 @@ payload, count badges incrementing on repeat taps, the full Con/Loot → Add Loo
 with a real captured `editEntry` payload confirming con/coin/items all patched correctly, a
 custom monster's rename propagating to both the tap-grid and the kill log, and a clean
 roster/state reset on session end.
+
+## 28. Combat search: empty-state "add new monster" box (2026-08-29)
+
+User's own words: "When i search for a monster, instead of displaying a list, remove the
+monster buttons/boxes under the searchbar that does not match the search. And if no match is
+found only display a box called 'add new monster'."
+
+**Half of this already works today** - confirmed in the browser preview (2026-08-29): the
+search field's existing `.filtered-out` mechanism (`filterCombatBrowseArea()`, see "Combat:
+tap-first workflow" in `CLAUDE.md`) already fully HIDES non-matching buttons (`display:none`,
+not a dim/grey state) rather than showing a separate filtered list - this part is done,
+nothing to build.
+
+**Real gap confirmed, worth fixing**: when a search matches nothing, today's result is empty
+`"Camps here"` / `"Matches your level"` section boxes with their labels still showing but
+nothing underneath - not much better than a plain empty area, and not the explicit
+"add new monster" fallback asked for. Build: when `renderCombatBrowseArea()`'s monster section
+(or the live filtered state, post-search) has zero visible matches, show a single box/button
+instead of the empty labeled sections - "Add new monster" (or similar), pre-filled from the
+current search text, one tap away from `addCustomMonsterFromSearch()`'s existing behavior
+(already wired to the `+` button) rather than requiring a separate click on `+`. Needs a
+decision: does this replace the `+` button entirely once there's no match, or sit alongside
+it? Also worth deciding whether camps get their own similar "no camps match" treatment or
+just silently stay empty (a zone can genuinely have zero known camps, which isn't really an
+"add a camp" situation - camps are wiki-curated data, not something this tap area lets you
+add ad-hoc the way custom monsters work).
